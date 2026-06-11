@@ -15,4 +15,10 @@ export type GameEvent =
   | { type: "itemPlayed"; player: PlayerId; cardId: string; cost: number }
   | { type: "weaponEquipped"; player: PlayerId; cardId: string; warriorInstanceId: string; cost: number }
   /** The card resolved with no effect — it needs a coded handler later. */
-  | { type: "effectNotImplemented"; player: PlayerId; cardId: string };
+  | { type: "effectNotImplemented"; player: PlayerId; cardId: string }
+  | { type: "warriorAttacked"; player: PlayerId; attackerInstanceId: string; defenderInstanceId: string; damage: number }
+  /** player = the destroyed Warrior's owner. */
+  | { type: "warriorDestroyed"; player: PlayerId; instanceId: string; cardId: string }
+  | { type: "weaponDestroyed"; player: PlayerId; cardId: string; warriorInstanceId: string }
+  | { type: "directAttacked"; player: PlayerId; attackerInstanceId: string; livesRemaining: number }
+  | { type: "gameWon"; winner: PlayerId };

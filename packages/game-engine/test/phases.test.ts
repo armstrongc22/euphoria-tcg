@@ -48,20 +48,6 @@ describe("phase gates", () => {
     expect(actions).toContainEqual({ kind: "endTurn" });
   });
 
-  it("rejects not-yet-implemented actions with NOT_IMPLEMENTED", () => {
-    const game = createGame({ decks: makeDecks(), seed: 1 });
-    const result = applyAction(game, {
-      kind: "attack",
-      attackerInstanceId: "a",
-      defenderInstanceId: "b",
-    });
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.code).toBe("NOT_IMPLEMENTED");
-    }
-  });
-
   it("rejects every action and offers none once a winner is set", () => {
     const game = createGame({ decks: makeDecks(), seed: 1 });
     game.winner = "player1";

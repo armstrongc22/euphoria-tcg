@@ -1,5 +1,5 @@
-import { runEndPhase } from "./turn";
-import type { GameAction, GameState, WarriorInPlay } from "./types";
+import { opponentOf, runEndPhase } from "./turn";
+import type { GameAction, GameState, PlayerId, WarriorInPlay } from "./types";
 
 export type EngineErrorCode =
   | "WRONG_PHASE"
@@ -10,7 +10,11 @@ export type EngineErrorCode =
   | "INSUFFICIENT_SPIRIT"
   | "FIELD_FULL"
   | "WARRIOR_NOT_FOUND"
-  | "WEAPON_ALREADY_EQUIPPED";
+  | "WEAPON_ALREADY_EQUIPPED"
+  | "FIRST_TURN_NO_ATTACKS"
+  | "WARRIOR_EXHAUSTED"
+  | "OPPONENT_HAS_WARRIORS"
+  | "DIRECT_ATTACK_LIMIT";
 
 export interface EngineError {
   code: EngineErrorCode;
@@ -41,6 +45,10 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
       return playItem(state, action.cardId);
     case "equipWeapon":
       return equipWeapon(state, action.cardId, action.warriorInstanceId);
+    case "attack":
+      return attackWarrior(state, action);
+    case "directAttack":
+      return directAttack(state, action.attackerInstanceId);
 
     case "enterBattle": {
       if (state.phase !== "main") {
@@ -70,9 +78,170 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     default:
       return fail(
         "NOT_IMPLEMENTED",
-        `Action "${action.kind}" is not implemented yet (combat arrives in a later step).`,
+        `Action "${(action as GameAction).kind}" is not implemented yet.`,
       );
   }
+}
+
+/** Shared gates for declaring any attack with one of your Warriors. */
+function validateAttacker(
+  state: GameState,
+  attackerInstanceId: string,
+): { attacker: WarriorInPlay } | { error: ActionResult } {
+  if (state.phase !== "battle") {
+    return {
+      error: fail(
+        "WRONG_PHASE",
+        `Attacks can only be declared in Battle Phase (current: ${state.phase}).`,
+      ),
+    };
+  }
+  if (state.config.noAttacksOnFirstTurn && state.turn === 1) {
+    return {
+      error: fail(
+        "FIRST_TURN_NO_ATTACKS",
+        "No attacks are allowed on the first turn of the game.",
+      ),
+    };
+  }
+  const attacker = state.players[state.activePlayer].field.find(
+    (w) => w.instanceId === attackerInstanceId,
+  );
+  if (attacker === undefined) {
+    return {
+      error: fail(
+        "WARRIOR_NOT_FOUND",
+        `${state.activePlayer} controls no Warrior "${attackerInstanceId}".`,
+      ),
+    };
+  }
+  if (attacker.exhausted) {
+    return {
+      error: fail(
+        "WARRIOR_EXHAUSTED",
+        `${attacker.card.name} has already attacked this turn.`,
+      ),
+    };
+  }
+  return { attacker };
+}
+
+/** Removes a Warrior from the field; it and any attached Weapon go to the Out Deck. */
+function destroyWarrior(
+  state: GameState,
+  ownerId: PlayerId,
+  instanceId: string,
+): void {
+  const owner = state.players[ownerId];
+  const index = owner.field.findIndex((w) => w.instanceId === instanceId);
+  if (index === -1) return;
+  const warrior = owner.field[index]!;
+  owner.field.splice(index, 1);
+
+  owner.outDeck.push(warrior.card);
+  state.events.push({
+    type: "warriorDestroyed",
+    player: ownerId,
+    instanceId,
+    cardId: warrior.card.id,
+  });
+  if (warrior.attachedWeapon !== undefined) {
+    owner.outDeck.push(warrior.attachedWeapon);
+    state.events.push({
+      type: "weaponDestroyed",
+      player: ownerId,
+      cardId: warrior.attachedWeapon.id,
+      warriorInstanceId: instanceId,
+    });
+  }
+}
+
+function attackWarrior(
+  state: GameState,
+  action: Extract<GameAction, { kind: "attack" }>,
+): ActionResult {
+  if (action.attackCardIds !== undefined && action.attackCardIds.length > 0) {
+    return fail("NOT_IMPLEMENTED", "Attack cards are not implemented yet.");
+  }
+  const gate = validateAttacker(state, action.attackerInstanceId);
+  if ("error" in gate) return gate.error;
+
+  const opponentId = opponentOf(state.activePlayer);
+  const defenderExists = state.players[opponentId].field.some(
+    (w) => w.instanceId === action.defenderInstanceId,
+  );
+  if (!defenderExists) {
+    return fail(
+      "WARRIOR_NOT_FOUND",
+      `${opponentId} controls no Warrior "${action.defenderInstanceId}" to attack.`,
+    );
+  }
+
+  const next = structuredClone(state);
+  const attacker = next.players[next.activePlayer].field.find(
+    (w) => w.instanceId === action.attackerInstanceId,
+  )!;
+  const defender = next.players[opponentId].field.find(
+    (w) => w.instanceId === action.defenderInstanceId,
+  )!;
+
+  // The attacker takes no counter damage (CLAUDE.md overrides the spec's
+  // "simultaneous" wording; see RulesConfig.combatDamageSimultaneous).
+  const damage = attacker.currentAttack;
+  defender.currentHealth -= damage;
+  attacker.exhausted = true;
+  next.events.push({
+    type: "warriorAttacked",
+    player: next.activePlayer,
+    attackerInstanceId: attacker.instanceId,
+    defenderInstanceId: defender.instanceId,
+    damage,
+  });
+
+  if (defender.currentHealth <= 0) {
+    destroyWarrior(next, opponentId, defender.instanceId);
+  }
+  return { ok: true, state: next };
+}
+
+function directAttack(state: GameState, attackerInstanceId: string): ActionResult {
+  const gate = validateAttacker(state, attackerInstanceId);
+  if ("error" in gate) return gate.error;
+
+  const opponentId = opponentOf(state.activePlayer);
+  if (state.players[opponentId].field.length > 0) {
+    return fail(
+      "OPPONENT_HAS_WARRIORS",
+      "Direct attacks are only allowed when the opponent controls no Warriors.",
+    );
+  }
+  if (state.players[state.activePlayer].directAttackUsedThisTurn) {
+    return fail(
+      "DIRECT_ATTACK_LIMIT",
+      `Only ${state.config.directAttackLimitPerTurn} direct attack is allowed per turn.`,
+    );
+  }
+
+  const next = structuredClone(state);
+  const player = next.players[next.activePlayer];
+  const opponent = next.players[opponentId];
+  const attacker = player.field.find((w) => w.instanceId === attackerInstanceId)!;
+
+  attacker.exhausted = true;
+  player.directAttackUsedThisTurn = true;
+  opponent.lives -= 1;
+  next.events.push({
+    type: "directAttacked",
+    player: player.id,
+    attackerInstanceId,
+    livesRemaining: opponent.lives,
+  });
+
+  if (opponent.lives <= 0) {
+    next.winner = player.id;
+    next.events.push({ type: "gameWon", winner: player.id });
+  }
+  return { ok: true, state: next };
 }
 
 /**
@@ -273,6 +442,31 @@ export function getLegalActions(state: GameState): GameAction[] {
       }
     }
     actions.push({ kind: "enterBattle" });
+  }
+  if (state.phase === "battle") {
+    const player = state.players[state.activePlayer];
+    const opponent = state.players[opponentOf(state.activePlayer)];
+    const attacksAllowed = !(
+      state.config.noAttacksOnFirstTurn && state.turn === 1
+    );
+    if (attacksAllowed) {
+      for (const attacker of player.field) {
+        if (attacker.exhausted) continue;
+        for (const defender of opponent.field) {
+          actions.push({
+            kind: "attack",
+            attackerInstanceId: attacker.instanceId,
+            defenderInstanceId: defender.instanceId,
+          });
+        }
+        if (opponent.field.length === 0 && !player.directAttackUsedThisTurn) {
+          actions.push({
+            kind: "directAttack",
+            attackerInstanceId: attacker.instanceId,
+          });
+        }
+      }
+    }
   }
   if (state.phase === "main" || state.phase === "battle") {
     actions.push({ kind: "endTurn" });
