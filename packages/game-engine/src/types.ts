@@ -1,38 +1,70 @@
-/**
- * Placeholder types for the Euphoria rules engine. No game logic lives here
- * yet; these shapes encode the current rules so the engine can be built
- * against them incrementally (with tests for every rules change).
- */
 import type { Card } from "@euphoria/card-data";
+import type { GameEvent } from "./events";
 
 export type PlayerId = "player1" | "player2";
 
-/** Spirit gain happens at start of turn, before draw. */
-export type Phase = "start" | "draw" | "main" | "battle" | "end";
+export const PLAYER_IDS: readonly PlayerId[] = ["player1", "player2"];
 
+/**
+ * Phases per docs/rules-spec.md. The draw happens inside the Start Phase
+ * (Spirit gain first, then draw). "start" and "end" only exist transiently
+ * while the engine resolves them; between actions the game rests in "main"
+ * or "battle".
+ */
+export type Phase = "start" | "main" | "battle" | "end";
+
+/** Ported from DEFAULT_RULES in the archived Python engine. */
 export interface RulesConfig {
   /** 30 */
   deckSize: number;
   /** 5 */
   startingHandSize: number;
-  /** 1 */
+  /** 1 — the start-of-turn gain also fires on turn 1, so P1 begins play at 2 */
   startingSpirit: number;
+  /** 1, gained at the start of turn before drawing */
+  spiritGainPerTurn: number;
+  /** null = uncapped */
+  maxSpirit: number | null;
   /** 3 */
   startingLives: number;
-  /** 1 — direct attacks allowed per turn */
+  /** 5 — Python engine value, adopted per project decision */
+  warriorSlots: number;
+  noAttacksOnFirstTurn: boolean;
+  /** 1 */
   directAttackLimitPerTurn: number;
+  warriorsCanAttackTurnSummoned: boolean;
+  /** false — attacker takes no counter damage (CLAUDE.md overrides the spec) */
+  combatDamageSimultaneous: boolean;
+  /** false — Attack cards are never offered on direct attacks */
+  attackCardsOnDirectAttacks: boolean;
+  oneWeaponPerWarrior: boolean;
 }
 
+/** Python engine's "temporary_attack_buffs" status; expires at the start of the owner's next turn. */
+export interface TemporaryAttackBuff {
+  amount: number;
+}
+
+/** Python engine's Permanent: a Warrior on the field. */
 export interface WarriorInPlay {
   /** Unique per game so duplicate cards on the field stay distinguishable. */
   instanceId: string;
   card: Card;
+  currentAttack: number;
+  currentHealth: number;
+  maxHealth: number;
+  /** Set when the Warrior attacks; cleared at the start of the owner's turn. */
+  exhausted: boolean;
   /** One Weapon per Warrior; it cannot be replaced or moved and dies with the Warrior. */
   attachedWeapon?: Card;
-  damageTaken: number;
-  /** Warriors may attack the turn they are summoned. */
-  summonedThisTurn: boolean;
-  hasAttackedThisTurn: boolean;
+  temporaryAttackBuffs: TemporaryAttackBuff[];
+}
+
+export interface DelayedEffect {
+  type: "gainSpirit";
+  amount: number;
+  /** Decremented at the start of the owner's turn; resolves when it reaches 0. */
+  turnsRemaining: number;
 }
 
 export interface PlayerState {
@@ -44,23 +76,27 @@ export interface PlayerState {
   field: WarriorInPlay[];
   /** Used Items/Attacks and destroyed Warriors/Weapons. */
   outDeck: Card[];
-  directAttacksThisTurn: number;
+  directAttackUsedThisTurn: boolean;
+  delayedEffects: DelayedEffect[];
 }
 
 export interface GameState {
+  config: RulesConfig;
   turn: number;
   activePlayer: PlayerId;
   phase: Phase;
   players: Record<PlayerId, PlayerState>;
-  /** Once the battle stage begins, Items and Weapons cannot be played. */
-  battleStageStarted: boolean;
+  winner: PlayerId | null;
+  /** Append-only structured log (the Python engine's print-based log). */
+  events: GameEvent[];
 }
 
 export type GameAction =
   | { kind: "playWarrior"; cardId: string }
-  | { kind: "playItem"; cardId: string }
-  | { kind: "playAttack"; cardId: string; targetInstanceId?: string }
+  | { kind: "playItem"; cardId: string; targetPlayer?: PlayerId; targetInstanceId?: string }
   | { kind: "equipWeapon"; cardId: string; warriorInstanceId: string }
-  /** No defender = direct attack (only legal if opponent has no Warriors). */
-  | { kind: "attack"; attackerInstanceId: string; defenderInstanceId?: string }
+  /** Attack cards are declared up front (no interactive prompt in the engine). */
+  | { kind: "attack"; attackerInstanceId: string; defenderInstanceId: string; attackCardIds?: string[] }
+  | { kind: "directAttack"; attackerInstanceId: string }
+  | { kind: "enterBattle" }
   | { kind: "endTurn" };
