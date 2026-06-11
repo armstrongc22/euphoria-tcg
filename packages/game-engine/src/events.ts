@@ -23,4 +23,7 @@ export type GameEvent =
   | { type: "warriorDestroyed"; player: PlayerId; instanceId: string; cardId: string }
   | { type: "weaponDestroyed"; player: PlayerId; cardId: string; warriorInstanceId: string }
   | { type: "directAttacked"; player: PlayerId; attackerInstanceId: string; livesRemaining: number }
-  | { type: "gameWon"; winner: PlayerId };
+  | { type: "gameWon"; winner: PlayerId }
+  | { type: "effectResolved"; player: PlayerId; cardId: string; effectCode: string }
+  | { type: "warriorAttackModified"; player: PlayerId; instanceId: string; amount: number; newAttack: number }
+  | { type: "warriorHealthModified"; player: PlayerId; instanceId: string; amount: number; newHealth: number };

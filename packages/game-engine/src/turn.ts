@@ -42,6 +42,36 @@ export function drawCards(
   }
 }
 
+/** Removes a Warrior from the field; it and any attached Weapon go to the Out Deck. */
+export function destroyWarrior(
+  state: GameState,
+  ownerId: PlayerId,
+  instanceId: string,
+): void {
+  const owner = state.players[ownerId];
+  const index = owner.field.findIndex((w) => w.instanceId === instanceId);
+  if (index === -1) return;
+  const warrior = owner.field[index]!;
+  owner.field.splice(index, 1);
+
+  owner.outDeck.push(warrior.card);
+  state.events.push({
+    type: "warriorDestroyed",
+    player: ownerId,
+    instanceId,
+    cardId: warrior.card.id,
+  });
+  if (warrior.attachedWeapon !== undefined) {
+    owner.outDeck.push(warrior.attachedWeapon);
+    state.events.push({
+      type: "weaponDestroyed",
+      player: ownerId,
+      cardId: warrior.attachedWeapon.id,
+      warriorInstanceId: instanceId,
+    });
+  }
+}
+
 /**
  * Full Start Phase for the active player, ending in Main. Order ported from
  * the Python engine's start_turn: refresh -> expire buffs -> delayed effects

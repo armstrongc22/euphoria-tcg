@@ -1,6 +1,7 @@
 import type { Card } from "@euphoria/card-data";
-import { opponentOf, runEndPhase } from "./turn";
-import type { GameAction, GameState, PlayerId, WarriorInPlay } from "./types";
+import { defaultEffectRegistry, type EffectRegistry } from "./effects";
+import { destroyWarrior, opponentOf, runEndPhase } from "./turn";
+import type { GameAction, GameState, WarriorInPlay } from "./types";
 
 export type EngineErrorCode =
   | "WRONG_PHASE"
@@ -36,7 +37,11 @@ function fail(code: EngineErrorCode, message: string): ActionResult {
  * Pure action reducer: validates, then returns a new state (the input state
  * is never mutated). Illegal actions return a typed error instead of throwing.
  */
-export function applyAction(state: GameState, action: GameAction): ActionResult {
+export function applyAction(
+  state: GameState,
+  action: GameAction,
+  effects: EffectRegistry = defaultEffectRegistry,
+): ActionResult {
   if (state.winner !== null) {
     return fail("GAME_OVER", `The game is over; ${state.winner} won.`);
   }
@@ -49,7 +54,7 @@ export function applyAction(state: GameState, action: GameAction): ActionResult 
     case "equipWeapon":
       return equipWeapon(state, action.cardId, action.warriorInstanceId);
     case "attack":
-      return attackWarrior(state, action);
+      return attackWarrior(state, action, effects);
     case "directAttack":
       return directAttack(state, action.attackerInstanceId);
 
@@ -129,36 +134,6 @@ function validateAttacker(
   return { attacker };
 }
 
-/** Removes a Warrior from the field; it and any attached Weapon go to the Out Deck. */
-function destroyWarrior(
-  state: GameState,
-  ownerId: PlayerId,
-  instanceId: string,
-): void {
-  const owner = state.players[ownerId];
-  const index = owner.field.findIndex((w) => w.instanceId === instanceId);
-  if (index === -1) return;
-  const warrior = owner.field[index]!;
-  owner.field.splice(index, 1);
-
-  owner.outDeck.push(warrior.card);
-  state.events.push({
-    type: "warriorDestroyed",
-    player: ownerId,
-    instanceId,
-    cardId: warrior.card.id,
-  });
-  if (warrior.attachedWeapon !== undefined) {
-    owner.outDeck.push(warrior.attachedWeapon);
-    state.events.push({
-      type: "weaponDestroyed",
-      player: ownerId,
-      cardId: warrior.attachedWeapon.id,
-      warriorInstanceId: instanceId,
-    });
-  }
-}
-
 /**
  * An Attack card is compatible only with Warriors of its own faction.
  * Neutral Attack cards are not compatible with anyone unless the card data
@@ -199,6 +174,7 @@ export function getCompatibleAttackCards(
 function attackWarrior(
   state: GameState,
   action: Extract<GameAction, { kind: "attack" }>,
+  effects: EffectRegistry,
 ): ActionResult {
   const gate = validateAttacker(state, action.attackerInstanceId);
   if ("error" in gate) return gate.error;
@@ -260,7 +236,7 @@ function attackWarrior(
     }
   }
 
-  const next = structuredClone(state);
+  let next = structuredClone(state);
 
   if (action.selectedAttackCardId !== undefined) {
     const player = next.players[next.activePlayer];
@@ -278,36 +254,51 @@ function attackWarrior(
       attackerInstanceId: action.attackerInstanceId,
       cost: card.cost,
     });
-    // Attack card effects are not resolved yet: damage is unmodified and
-    // the card is marked as pending a coded handler.
-    next.events.push({
-      type: "effectNotImplemented",
-      player: player.id,
-      cardId: card.id,
+
+    // Resolve the card's effect before combat damage. An unknown or failed
+    // effect never aborts the attack or corrupts state: the cost stays paid
+    // (per project decision) and the card is marked as pending a handler.
+    const resolution = effects.resolve(next, card, {
+      player: next.activePlayer,
+      attackerInstanceId: action.attackerInstanceId,
+      defenderInstanceId: action.defenderInstanceId,
     });
+    if (resolution.outcome.resolved) {
+      next = resolution.state;
+    } else {
+      next.events.push({
+        type: "effectNotImplemented",
+        player: player.id,
+        cardId: card.id,
+      });
+    }
   }
+
+  // Re-find both Warriors: the effect may have destroyed the defender.
   const attacker = next.players[next.activePlayer].field.find(
     (w) => w.instanceId === action.attackerInstanceId,
-  )!;
+  );
   const defender = next.players[opponentId].field.find(
     (w) => w.instanceId === action.defenderInstanceId,
-  )!;
-
-  // The attacker takes no counter damage (CLAUDE.md overrides the spec's
-  // "simultaneous" wording; see RulesConfig.combatDamageSimultaneous).
-  const damage = attacker.currentAttack;
-  defender.currentHealth -= damage;
-  attacker.exhausted = true;
-  next.events.push({
-    type: "warriorAttacked",
-    player: next.activePlayer,
-    attackerInstanceId: attacker.instanceId,
-    defenderInstanceId: defender.instanceId,
-    damage,
-  });
-
-  if (defender.currentHealth <= 0) {
-    destroyWarrior(next, opponentId, defender.instanceId);
+  );
+  if (attacker !== undefined) {
+    attacker.exhausted = true;
+  }
+  if (attacker !== undefined && defender !== undefined) {
+    // The attacker takes no counter damage (CLAUDE.md overrides the spec's
+    // "simultaneous" wording; see RulesConfig.combatDamageSimultaneous).
+    const damage = attacker.currentAttack;
+    defender.currentHealth -= damage;
+    next.events.push({
+      type: "warriorAttacked",
+      player: next.activePlayer,
+      attackerInstanceId: attacker.instanceId,
+      defenderInstanceId: defender.instanceId,
+      damage,
+    });
+    if (defender.currentHealth <= 0) {
+      destroyWarrior(next, opponentId, defender.instanceId);
+    }
   }
   return { ok: true, state: next };
 }

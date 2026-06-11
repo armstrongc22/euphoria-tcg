@@ -14,7 +14,18 @@ export type { GameEvent } from "./events";
 export { DEFAULT_RULES } from "./config";
 export { createRng, shuffleCards } from "./rng";
 export { createGame, type CreateGameOptions } from "./setup";
-export { opponentOf } from "./turn";
+export { destroyWarrior, opponentOf } from "./turn";
+export {
+  EffectRegistry,
+  createDefaultEffectRegistry,
+  defaultEffectRegistry,
+  normalizeEffectCode,
+  type EffectContext,
+  type EffectHandler,
+  type EffectOutcome,
+  type EffectParams,
+  type EffectResolution,
+} from "./effects";
 export {
   applyAction,
   getCompatibleAttackCards,
