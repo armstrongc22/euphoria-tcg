@@ -70,6 +70,29 @@ export function makeWeaponCard(overrides: Partial<Card> = {}): Card {
   };
 }
 
+export function makeAttackCard(
+  faction: Card["faction"] = "Dwarf",
+  overrides: Partial<Card> = {},
+): Card {
+  counter += 1;
+  const slug = `test-attack-${counter}`;
+  return {
+    id: `test_attack_${counter}`,
+    slug,
+    name: `Test Attack ${counter}`,
+    faction,
+    type: "Attack",
+    spiritCost: 1,
+    costResource: "Spirit",
+    rulesText: "Test attack effect.",
+    imageFile: `${faction.toLowerCase()}/${slug}.png`,
+    rarity: "Beta",
+    cost: 1,
+    effectText: "Test attack effect.",
+    ...overrides,
+  };
+}
+
 export function makeDeck(size = 30): Card[] {
   return Array.from({ length: size }, () => makeWarriorCard());
 }

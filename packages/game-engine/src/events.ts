@@ -16,6 +16,8 @@ export type GameEvent =
   | { type: "weaponEquipped"; player: PlayerId; cardId: string; warriorInstanceId: string; cost: number }
   /** The card resolved with no effect — it needs a coded handler later. */
   | { type: "effectNotImplemented"; player: PlayerId; cardId: string }
+  /** Cost paid and card moved to the Out Deck; its effect is still pending a handler. */
+  | { type: "attackCardUsed"; player: PlayerId; cardId: string; attackerInstanceId: string; cost: number }
   | { type: "warriorAttacked"; player: PlayerId; attackerInstanceId: string; defenderInstanceId: string; damage: number }
   /** player = the destroyed Warrior's owner. */
   | { type: "warriorDestroyed"; player: PlayerId; instanceId: string; cardId: string }

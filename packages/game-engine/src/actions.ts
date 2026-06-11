@@ -1,3 +1,4 @@
+import type { Card } from "@euphoria/card-data";
 import { opponentOf, runEndPhase } from "./turn";
 import type { GameAction, GameState, PlayerId, WarriorInPlay } from "./types";
 
@@ -14,7 +15,9 @@ export type EngineErrorCode =
   | "FIRST_TURN_NO_ATTACKS"
   | "WARRIOR_EXHAUSTED"
   | "OPPONENT_HAS_WARRIORS"
-  | "DIRECT_ATTACK_LIMIT";
+  | "DIRECT_ATTACK_LIMIT"
+  | "ATTACK_CARD_CHOICE_REQUIRED"
+  | "ATTACK_CARD_INCOMPATIBLE";
 
 export interface EngineError {
   code: EngineErrorCode;
@@ -156,13 +159,47 @@ function destroyWarrior(
   }
 }
 
+/**
+ * An Attack card is compatible only with Warriors of its own faction.
+ * Neutral Attack cards are not compatible with anyone unless the card data
+ * explicitly allows it — no field grants that today (the current set has no
+ * Neutral Attack cards), so this is the single place to extend if one lands.
+ */
+export function isAttackCardCompatible(
+  card: Card,
+  attackerFaction: Card["faction"],
+): boolean {
+  return card.type === "Attack" && card.faction === attackerFaction;
+}
+
+/**
+ * Compatible AND usable right now: in the active player's hand, same
+ * faction as the attacker, and affordable. Deduped by card id.
+ */
+export function getCompatibleAttackCards(
+  state: GameState,
+  attackerInstanceId: string,
+): Card[] {
+  const player = state.players[state.activePlayer];
+  const attacker = player.field.find((w) => w.instanceId === attackerInstanceId);
+  if (attacker === undefined) return [];
+
+  const seen = new Set<string>();
+  const compatible: Card[] = [];
+  for (const card of player.hand) {
+    if (seen.has(card.id)) continue;
+    seen.add(card.id);
+    if (!isAttackCardCompatible(card, attacker.card.faction)) continue;
+    if (card.cost > player.spirit) continue;
+    compatible.push(card);
+  }
+  return compatible;
+}
+
 function attackWarrior(
   state: GameState,
   action: Extract<GameAction, { kind: "attack" }>,
 ): ActionResult {
-  if (action.attackCardIds !== undefined && action.attackCardIds.length > 0) {
-    return fail("NOT_IMPLEMENTED", "Attack cards are not implemented yet.");
-  }
   const gate = validateAttacker(state, action.attackerInstanceId);
   if ("error" in gate) return gate.error;
 
@@ -177,7 +214,78 @@ function attackWarrior(
     );
   }
 
+  if (action.selectedAttackCardId !== undefined && action.skipAttackCard === true) {
+    return fail(
+      "ATTACK_CARD_CHOICE_REQUIRED",
+      "Provide either selectedAttackCardId or skipAttackCard: true, not both.",
+    );
+  }
+
+  // The attack-card window: a choice is required only when one is usable.
+  if (
+    action.selectedAttackCardId === undefined &&
+    action.skipAttackCard !== true &&
+    getCompatibleAttackCards(state, action.attackerInstanceId).length > 0
+  ) {
+    return fail(
+      "ATTACK_CARD_CHOICE_REQUIRED",
+      "A compatible Attack card is available: select it with selectedAttackCardId or pass skipAttackCard: true.",
+    );
+  }
+
+  if (action.selectedAttackCardId !== undefined) {
+    const player = state.players[state.activePlayer];
+    const card = player.hand.find((c) => c.id === action.selectedAttackCardId);
+    if (card === undefined) {
+      return fail(
+        "CARD_NOT_IN_HAND",
+        `${player.id} has no card "${action.selectedAttackCardId}" in hand.`,
+      );
+    }
+    if (card.type !== "Attack") {
+      return fail("WRONG_CARD_TYPE", `${card.name} is not an Attack card.`);
+    }
+    const attackerFaction = gate.attacker.card.faction;
+    if (!isAttackCardCompatible(card, attackerFaction)) {
+      return fail(
+        "ATTACK_CARD_INCOMPATIBLE",
+        `${card.name} (${card.faction}) is not compatible with a ${attackerFaction} Warrior. Attack cards must match the attacker's faction.`,
+      );
+    }
+    if (player.spirit < card.cost) {
+      return fail(
+        "INSUFFICIENT_SPIRIT",
+        `${card.name} costs ${card.cost} Spirit; ${player.id} has ${player.spirit}.`,
+      );
+    }
+  }
+
   const next = structuredClone(state);
+
+  if (action.selectedAttackCardId !== undefined) {
+    const player = next.players[next.activePlayer];
+    const handIndex = player.hand.findIndex(
+      (c) => c.id === action.selectedAttackCardId,
+    );
+    const card = player.hand[handIndex]!;
+    player.spirit -= card.cost;
+    player.hand.splice(handIndex, 1);
+    player.outDeck.push(card);
+    next.events.push({
+      type: "attackCardUsed",
+      player: player.id,
+      cardId: card.id,
+      attackerInstanceId: action.attackerInstanceId,
+      cost: card.cost,
+    });
+    // Attack card effects are not resolved yet: damage is unmodified and
+    // the card is marked as pending a coded handler.
+    next.events.push({
+      type: "effectNotImplemented",
+      player: player.id,
+      cardId: card.id,
+    });
+  }
   const attacker = next.players[next.activePlayer].field.find(
     (w) => w.instanceId === action.attackerInstanceId,
   )!;
@@ -452,12 +560,30 @@ export function getLegalActions(state: GameState): GameAction[] {
     if (attacksAllowed) {
       for (const attacker of player.field) {
         if (attacker.exhausted) continue;
+        const attackCards = getCompatibleAttackCards(state, attacker.instanceId);
         for (const defender of opponent.field) {
-          actions.push({
-            kind: "attack",
-            attackerInstanceId: attacker.instanceId,
-            defenderInstanceId: defender.instanceId,
-          });
+          if (attackCards.length === 0) {
+            actions.push({
+              kind: "attack",
+              attackerInstanceId: attacker.instanceId,
+              defenderInstanceId: defender.instanceId,
+            });
+          } else {
+            for (const card of attackCards) {
+              actions.push({
+                kind: "attack",
+                attackerInstanceId: attacker.instanceId,
+                defenderInstanceId: defender.instanceId,
+                selectedAttackCardId: card.id,
+              });
+            }
+            actions.push({
+              kind: "attack",
+              attackerInstanceId: attacker.instanceId,
+              defenderInstanceId: defender.instanceId,
+              skipAttackCard: true,
+            });
+          }
         }
         if (opponent.field.length === 0 && !player.directAttackUsedThisTurn) {
           actions.push({

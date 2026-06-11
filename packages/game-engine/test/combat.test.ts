@@ -194,18 +194,6 @@ describe("Warrior vs Warrior combat", () => {
     expectError(state, attack(attacker, friendly), "WARRIOR_NOT_FOUND");
   });
 
-  it("rejects declared attack cards until they are implemented", () => {
-    const game = turnTwo();
-    const attacker = putWarriorOnField(game, "player2");
-    const defender = putWarriorOnField(game, "player1");
-    const state = mustApply(game, { kind: "enterBattle" });
-
-    expectError(
-      state,
-      { ...attack(attacker, defender), attackCardIds: ["some_attack"] } as GameAction,
-      "NOT_IMPLEMENTED",
-    );
-  });
 });
 
 describe("direct attacks", () => {

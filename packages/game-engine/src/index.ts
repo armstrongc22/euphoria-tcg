@@ -17,7 +17,9 @@ export { createGame, type CreateGameOptions } from "./setup";
 export { opponentOf } from "./turn";
 export {
   applyAction,
+  getCompatibleAttackCards,
   getLegalActions,
+  isAttackCardCompatible,
   type ActionResult,
   type EngineError,
   type EngineErrorCode,

@@ -97,8 +97,19 @@ export type GameAction =
   | { kind: "playWarrior"; cardId: string }
   | { kind: "playItem"; cardId: string; targetPlayer?: PlayerId; targetInstanceId?: string }
   | { kind: "equipWeapon"; cardId: string; warriorInstanceId: string }
-  /** Attack cards are declared up front (no interactive prompt in the engine). */
-  | { kind: "attack"; attackerInstanceId: string; defenderInstanceId: string; attackCardIds?: string[] }
+  /**
+   * If the attacking player holds a compatible (same-faction, affordable)
+   * Attack card, the action must carry either selectedAttackCardId (a card
+   * id from hand) or skipAttackCard: true. Hand cards have no instance ids;
+   * duplicates are identical, so selecting by card id consumes one copy.
+   */
+  | {
+      kind: "attack";
+      attackerInstanceId: string;
+      defenderInstanceId: string;
+      selectedAttackCardId?: string;
+      skipAttackCard?: boolean;
+    }
   | { kind: "directAttack"; attackerInstanceId: string }
   | { kind: "enterBattle" }
   | { kind: "endTurn" };
