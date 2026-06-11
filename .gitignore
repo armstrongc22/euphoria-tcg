@@ -1,0 +1,11 @@
+# Staging area for raw card files; superseded by data/, assets/, _archive/
+_incoming/
+
+# Local-machine Claude Code settings
+.claude/settings.local.json
+
+# Python
+__pycache__/
+
+# Node (for the upcoming packages/ workspace)
+node_modules/

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "euphoria-tcg/card.schema.json",
+  "title": "Euphoria TCG Card",
+  "type": "object",
+  "required": [
+    "id",
+    "slug",
+    "name",
+    "faction",
+    "type",
+    "spiritCost",
+    "costResource",
+    "imageFile",
+    "rarity",
+    "deckTags"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique card id, e.g. sonic_warrior_bit_schneider"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "URL- and filename-safe unique slug"
+    },
+    "name": { "type": "string" },
+    "faction": {
+      "enum": ["Monk", "Dwarf", "Sonic", "Surfer", "Shaman", "Neutral"]
+    },
+    "type": {
+      "enum": ["Warrior", "Item", "Weapon", "Attack"]
+    },
+    "spiritCost": { "type": "integer", "minimum": 0 },
+    "costResource": { "const": "Spirit" },
+    "attack": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Warriors only"
+    },
+    "health": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Warriors only"
+    },
+    "imageFile": {
+      "type": "string",
+      "pattern": "^[a-z]+/[a-z0-9-]+\\.png$",
+      "description": "Path relative to assets/cards/"
+    },
+    "rarity": { "type": "string" },
+    "color": { "type": "string" },
+    "subtype": { "type": "string" },
+    "supportFaction": {
+      "enum": ["Monk", "Dwarf", "Sonic", "Surfer", "Shaman"]
+    },
+    "deckTags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "rulesText": { "type": "string" },
+    "effects": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "effectCode": {
+      "type": "string",
+      "description": "Generic effect handler code, see docs/effect-schema.md"
+    },
+    "effectParams": { "type": "object" },
+    "timing": {
+      "enum": ["main_phase", "on_attack_replace", "on_equip", "while_equipped"]
+    }
+  }
+}

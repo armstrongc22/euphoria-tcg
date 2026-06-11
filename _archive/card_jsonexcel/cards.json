@@ -1,0 +1,2131 @@
+[
+  {
+    "id": "sonic_warrior_bit_schneider",
+    "slug": "bit-schneider",
+    "name": "Bit Schneider",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 1900,
+    "health": 6500,
+    "imageFile": "bit-schneider.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_warrior_brut",
+    "slug": "brut",
+    "name": "Brut",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 3000,
+    "health": 5500,
+    "imageFile": "brut.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_warrior_carlson",
+    "slug": "carlson",
+    "name": "Carlson",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 1900,
+    "health": 6000,
+    "imageFile": "carlson.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_warrior_cassidy_sinclair",
+    "slug": "cassidy-sinclair",
+    "name": "Cassidy Sinclair",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 1950,
+    "health": 6500,
+    "imageFile": "cassidy-sinclair.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_warrior_high_councilor_jerome_baldwin",
+    "slug": "high-councilor-jerome-baldwin",
+    "name": "High Councilor Jerome Baldwin",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 1700,
+    "health": 10000,
+    "imageFile": "high-councilor-jerome-baldwin.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_warrior_kit",
+    "slug": "kit",
+    "name": "Kit",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 1800,
+    "health": 6500,
+    "imageFile": "kit.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_warrior_lynn_katabatic",
+    "slug": "lynn-katabatic",
+    "name": "Lynn Katabatic",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2200,
+    "health": 5500,
+    "imageFile": "lynn-katabatic.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_warrior_priest_aquinas",
+    "slug": "priest-aquinas",
+    "name": "Priest Aquinas",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2000,
+    "health": 5500,
+    "imageFile": "priest-aquinas.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_warrior_raigi",
+    "slug": "raigi",
+    "name": "Raigi",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2650,
+    "health": 5000,
+    "imageFile": "raigi.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_warrior_sunourufu",
+    "slug": "sunourufu",
+    "name": "Sunōurufu",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2350,
+    "health": 6000,
+    "imageFile": "sunourufu.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_warrior_titus",
+    "slug": "titus",
+    "name": "Titus",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2800,
+    "health": 6000,
+    "imageFile": "titus.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_warrior_tristin_dangan",
+    "slug": "tristin-dangan",
+    "name": "Tristin Dangan",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 1900,
+    "health": 5500,
+    "imageFile": "tristin-dangan.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_warrior_warden_babylon",
+    "slug": "warden-babylon",
+    "name": "Warden Babylon",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2500,
+    "health": 6100,
+    "imageFile": "warden-babylon.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_warrior_yojimbo",
+    "slug": "yojimbo",
+    "name": "Yojimbo",
+    "faction": "Sonic",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2750,
+    "health": 6500,
+    "imageFile": "yojimbo.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_alluvium",
+    "slug": "alluvium",
+    "name": "Alluvium",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2100,
+    "health": 6250,
+    "imageFile": "alluvium.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_aur_neolin",
+    "slug": "aur-neolin",
+    "name": "Aur Neolin",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 1900,
+    "health": 5500,
+    "imageFile": "aur-neolin.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_captain_cold_rain_kai",
+    "slug": "captain-cold-rain-kai",
+    "name": "Captain “Cold Rain” Kai",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2400,
+    "health": 6500,
+    "imageFile": "captain-cold-rain-kai.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_chiup_flowiktu",
+    "slug": "chiup-flowiktu",
+    "name": "Chiup Flowiktu",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2000,
+    "health": 5800,
+    "imageFile": "chiup-flowiktu.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_countess_kalix",
+    "slug": "countess-kalix",
+    "name": "Countess Kalix",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2300,
+    "health": 5000,
+    "imageFile": "countess-kalix.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_delta_renvatten",
+    "slug": "delta-renvatten",
+    "name": "Delta Renvatten",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2500,
+    "health": 7000,
+    "imageFile": "delta-renvatten.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_fen_larkin",
+    "slug": "fen-larkin",
+    "name": "Fen Larkin",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2200,
+    "health": 5500,
+    "imageFile": "fen-larkin.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_freia_renvatten",
+    "slug": "freia-renvatten",
+    "name": "Freia Renvatten",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 1850,
+    "health": 10000,
+    "imageFile": "freia-renvatten.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_haito",
+    "slug": "haito",
+    "name": "Haito",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2000,
+    "health": 6500,
+    "imageFile": "haito.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_kade_ritz",
+    "slug": "kade-ritz",
+    "name": "Kade Ritz",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2450,
+    "health": 6300,
+    "imageFile": "kade-ritz.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_kaltvatten",
+    "slug": "kaltvatten",
+    "name": "Kaltvatten",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 3000,
+    "health": 6500,
+    "imageFile": "kaltvatten.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_mark_lee_fathom",
+    "slug": "mark-lee-fathom",
+    "name": "Mark Lee Fathom",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2400,
+    "health": 6500,
+    "imageFile": "mark-lee-fathom.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_okee",
+    "slug": "okee",
+    "name": "Okee",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2700,
+    "health": 6000,
+    "imageFile": "okee.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "surfer_warrior_pandora_the_island_eater",
+    "slug": "pandora-the-island-eater",
+    "name": "Pandora the Island Eater",
+    "faction": "Surfer",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2000,
+    "health": 6300,
+    "imageFile": "pandora-the-island-eater.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_aaron_alacapati",
+    "slug": "aaron-alacapati",
+    "name": "Aaron Alacapati",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2500,
+    "health": 6500,
+    "imageFile": "aaron-alacapati.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_ajax",
+    "slug": "ajax",
+    "name": "Ajax",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2500,
+    "health": 7500,
+    "imageFile": "ajax.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_atlas_alacapati",
+    "slug": "atlas-alacapati",
+    "name": "Atlas Alacapati",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 3000,
+    "health": 7500,
+    "imageFile": "atlas-alacapati.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_bliss_valentine",
+    "slug": "bliss-valentine",
+    "name": "Bliss Valentine",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2200,
+    "health": 6000,
+    "imageFile": "bliss-valentine.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_durga_highstone",
+    "slug": "durga-highstone",
+    "name": "Durga Highstone",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2100,
+    "health": 8500,
+    "imageFile": "durga-highstone.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_exodus_st_claire",
+    "slug": "exodus-st-claire",
+    "name": "Exodus St. Claire",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2600,
+    "health": 7000,
+    "imageFile": "exodus-st-claire.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_freight_train",
+    "slug": "freight-train",
+    "name": "Freight Train",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 1800,
+    "health": 6000,
+    "imageFile": "freight-train.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_gulag",
+    "slug": "gulag",
+    "name": "Gulag",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2300,
+    "health": 6500,
+    "imageFile": "gulag.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_nyx_highstone",
+    "slug": "nyx-highstone",
+    "name": "Nyx Highstone",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2200,
+    "health": 7000,
+    "imageFile": "nyx-highstone.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_prosperity",
+    "slug": "prosperity",
+    "name": "Prosperity",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2200,
+    "health": 6500,
+    "imageFile": "prosperity.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_the_terra_twins",
+    "slug": "the-terra-twins",
+    "name": "The Terra Twins",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2100,
+    "health": 7500,
+    "imageFile": "the-terra-twins.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_titan",
+    "slug": "titan",
+    "name": "Titan",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2400,
+    "health": 7500,
+    "imageFile": "titan.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_troy_chasm",
+    "slug": "troy-chasm",
+    "name": "Troy Chasm",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2000,
+    "health": 6500,
+    "imageFile": "troy-chasm.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_tun_centree",
+    "slug": "tun-centree",
+    "name": "Tun Centree",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2500,
+    "health": 7000,
+    "imageFile": "tun-centree.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_invictius_durango",
+    "slug": "invictius-durango",
+    "name": "“Invictius” Durango",
+    "faction": "Dwarf",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2600,
+    "health": 6600,
+    "imageFile": "invictius-durango.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "warrior_blaize-azazel",
+    "slug": "blaize-azazel",
+    "name": "Blaize Azazel",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2100,
+    "health": 7000,
+    "imageFile": "blaize-azazel.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_diyu-shang",
+    "slug": "diyu-shang",
+    "name": "Dìyù Shang",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2400,
+    "health": 6000,
+    "imageFile": "diyu-shang.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_gouhuo-yongheng",
+    "slug": "gouhuo-yongheng",
+    "name": "Gōuhuǒ Yǒnghéng",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2750,
+    "health": 7500,
+    "imageFile": "gouhuo-yongheng.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_hades-ceru",
+    "slug": "hades-ceru",
+    "name": "Hades Ceru",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2550,
+    "health": 6500,
+    "imageFile": "hades-ceru.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_haifa-morningstar",
+    "slug": "haifa-morningstar",
+    "name": "Haifa Morningstar",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2350,
+    "health": 5500,
+    "imageFile": "haifa-morningstar.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_hideon",
+    "slug": "hideon",
+    "name": "Hideon",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 1800,
+    "health": 5500,
+    "imageFile": "hideon.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_huoyan-ying",
+    "slug": "huoyan-ying",
+    "name": "Huǒyàn Yīng",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2200,
+    "health": 5500,
+    "imageFile": "huoyan-ying.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_jiaohui-zhong",
+    "slug": "jiaohui-zhong",
+    "name": "Jiàohuì Zhōng",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2800,
+    "health": 7500,
+    "imageFile": "jiaohui-zhong.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_juan-feng",
+    "slug": "juan-feng",
+    "name": "Juǎn Fēng",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2500,
+    "health": 6000,
+    "imageFile": "juan-feng.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_knight-gradi",
+    "slug": "knight-gradi",
+    "name": "Knight Gradi",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2000,
+    "health": 6500,
+    "imageFile": "knight-gradi.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_liuxing",
+    "slug": "liuxing",
+    "name": "Liúxīng",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2200,
+    "health": 7000,
+    "imageFile": "liuxing.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_oog",
+    "slug": "oog",
+    "name": "Oog",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 1850,
+    "health": 5500,
+    "imageFile": "oog.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_warden-arcane",
+    "slug": "warden-arcane",
+    "name": "Warden Arcane",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2300,
+    "health": 6000,
+    "imageFile": "warden-arcane.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_xian",
+    "slug": "xian",
+    "name": "Xian",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "attack": 2000,
+    "health": 6000,
+    "imageFile": "xian.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_emo",
+    "slug": "emo",
+    "name": "Èmó",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2600,
+    "health": 6500,
+    "imageFile": "emo.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "warrior_hope-cyrus",
+    "slug": "hope-cyrus",
+    "name": "“Hope” Cyrus",
+    "faction": "Monk",
+    "type": "Warrior",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "attack": 2300,
+    "health": 6500,
+    "imageFile": "hope-cyrus.webp",
+    "rarity": "Beta",
+    "color": "Red"
+  },
+  {
+    "id": "shaman_warrior_augustine",
+    "slug": "augustine",
+    "name": "Augustine",
+    "faction": "Shaman",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 4000,
+    "health": 7000,
+    "imageFile": "augustine.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "shaman_warrior_aurelius",
+    "slug": "aurelius",
+    "name": "Aurelius",
+    "faction": "Shaman",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 3000,
+    "health": 9000,
+    "imageFile": "aurelius.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "shaman_warrior_chitra",
+    "slug": "chitra",
+    "name": "Chitra",
+    "faction": "Shaman",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 3000,
+    "health": 8000,
+    "imageFile": "chitra.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "shaman_warrior_erelim",
+    "slug": "erelim",
+    "name": "Erelim",
+    "faction": "Shaman",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2800,
+    "health": 6000,
+    "imageFile": "erelim.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "shaman_warrior_flamma",
+    "slug": "flamma",
+    "name": "Flamma",
+    "faction": "Shaman",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 4000,
+    "health": 6800,
+    "imageFile": "flamma.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "shaman_warrior_halo",
+    "slug": "halo",
+    "name": "Halo",
+    "faction": "Shaman",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2000,
+    "health": 6000,
+    "imageFile": "halo.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "shaman_warrior_jeru_baalbek",
+    "slug": "jeru-baalbek",
+    "name": "Jeru Baalbek",
+    "faction": "Shaman",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 3500,
+    "health": 8000,
+    "imageFile": "jeru-baalbek.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "shaman_warrior_keta_mula",
+    "slug": "keta-mula",
+    "name": "Keta Mula",
+    "faction": "Shaman",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 3100,
+    "health": 5500,
+    "imageFile": "keta-mula.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "shaman_warrior_kira_tyler",
+    "slug": "kira-tyler",
+    "name": "Kira Tyler",
+    "faction": "Shaman",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2900,
+    "health": 5500,
+    "imageFile": "kira-tyler.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "shaman_warrior_lei_the_necromancer",
+    "slug": "lei-the-necromancer",
+    "name": "Lei the Necromancer",
+    "faction": "Shaman",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 3300,
+    "health": 7000,
+    "imageFile": "lei-the-necromancer.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "shaman_warrior_rahu",
+    "slug": "rahu",
+    "name": "Rahu",
+    "faction": "Shaman",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 3750,
+    "health": 8500,
+    "imageFile": "rahu.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "shaman_warrior_rohini",
+    "slug": "rohini",
+    "name": "Rohini",
+    "faction": "Shaman",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 3500,
+    "health": 5500,
+    "imageFile": "rohini.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "shaman_warrior_valkyrie",
+    "slug": "valkyrie",
+    "name": "Valkyrie",
+    "faction": "Shaman",
+    "type": "Warrior",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "attack": 2650,
+    "health": 5900,
+    "imageFile": "valkyrie.webp",
+    "rarity": "Beta"
+  },
+  {
+    "id": "sonic_attack_cytotoxic_chapel",
+    "slug": "cytotoxic-chapel",
+    "name": "Cytotoxic Chapel",
+    "faction": "Sonic",
+    "type": "Attack",
+    "subtype": "Lingering",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Deal 1500 damage to all Warriors on your opponent’s side of the field. All Warriors that took damage from this effect take 500 damage on your next turn.",
+    "imageFile": "cytotoxic-chapel.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "aoe_damage_then_delayed_damage",
+        "amount": 1500,
+        "secondaryAmount": 500,
+        "target": "all_opponent_warriors",
+        "duration": "next_turn"
+      }
+    ]
+  },
+  {
+    "id": "sonic_attack_megawatt_apocalypse",
+    "slug": "megawatt-apocalypse",
+    "name": "Megawatt Apocalypse",
+    "faction": "Sonic",
+    "type": "Attack",
+    "subtype": "Finisher",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Destroy 1 Warrior on your opponent’s side of the field.",
+    "imageFile": "megawatt-apocalypse.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "destroy_enemy_warrior",
+        "amount": 1,
+        "target": "opponent_warrior",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "sonic_attack_pisubaipa",
+    "slug": "pisubaipa",
+    "name": "Pīsubaipā",
+    "faction": "Sonic",
+    "type": "Attack",
+    "subtype": "Lingering",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Add 1000 damage this turn. The Warrior attacked by this card cannot attack for 2 turns.",
+    "imageFile": "pisubaipa.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "add_damage_and_disable_attacked_warrior",
+        "amount": 1000,
+        "target": "attacked_warrior",
+        "duration": "2_turns"
+      }
+    ]
+  },
+  {
+    "id": "sonic_attack_saranyus_armory",
+    "slug": "saranyus-armory",
+    "name": "Saranyu’s Armory",
+    "faction": "Sonic",
+    "type": "Attack",
+    "subtype": "Burst",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Target 1 Warrior, deal 2000 additional damage this turn.",
+    "imageFile": "saranyus-armory.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "add_damage_to_target_warrior_this_turn",
+        "amount": 2000,
+        "target": "target_warrior",
+        "duration": "this_turn"
+      }
+    ]
+  },
+  {
+    "id": "surfer_attack_bitter_guard",
+    "slug": "bitter-guard",
+    "name": "Bitter Guard",
+    "faction": "Surfer",
+    "type": "Attack",
+    "subtype": "Burst",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "On your opponent’s next turn, all their ATTACK damage is cut in half.",
+    "imageFile": "bitter-guard.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "halve_opponent_attack_damage_next_turn",
+        "amount": 0.5,
+        "target": "opponent_attack_damage",
+        "duration": "opponent_next_turn"
+      }
+    ]
+  },
+  {
+    "id": "surfer_attack_floe_breaker",
+    "slug": "floe-breaker",
+    "name": "Floe Breaker",
+    "faction": "Surfer",
+    "type": "Attack",
+    "subtype": "Burst",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Add 2000 additional damage to your next attack.",
+    "imageFile": "floe-breaker.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "add_damage_to_next_attack",
+        "amount": 2000,
+        "target": "your_next_attack",
+        "duration": "next_attack"
+      }
+    ]
+  },
+  {
+    "id": "surfer_attack_serfs_bondage",
+    "slug": "serfs-bondage",
+    "name": "Serf’s Bondage",
+    "faction": "Surfer",
+    "type": "Attack",
+    "subtype": "Lingering",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Deal 1000 damage to up to 2 Warriors on your opponent’s side of the field. These Warriors cannot attack on their next turn.",
+    "imageFile": "serfs-bondage.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "damage_up_to_two_and_disable_next_turn",
+        "amount": 1000,
+        "target": "up_to_2_opponent_warriors",
+        "duration": "next_turn"
+      }
+    ]
+  },
+  {
+    "id": "attack_apex_forest",
+    "slug": "apex-forest",
+    "name": "Apex Forest",
+    "faction": "Dwarf",
+    "type": "Attack",
+    "subtype": "multi",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Pick one Warrior. Attack it. All other Warriors on your opponent’s side of the field take 1000 damage.",
+    "imageFile": "apex-forest.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "attack_target_and_splash_enemies",
+        "amount": 1000,
+        "target": "selected_opponent_warrior; other_opponent_warriors",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "attack_guatavita",
+    "slug": "guatavita",
+    "name": "Guatavita",
+    "faction": "Dwarf",
+    "type": "Attack",
+    "subtype": "finisher",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Destroy 1 Warrior on your opponent’s side of the field.",
+    "imageFile": "guatavita.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "destroy_enemy_warrior",
+        "amount": 1,
+        "target": "one_opponent_warrior",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "attack_oak_splitter_5x",
+    "slug": "oak-splitter-5x",
+    "name": "Oak Splitter 5x",
+    "faction": "Dwarf",
+    "type": "Attack",
+    "subtype": "burst",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Add 2000 damage this turn",
+    "imageFile": "oak-splitter-5x.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "add_damage_this_turn",
+        "amount": 2000,
+        "target": "self_damage_bonus",
+        "duration": "this_turn"
+      }
+    ]
+  },
+  {
+    "id": "attack_silurian_period",
+    "slug": "silurian-period",
+    "name": "Silurian Period",
+    "faction": "Dwarf",
+    "type": "Attack",
+    "subtype": "lingering",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Deal 500 damage to each of your opponent’s Warriors that were on the field when this card was played, for the next 4 turns.",
+    "imageFile": "silurian-period.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "lingering_damage_existing_enemy_warriors",
+        "amount": 500,
+        "target": "opponent_warriors_on_field_when_played",
+        "duration": "4_turns"
+      }
+    ]
+  },
+  {
+    "id": "attack_7th-plague",
+    "slug": "7th-plague",
+    "name": "7th Plague",
+    "faction": "Monk",
+    "type": "Attack",
+    "subtype": "Multi",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "All Warriors on your opponent’s side of the field take 1000 damage.",
+    "imageFile": "7th-plague.webp",
+    "rarity": "Beta",
+    "color": "Red",
+    "effects": [
+      {
+        "key": "damage_all_enemy_warriors",
+        "amount": 1000,
+        "target": "all opponent Warriors",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "attack_dantes-lamentation",
+    "slug": "dantes-lamentation",
+    "name": "Dante’s Lamentation",
+    "faction": "Monk",
+    "type": "Attack",
+    "subtype": "Finisher",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Destroy 1 Warrior on your opponent’s side of the field.",
+    "imageFile": "dantes-lamentation.webp",
+    "rarity": "Beta",
+    "color": "Red",
+    "effects": [
+      {
+        "key": "destroy_enemy_warrior",
+        "amount": 1,
+        "target": "1 opponent Warrior",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "attack_gylippus",
+    "slug": "gylippus",
+    "name": "Gylippus",
+    "faction": "Monk",
+    "type": "Attack",
+    "subtype": "Multi",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Target 2 Warriors. 1. Deal 2000 additional damage when you attack. 2. Deal 1000 total damage.",
+    "imageFile": "gylippus.webp",
+    "rarity": "Beta",
+    "color": "Red",
+    "effects": [
+      {
+        "key": "target_two_warriors_boost_and_damage",
+        "amount": "2000 / 1000",
+        "target": "2 Warriors",
+        "duration": "mixed; confirm timing"
+      }
+    ]
+  },
+  {
+    "id": "shaman_attack_decimation",
+    "slug": "decimation",
+    "name": "Decimation",
+    "faction": "Shaman",
+    "type": "Attack",
+    "subtype": "Finisher",
+    "spiritCost": 3,
+    "costResource": "Spirit",
+    "rulesText": "If there are 5 or more Warriors on the field, each Warrior must draw a stone. The 2 Warriors who draw a white stone are immediately destroyed.",
+    "imageFile": "decimation.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "conditional_stone_draw_destroy_two",
+        "amount": 2,
+        "secondaryAmount": 5,
+        "target": "warriors_on_field",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "item_a_dragons_judgement",
+    "slug": "a-dragons-judgement",
+    "name": "A Dragon’s Judgement",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Combat",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Until your next turn, any Warrior that attacks a Monk loses 1000 HEALTH.",
+    "imageFile": "a-dragons-judgement.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "monk_retaliation_health_loss_until_next_turn",
+        "amount": 1000,
+        "target": "warriors_attacking_monk",
+        "duration": "until_your_next_turn"
+      }
+    ]
+  },
+  {
+    "id": "item_a_thiefs_pride",
+    "slug": "a-thiefs-pride",
+    "name": "A Thief’s Pride",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Provision",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Your opponent reveals their hand. Take 1 Item card and add it to your hand.",
+    "imageFile": "a-thiefs-pride.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "steal_item_from_revealed_hand",
+        "amount": 1,
+        "target": "opponent_hand_item_card",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "item_anansis_highway",
+    "slug": "anansis-highway",
+    "name": "Anansi’s Highway",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Provision",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Add 1 Dwarf Warrior to your hand.",
+    "imageFile": "anansis-highway.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "add_dwarf_warrior_to_hand",
+        "amount": 1,
+        "target": "dwarf_warrior",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "item_best_friends_bond",
+    "slug": "best-friends-bond",
+    "name": "Best Friend’s Bond",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Provision",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "If you have 2 Warriors of the same type on the field, gain 1 Spirit.",
+    "imageFile": "best-friends-bond.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "gain_spirit_if_two_same_type_warriors",
+        "amount": 1,
+        "target": "self_spirit",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "item_choir_of_pyrois",
+    "slug": "choir-of-pyrois",
+    "name": "Choir of Pyrois",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Combat",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Choose 1 Monk Warrior on your side of the field. It can attack twice this turn.",
+    "imageFile": "choir-of-pyrois.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "monk_warrior_attack_twice_this_turn",
+        "amount": 1,
+        "target": "friendly_monk_warrior",
+        "duration": "this_turn"
+      }
+    ]
+  },
+  {
+    "id": "item_coerced_loyalty",
+    "slug": "coerced-loyalty",
+    "name": "Coerced Loyalty",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Combat",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Select 1 Warrior on your opponent’s side of the field. Take control of that W...",
+    "imageFile": "coerced-loyalty.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "temporary_control_steal_with_damage_buyback",
+        "amount": 1,
+        "secondaryAmount": 5000,
+        "target": "opponent_warrior",
+        "duration": "until_opponent_pays_damage_or_indefinite"
+      }
+    ]
+  },
+  {
+    "id": "item_cryraven_circus",
+    "slug": "cryraven-circus",
+    "name": "Cryraven Circus",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Healing",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Every Warrior on your side of the field gains 750 HEALTH.",
+    "imageFile": "cryraven-circus.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "team_health_gain",
+        "amount": 750,
+        "target": "friendly_warriors",
+        "duration": "instant_or_persistent_health_gain"
+      }
+    ]
+  },
+  {
+    "id": "item_flame_training",
+    "slug": "flame-training",
+    "name": "Flame Training",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Provision",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "All Monk Warriors on your side of the field gain 500 ATTACK this turn.",
+    "imageFile": "flame-training.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "friendly_monk_attack_buff_this_turn",
+        "amount": 500,
+        "target": "friendly_monk_warriors",
+        "duration": "this_turn"
+      }
+    ]
+  },
+  {
+    "id": "item_gils_unit",
+    "slug": "gils-unit",
+    "name": "GILs Unit",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Healing",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Put 1 Warrior on your side of the field out of play for 3 turns. When they re...",
+    "imageFile": "gils-unit.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "temporary_out_of_play_then_restore_health",
+        "amount": 1,
+        "secondaryAmount": 3,
+        "target": "friendly_warrior",
+        "duration": "3_turns"
+      }
+    ]
+  },
+  {
+    "id": "item_gorgons_eye",
+    "slug": "gorgons-eye",
+    "name": "Gorgon’s Eye",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Prevent",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "No attacks can be declared until your next turn.",
+    "imageFile": "gorgons-eye.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "prevent_all_attacks_until_next_turn",
+        "target": "all_players_attack_declaration",
+        "duration": "until_your_next_turn"
+      }
+    ]
+  },
+  {
+    "id": "item_greenskin_auction_house",
+    "slug": "greenskin-auction-house",
+    "name": "Greenskin Auction House",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Provision",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Add 1 Weapon from your deck to your hand.",
+    "imageFile": "greenskin-auction-house.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "tutor_weapon_from_deck",
+        "amount": 1,
+        "target": "weapon_card_in_deck",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "item_greenskin_kiln_co",
+    "slug": "greenskin-kiln-co",
+    "name": "Greenskin Kiln Co.",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Provision",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Add 1 Weapon card to your hand.",
+    "imageFile": "greenskin-kiln-co.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "add_weapon_card_to_hand",
+        "amount": 1,
+        "target": "weapon_card",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "item_gunder_love",
+    "slug": "gunder-love",
+    "name": "Gunder Love",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Healing",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Choose 1 Warrior. That Warrior gains 1500 HEALTH.",
+    "imageFile": "gunder-love.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "single_warrior_health_gain",
+        "amount": 1500,
+        "target": "one_warrior",
+        "duration": "instant_or_persistent_health_gain"
+      }
+    ]
+  },
+  {
+    "id": "item_heavens_door_izakaya",
+    "slug": "heavens-door-izakaya",
+    "name": "Heaven’s Door Izakaya",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Provision",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "On your next turn, all Sonic Warriors on your side of the field gain 1000 ATT...",
+    "imageFile": "heavens-door-izakaya.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "next_turn_friendly_sonic_attack_buff",
+        "amount": 1000,
+        "target": "friendly_sonic_warriors",
+        "duration": "your_next_turn"
+      }
+    ]
+  },
+  {
+    "id": "item_high_tea",
+    "slug": "high-tea",
+    "name": "High Tea",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Prevent",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "If you have 2 or more Warriors on your side of the field: select 1. That Warr...",
+    "imageFile": "high-tea.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "protect_one_warrior_with_health_sacrifice_bypass",
+        "amount": 1000,
+        "target": "friendly_warrior; opponent_warriors",
+        "duration": "this_turn"
+      }
+    ]
+  },
+  {
+    "id": "item_lahkt_brand_family_products",
+    "slug": "lahkt-brand-family-products",
+    "name": "Lahkt Brand Family Products",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Provision",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Add 1 Weapon or Item card to your hand.",
+    "imageFile": "lahkt-brand-family-products.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "add_weapon_or_item_to_hand",
+        "amount": 1,
+        "target": "weapon_or_item_card",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "item_moral_determination_authrotity",
+    "slug": "moral-determination-authrotity",
+    "name": "Moral Determination Authrotity",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Prevent",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Any of your opponent’s Warriors that attack next turn can’t attack on their n...",
+    "imageFile": "moral-determination-authrotity.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "punish_next_turn_attackers_with_following_turn_disable",
+        "target": "opponent_warriors_that_attack_next_turn",
+        "duration": "opponent_next_turn_then_following_turn"
+      }
+    ]
+  },
+  {
+    "id": "item_orange_court",
+    "slug": "orange-court",
+    "name": "Orange Court",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Prevent",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Your opponent cannot attack Dwarf Warriors on their next turn.",
+    "imageFile": "orange-court.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "prevent_attacks_against_dwarf_warriors_next_turn",
+        "target": "friendly_dwarf_warriors",
+        "duration": "opponent_next_turn"
+      }
+    ]
+  },
+  {
+    "id": "item_primetime_interview",
+    "slug": "primetime-interview",
+    "name": "Primetime Interview",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Combat",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Select 1 Warrior on your opponent’s side of the field. It is the only Warrior...",
+    "imageFile": "primetime-interview.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "restrict_opponent_attacks_to_selected_warrior_until_next_turn",
+        "amount": 1,
+        "target": "selected_opponent_warrior",
+        "duration": "until_your_next_turn"
+      }
+    ]
+  },
+  {
+    "id": "item_pyro_bokor",
+    "slug": "pyro-bokor",
+    "name": "Pyro Bokor",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Provision",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Add 1 Monk Attack or Monk Warrior card to your hand.",
+    "imageFile": "pyro-bokor.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "add_monk_attack_or_warrior_to_hand",
+        "amount": 1,
+        "target": "monk_attack_or_monk_warrior_card",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "item_reliable_henchmen",
+    "slug": "reliable-henchmen",
+    "name": "Reliable Henchmen",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Provision",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Add 1 Dwarf Warrior to your hand.",
+    "imageFile": "reliable-henchmen.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "add_dwarf_warrior_to_hand",
+        "amount": 1,
+        "target": "dwarf_warrior",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "item_secure_deposits",
+    "slug": "secure-deposits",
+    "name": "Secure Deposits",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Provision",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Place 1 Spirit in escrow. In 3 turns, gain 3 Spirit.",
+    "imageFile": "secure-deposits.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "delayed_spirit_escrow_gain",
+        "amount": 1,
+        "secondaryAmount": 3,
+        "target": "self_spirit",
+        "duration": "3_turns"
+      }
+    ]
+  },
+  {
+    "id": "item_slush_fund",
+    "slug": "slush-fund",
+    "name": "Slush Fund",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Provision",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "When activated, both players add their current collection of aura to a pot. A...",
+    "imageFile": "slush-fund.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "pool_and_split_aura_user_gets_roundup",
+        "secondaryAmount": 2,
+        "target": "both_players_aura",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "item_totems_creation",
+    "slug": "totems-creation",
+    "name": "Totem’s Creation",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Provision",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Revive 1 Warrior that’s been destroyed to your side of the field.",
+    "imageFile": "totems-creation.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "revive_destroyed_warrior_to_your_field",
+        "amount": 1,
+        "target": "destroyed_warrior",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "item_training_arc",
+    "slug": "training-arc",
+    "name": "Training Arc",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Combat",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Next turn, add 1500 ATTACK to 1 Warrior for 2 turns.",
+    "imageFile": "training-arc.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "delayed_attack_buff_for_two_turns",
+        "amount": 1500,
+        "secondaryAmount": 2,
+        "target": "one_warrior",
+        "duration": "next_turn_for_2_turns"
+      }
+    ]
+  },
+  {
+    "id": "item_trial_of_gia",
+    "slug": "trial-of-gia",
+    "name": "Trial of Gia",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Combat",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Place 1 Warrior you control against 1 Warrior your opponent controls. The two...",
+    "imageFile": "trial-of-gia.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "forced_duel_until_one_destroyed",
+        "amount": 1,
+        "secondaryAmount": 1,
+        "target": "friendly_warrior_and_opponent_warrior",
+        "duration": "until_one_destroyed"
+      }
+    ]
+  },
+  {
+    "id": "item_vibrant_pastures",
+    "slug": "vibrant-pastures",
+    "name": "Vibrant Pastures",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Healing",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Pick 1 Warrior. It gets 500 HEALTH for every Item in your Out deck.",
+    "imageFile": "vibrant-pastures.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "health_gain_per_item_in_out_deck",
+        "amount": 500,
+        "target": "one_warrior",
+        "duration": "instant_or_persistent_health_gain"
+      }
+    ]
+  },
+  {
+    "id": "item_xl_c2k_type_r",
+    "slug": "xl-c2k-type-r",
+    "name": "XL-C2K TYPE R",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Combat",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Every Warrior on your opponent’s side of the field takes 500 damage.",
+    "imageFile": "xl-c2k-type-r.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "opponent_team_damage",
+        "amount": 500,
+        "target": "opponent_warriors",
+        "duration": "instant"
+      }
+    ]
+  },
+  {
+    "id": "item_xl_qr517",
+    "slug": "xl-qr517",
+    "name": "XL-QR517",
+    "faction": "Neutral",
+    "type": "Item",
+    "subtype": "Combat",
+    "spiritCost": 1,
+    "costResource": "Spirit",
+    "rulesText": "Place 1 Warrior in the tank. The tank has 1500 ATTACK and 3100 HEALTH. Once d...",
+    "imageFile": "xl-qr517.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "temporary_tank_form_until_destroyed",
+        "amount": 1500,
+        "secondaryAmount": 3100,
+        "target": "one_warrior",
+        "duration": "until_tank_destroyed"
+      }
+    ]
+  },
+  {
+    "id": "weapon_apotheosis",
+    "slug": "apotheosis",
+    "name": "Apotheosis",
+    "faction": "Neutral",
+    "type": "Weapon",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "rulesText": "The damage inflicted by a Warrior equipped with this card is always half the opponent’s HEALTH.",
+    "imageFile": "apotheosis.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "damage_equals_half_opponent_health",
+        "amount": 0.5,
+        "target": "opponent_warrior_health",
+        "duration": "while_equipped"
+      }
+    ]
+  },
+  {
+    "id": "weapon_armageddon",
+    "slug": "armageddon",
+    "name": "Armageddon",
+    "faction": "Neutral",
+    "type": "Weapon",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "rulesText": "A Warrior equipped with this card gains 250 ATTACK for each destroyed Warrior on their side of the field.",
+    "imageFile": "armageddon.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "attack_per_destroyed_friendly_warrior",
+        "amount": 250,
+        "target": "equipped_warrior_attack",
+        "duration": "while_equipped"
+      }
+    ]
+  },
+  {
+    "id": "weapon_fafnir",
+    "slug": "fafnir",
+    "name": "Fafnir",
+    "faction": "Neutral",
+    "type": "Weapon",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "rulesText": "A Warrior equipped with this card gains 500 ATTACK. A Monk Warrior equipped with this card gains 1000 ATTACK.",
+    "imageFile": "fafnir.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "attack_bonus_monk_bonus",
+        "amount": 500,
+        "secondaryAmount": 1000,
+        "target": "equipped_warrior_attack",
+        "duration": "while_equipped"
+      }
+    ]
+  },
+  {
+    "id": "weapon_fairys_treasure_chest",
+    "slug": "fairys-treasure-chest",
+    "name": "Fairy’s Treasure Chest",
+    "faction": "Neutral",
+    "type": "Weapon",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "rulesText": "A Warrior equipped with this card gains 1000 ATTACK and 1000 HEALTH.",
+    "imageFile": "fairys-treasure-chest.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "attack_and_health_bonus",
+        "amount": 1000,
+        "secondaryAmount": 1000,
+        "target": "equipped_warrior_attack_and_health",
+        "duration": "while_equipped"
+      }
+    ]
+  },
+  {
+    "id": "weapon_gilgamesh",
+    "slug": "gilgamesh",
+    "name": "Gilgamesh",
+    "faction": "Neutral",
+    "type": "Weapon",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "rulesText": "If the Warrior equipped with this card battles a Warrior with a higher ATTACK, that Warrior gains ATTACK equal to the difference between the two Warriors.",
+    "imageFile": "gilgamesh.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "equalize_attack_when_battling_higher_attack",
+        "amount": "difference",
+        "target": "equipped_warrior_attack",
+        "duration": "during_battle"
+      }
+    ]
+  },
+  {
+    "id": "weapon_jesus",
+    "slug": "jesus",
+    "name": "Jesus",
+    "faction": "Neutral",
+    "type": "Weapon",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "rulesText": "A Warrior equipped with this card gains 1000 ATTACK. A Warrior attacked by a Warrior equipped with this card cannot be destroyed. If the resulting battle would destroy the Warrior their HEALTH is now 1.",
+    "imageFile": "jesus.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "attack_bonus_and_leave_attacked_warrior_at_one_health",
+        "amount": 1000,
+        "secondaryAmount": 1,
+        "target": "equipped_warrior_attack_and_attacked_warrior_health",
+        "duration": "while_equipped"
+      }
+    ]
+  },
+  {
+    "id": "weapon_moirai",
+    "slug": "moirai",
+    "name": "Moirai",
+    "faction": "Neutral",
+    "type": "Weapon",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "rulesText": "When a Warrior you control is equipped with this card, you can select a Warrior not equipped with this card to attack again once per turn.",
+    "imageFile": "moirai.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "grant_extra_attack_to_other_warrior_once_per_turn",
+        "amount": 1,
+        "target": "other_friendly_warrior",
+        "duration": "once_per_turn"
+      }
+    ]
+  },
+  {
+    "id": "weapon_ontology",
+    "slug": "ontology",
+    "name": "Ontology",
+    "faction": "Neutral",
+    "type": "Weapon",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "rulesText": "A Warrior equipped with this card can negate 1 attack against it per turn. A Warrior that attacks a Warrior equipped with this card loses 500 ATTACK.",
+    "imageFile": "ontology.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "negate_attack_once_and_reduce_attacker_attack",
+        "amount": 1,
+        "secondaryAmount": -500,
+        "target": "incoming_attack_and_attacking_warrior_attack",
+        "duration": "once_per_turn"
+      }
+    ]
+  },
+  {
+    "id": "weapon_phobos",
+    "slug": "phobos",
+    "name": "Phobos",
+    "faction": "Neutral",
+    "type": "Weapon",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "rulesText": "A Warrior attacked by a Warrior equipped with this card can’t attack for 1 turn.",
+    "imageFile": "phobos.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "disable_attacked_warrior_one_turn",
+        "amount": 1,
+        "target": "attacked_warrior",
+        "duration": "1_turn"
+      }
+    ]
+  },
+  {
+    "id": "weapon_scythe_cycle",
+    "slug": "scythe-cycle",
+    "name": "Scythe Cycle",
+    "faction": "Neutral",
+    "type": "Weapon",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "rulesText": "Equip to 1 Warrior. That Warrior gains 500 ATTACK. When they attack, if your opponent has more than 1 Warrior, select one, that Warrior takes 500 damage.",
+    "imageFile": "scythe-cycle.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "attack_bonus_and_splash_damage_to_selected_warrior",
+        "amount": 500,
+        "secondaryAmount": 500,
+        "target": "equipped_warrior_attack_and_selected_opponent_warrior",
+        "duration": "while_equipped"
+      }
+    ]
+  },
+  {
+    "id": "weapon_skeleton_key",
+    "slug": "skeleton-key",
+    "name": "Skeleton Key",
+    "faction": "Neutral",
+    "type": "Weapon",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "rulesText": "When an opponent attacks a Warrior equipped with this card, cut the damage in half.",
+    "imageFile": "skeleton-key.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "halve_incoming_damage",
+        "amount": 0.5,
+        "target": "incoming_damage_to_equipped_warrior",
+        "duration": "while_equipped"
+      }
+    ]
+  },
+  {
+    "id": "weapon_xiwanghao",
+    "slug": "xiwanghao",
+    "name": "Xīwànghǎo",
+    "faction": "Neutral",
+    "type": "Weapon",
+    "spiritCost": 2,
+    "costResource": "Spirit",
+    "rulesText": "When a Warrior equipped with this card attacks, add the difference between both Warrior’s ATTACK to the damage calculation.",
+    "imageFile": "xiwanghao.webp",
+    "rarity": "Beta",
+    "effects": [
+      {
+        "key": "add_attack_difference_to_damage",
+        "amount": "difference",
+        "target": "damage_calculation",
+        "duration": "when_attacking"
+      }
+    ]
+  }
+]
