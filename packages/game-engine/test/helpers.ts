@@ -30,6 +30,46 @@ export function makeWarriorCard(overrides: Partial<Card> = {}): Card {
   };
 }
 
+export function makeItemCard(overrides: Partial<Card> = {}): Card {
+  counter += 1;
+  const slug = `test-item-${counter}`;
+  return {
+    id: `test_item_${counter}`,
+    slug,
+    name: `Test Item ${counter}`,
+    faction: "Neutral",
+    type: "Item",
+    spiritCost: 1,
+    costResource: "Spirit",
+    rulesText: "Test item effect.",
+    imageFile: `items/${slug}.png`,
+    rarity: "Beta",
+    cost: 1,
+    effectText: "Test item effect.",
+    ...overrides,
+  };
+}
+
+export function makeWeaponCard(overrides: Partial<Card> = {}): Card {
+  counter += 1;
+  const slug = `test-weapon-${counter}`;
+  return {
+    id: `test_weapon_${counter}`,
+    slug,
+    name: `Test Weapon ${counter}`,
+    faction: "Neutral",
+    type: "Weapon",
+    spiritCost: 2,
+    costResource: "Spirit",
+    rulesText: "Test weapon effect.",
+    imageFile: `weapons/${slug}.png`,
+    rarity: "Beta",
+    cost: 2,
+    effectText: "Test weapon effect.",
+    ...overrides,
+  };
+}
+
 export function makeDeck(size = 30): Card[] {
   return Array.from({ length: size }, () => makeWarriorCard());
 }

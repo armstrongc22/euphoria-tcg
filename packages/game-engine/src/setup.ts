@@ -50,6 +50,7 @@ export function createGame(options: CreateGameOptions): GameState {
     },
     winner: null,
     events: [],
+    nextInstanceId: 1,
   };
 
   for (const id of PLAYER_IDS) {

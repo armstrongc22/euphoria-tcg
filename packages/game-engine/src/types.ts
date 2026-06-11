@@ -89,6 +89,8 @@ export interface GameState {
   winner: PlayerId | null;
   /** Append-only structured log (the Python engine's print-based log). */
   events: GameEvent[];
+  /** Counter for unique WarriorInPlay instance ids. */
+  nextInstanceId: number;
 }
 
 export type GameAction =

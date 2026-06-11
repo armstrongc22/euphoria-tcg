@@ -10,4 +10,9 @@ export type GameEvent =
   /** Deck-out is not a loss for now — flagged as a rule to revisit. */
   | { type: "drawFailedDeckEmpty"; player: PlayerId }
   | { type: "phaseChanged"; phase: Phase }
-  | { type: "turnEnded"; player: PlayerId };
+  | { type: "turnEnded"; player: PlayerId }
+  | { type: "warriorSummoned"; player: PlayerId; cardId: string; instanceId: string; cost: number }
+  | { type: "itemPlayed"; player: PlayerId; cardId: string; cost: number }
+  | { type: "weaponEquipped"; player: PlayerId; cardId: string; warriorInstanceId: string; cost: number }
+  /** The card resolved with no effect — it needs a coded handler later. */
+  | { type: "effectNotImplemented"; player: PlayerId; cardId: string };

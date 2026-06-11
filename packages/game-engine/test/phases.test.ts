@@ -43,17 +43,17 @@ describe("phase gates", () => {
 
   it("offers enterBattle and endTurn in Main Phase", () => {
     const game = createGame({ decks: makeDecks(), seed: 1 });
-    expect(getLegalActions(game)).toEqual([
-      { kind: "enterBattle" },
-      { kind: "endTurn" },
-    ]);
+    const actions = getLegalActions(game);
+    expect(actions).toContainEqual({ kind: "enterBattle" });
+    expect(actions).toContainEqual({ kind: "endTurn" });
   });
 
   it("rejects not-yet-implemented actions with NOT_IMPLEMENTED", () => {
     const game = createGame({ decks: makeDecks(), seed: 1 });
     const result = applyAction(game, {
-      kind: "playWarrior",
-      cardId: "anything",
+      kind: "attack",
+      attackerInstanceId: "a",
+      defenderInstanceId: "b",
     });
 
     expect(result.ok).toBe(false);
