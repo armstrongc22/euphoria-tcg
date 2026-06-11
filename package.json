@@ -1,0 +1,21 @@
+{
+  "name": "euphoria-tcg",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "validate:cards": "tsx packages/card-data/src/validate.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0"
+  }
+}
