@@ -53,7 +53,7 @@ export function createWarriorInPlay(state: GameState, card: Card): WarriorInPlay
     currentAttack: card.attack ?? 0,
     currentHealth: card.health ?? 0,
     maxHealth: card.health ?? 0,
-    exhausted: false,
+    attacksRemaining: 1,
     temporaryAttackBuffs: [],
   };
 }
@@ -100,7 +100,7 @@ export function runStartPhase(state: GameState): void {
 
   player.directAttackUsedThisTurn = false;
   for (const warrior of player.field) {
-    warrior.exhausted = false;
+    warrior.attacksRemaining = 1;
   }
   state.events.push({ type: "warriorsRefreshed", player: player.id });
 
@@ -119,7 +119,11 @@ export function runEndPhase(state: GameState): void {
   const player = state.players[state.activePlayer];
   state.phase = "end";
   state.events.push({ type: "turnEnded", player: player.id });
-  // Destroyed/win checks land here with combat (plan steps 5-6).
+
+  // Unused extra attacks (e.g. EXTRA_ATTACK_THIS_TURN) expire at end of turn.
+  for (const warrior of player.field) {
+    warrior.attacksRemaining = Math.min(warrior.attacksRemaining, 1);
+  }
 
   state.activePlayer = opponentOf(state.activePlayer);
   state.turn += 1;

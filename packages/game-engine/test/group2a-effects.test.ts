@@ -88,7 +88,7 @@ describe("DESTROY_TARGET_WARRIOR via real Attack cards", () => {
       defender.card.id,
     ]);
     expect(state.events.some((e) => e.type === "warriorAttacked")).toBe(false);
-    expect(state.players.player2.field[0]?.exhausted).toBe(true);
+    expect(state.players.player2.field[0]?.attacksRemaining).toBe(0);
     expect(state.players.player2.spirit).toBe(1); // cost 1 paid
   });
 

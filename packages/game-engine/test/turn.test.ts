@@ -50,12 +50,12 @@ describe("turn lifecycle", () => {
     expect(state.players.player1.deck).toHaveLength(23);
   });
 
-  it("refreshes exhausted Warriors at the start of the owner's turn", () => {
+  it("refreshes spent Warriors to one attack at the start of the owner's turn", () => {
     const game = createGame({ decks: makeDecks(), seed: 1 });
-    putWarriorOnField(game, "player2", { exhausted: true });
+    putWarriorOnField(game, "player2", { attacksRemaining: 0 });
 
     const next = mustApply(game, endTurn);
-    expect(next.players.player2.field[0]?.exhausted).toBe(false);
+    expect(next.players.player2.field[0]?.attacksRemaining).toBe(1);
   });
 
   it("resets the direct-attack flag at the start of the owner's turn", () => {

@@ -124,7 +124,7 @@ export function putWarriorOnField(
     currentAttack: card.attack ?? 0,
     currentHealth: card.health ?? 0,
     maxHealth: card.health ?? 0,
-    exhausted: false,
+    attacksRemaining: 1,
     temporaryAttackBuffs: [],
     ...overrides,
   };

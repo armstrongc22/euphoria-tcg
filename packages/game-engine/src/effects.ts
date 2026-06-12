@@ -394,6 +394,47 @@ const healthPerItemInOutDeckHandler: EffectHandler = (state, params, context) =>
   return { resolved: true };
 };
 
+const WARRIOR_FACTIONS = ["Monk", "Dwarf", "Sonic", "Surfer", "Shaman"] as const;
+
+/**
+ * Faction restriction for an effect's target: an explicit targetFaction
+ * param wins; otherwise a faction named inside the target keyword counts
+ * (e.g. "friendly_monk_warrior" -> Monk). Undefined = unrestricted.
+ */
+function factionConstraint(params: EffectParams): string | undefined {
+  const explicit = stringParam(params, ["targetFaction", "faction"]);
+  if (explicit !== undefined) return explicit;
+  const keyword = stringParam(params, ["target"]);
+  if (keyword !== undefined) {
+    const normalized = normalizeEffectCode(keyword);
+    for (const faction of WARRIOR_FACTIONS) {
+      if (normalized.includes(faction.toUpperCase())) return faction;
+    }
+  }
+  return undefined;
+}
+
+/** "Choose 1 Monk Warrior on your side of the field. It can attack twice this turn." */
+const extraAttackThisTurnHandler: EffectHandler = (state, params, context) => {
+  const target = requireWarriorTarget(state, params, context, "friendly");
+  if (!target.ok) return target.outcome;
+
+  const faction = factionConstraint(params);
+  if (faction !== undefined && target.warrior.card.faction !== faction) {
+    return targetFailure(`the target must be a ${faction} Warrior.`);
+  }
+  const amount = numberParam(params, ["amount"], 1);
+  target.warrior.attacksRemaining += amount;
+  state.events.push({
+    type: "extraAttackGranted",
+    player: context.player,
+    instanceId: target.warrior.instanceId,
+    amount,
+    attacksRemaining: target.warrior.attacksRemaining,
+  });
+  return { resolved: true };
+};
+
 /** "Destroy 1 Warrior on your opponent's side of the field." */
 const destroyTargetWarriorHandler: EffectHandler = (state, params, context) => {
   const target = requireWarriorTarget(state, params, context, "enemy", context.defenderInstanceId);
@@ -551,6 +592,8 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   registry.register("REVIVE_WARRIOR", reviveWarriorHandler);
   // Group 2B-2: computed heal scaling with Out Deck Items.
   registry.register("HEALTH_PER_ITEM_IN_OUT_DECK", healthPerItemInOutDeckHandler);
+  // Group 2B-3: one additional attack this turn for a friendly Warrior.
+  registry.register("EXTRA_ATTACK_THIS_TURN", extraAttackThisTurnHandler);
   // +2000-damage Attack cards buff the attacker for the turn.
   registry.register("ATTACK_DAMAGE_BONUS", modifyAttackHandler);
 

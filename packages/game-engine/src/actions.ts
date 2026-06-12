@@ -128,11 +128,11 @@ function validateAttacker(
       ),
     };
   }
-  if (attacker.exhausted) {
+  if (attacker.attacksRemaining <= 0) {
     return {
       error: fail(
         "WARRIOR_EXHAUSTED",
-        `${attacker.card.name} has already attacked this turn.`,
+        `${attacker.card.name} has no attacks remaining this turn.`,
       ),
     };
   }
@@ -288,7 +288,7 @@ function attackWarrior(
     (w) => w.instanceId === action.defenderInstanceId,
   );
   if (attacker !== undefined) {
-    attacker.exhausted = true;
+    attacker.attacksRemaining -= 1;
   }
   if (attacker !== undefined && defender !== undefined) {
     // The attacker takes no counter damage (CLAUDE.md overrides the spec's
@@ -332,7 +332,7 @@ function directAttack(state: GameState, attackerInstanceId: string): ActionResul
   const opponent = next.players[opponentId];
   const attacker = player.field.find((w) => w.instanceId === attackerInstanceId)!;
 
-  attacker.exhausted = true;
+  attacker.attacksRemaining -= 1;
   player.directAttackUsedThisTurn = true;
   opponent.lives -= 1;
   next.events.push({
@@ -575,7 +575,7 @@ export function getLegalActions(state: GameState): GameAction[] {
     );
     if (attacksAllowed) {
       for (const attacker of player.field) {
-        if (attacker.exhausted) continue;
+        if (attacker.attacksRemaining <= 0) continue;
         const attackCards = getCompatibleAttackCards(state, attacker.instanceId);
         for (const defender of opponent.field) {
           if (attackCards.length === 0) {

@@ -55,7 +55,7 @@ describe("Warrior vs Warrior combat", () => {
     expect(survivingDefender.currentHealth).toBe(1200); // 2000 - 800
     const survivingAttacker = state.players.player2.field[0]!;
     expect(survivingAttacker.currentHealth).toBe(attacker.currentHealth);
-    expect(survivingAttacker.exhausted).toBe(true);
+    expect(survivingAttacker.attacksRemaining).toBe(0);
     expect(
       state.events.some(
         (e) => e.type === "warriorAttacked" && e.damage === 800,
@@ -208,7 +208,7 @@ describe("direct attacks", () => {
 
     expect(state.players.player1.lives).toBe(2);
     expect(state.players.player2.directAttackUsedThisTurn).toBe(true);
-    expect(state.players.player2.field[0]?.exhausted).toBe(true);
+    expect(state.players.player2.field[0]?.attacksRemaining).toBe(0);
     expect(
       state.events.some(
         (e) => e.type === "directAttacked" && e.livesRemaining === 2,
@@ -277,9 +277,9 @@ describe("direct attacks", () => {
     );
   });
 
-  it("is rejected for an exhausted Warrior", () => {
+  it("is rejected for a Warrior with no attacks remaining", () => {
     const game = turnTwo();
-    const attacker = putWarriorOnField(game, "player2", { exhausted: true });
+    const attacker = putWarriorOnField(game, "player2", { attacksRemaining: 0 });
     const state = mustApply(game, { kind: "enterBattle" });
 
     expectError(
@@ -310,10 +310,10 @@ describe("direct attacks", () => {
 });
 
 describe("getLegalActions in Battle Phase", () => {
-  it("enumerates attacker/defender pairs, skipping exhausted Warriors", () => {
+  it("enumerates attacker/defender pairs, skipping spent Warriors", () => {
     const game = turnTwo();
     const fresh = putWarriorOnField(game, "player2");
-    const tired = putWarriorOnField(game, "player2", { exhausted: true });
+    const tired = putWarriorOnField(game, "player2", { attacksRemaining: 0 });
     const defenderA = putWarriorOnField(game, "player1");
     const defenderB = putWarriorOnField(game, "player1");
     const state = mustApply(game, { kind: "enterBattle" });
@@ -343,7 +343,7 @@ describe("getLegalActions in Battle Phase", () => {
       kind: "directAttack",
       attackerInstanceId: attacker.instanceId,
     });
-    expect(after.players.player2.field.some((w) => !w.exhausted)).toBe(false);
+    expect(after.players.player2.field.some((w) => w.attacksRemaining > 0)).toBe(false);
     expect(getLegalActions(after).some((a) => a.kind === "directAttack")).toBe(
       false,
     );

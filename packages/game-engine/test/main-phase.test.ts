@@ -43,7 +43,7 @@ describe("summon Warrior", () => {
     expect(warrior.currentAttack).toBe(1200);
     expect(warrior.currentHealth).toBe(3000);
     expect(warrior.maxHealth).toBe(3000);
-    expect(warrior.exhausted).toBe(false);
+    expect(warrior.attacksRemaining).toBe(1);
     expect(
       next.events.some(
         (e) => e.type === "warriorSummoned" && e.cardId === card.id,

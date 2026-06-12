@@ -4,12 +4,14 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  applyAction,
   createGame,
   defaultEffectRegistry,
   type GameState,
 } from "../src/index";
 import {
   makeDecks,
+  makeWarriorCard,
   mustApply,
   putWarriorOnField,
   realCard,
@@ -44,7 +46,7 @@ describe("REVIVE_WARRIOR via Totem's Creation", () => {
     expect(revived.currentAttack).toBe(1900);
     expect(revived.currentHealth).toBe(6500);
     expect(revived.maxHealth).toBe(6500);
-    expect(revived.exhausted).toBe(false);
+    expect(revived.attacksRemaining).toBe(1);
     // The Warrior left the Out Deck; only the used Item remains there.
     expect(p1.outDeck.map((c) => c.id)).toEqual([item.id]);
     expect(
@@ -262,5 +264,186 @@ describe("HEALTH_PER_ITEM_IN_OUT_DECK via Vibrant Pastures", () => {
       expect(outcome.code).toBe("EFFECT_FAILED");
     }
     expect(state).toBe(game);
+  });
+});
+
+describe("EXTRA_ATTACK_THIS_TURN via Choir of Pyrois", () => {
+  /** Turn 2, P2 active: friendly Monk attacker vs a tough P1 defender. */
+  function monkBattle() {
+    const state = mustApply(createGame({ decks: makeDecks(), seed: 1 }), {
+      kind: "endTurn",
+    });
+    state.players.player2.hand = [];
+    const monk = putWarriorOnField(state, "player2", {
+      card: makeWarriorCard({ faction: "Monk" }),
+      currentAttack: 500,
+    });
+    const defender = putWarriorOnField(state, "player1", {
+      currentHealth: 9000,
+    });
+    return { state, monk, defender };
+  }
+
+  function attackOnce(state: GameState, monk: { instanceId: string }, defender: { instanceId: string }) {
+    return applyAction(state, {
+      kind: "attack",
+      attackerInstanceId: monk.instanceId,
+      defenderInstanceId: defender.instanceId,
+    });
+  }
+
+  it("a Warrior normally attacks only once per turn", () => {
+    const { state, monk, defender } = monkBattle();
+    let s = mustApply(state, { kind: "enterBattle" });
+    const first = attackOnce(s, monk, defender);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+
+    const second = attackOnce(first.state, monk, defender);
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.error.code).toBe("WARRIOR_EXHAUSTED");
+  });
+
+  it("grants a second Warrior-vs-Warrior attack this turn, but not a third", () => {
+    const { state, monk, defender } = monkBattle();
+    const item = realCard("choir-of-pyrois");
+    state.players.player2.hand.push(item);
+
+    let s = mustApply(state, {
+      kind: "playItem",
+      cardId: item.id,
+      targetInstanceId: monk.instanceId,
+    });
+    expect(s.players.player2.field[0]?.attacksRemaining).toBe(2);
+    expect(
+      s.events.some(
+        (e) => e.type === "extraAttackGranted" && e.instanceId === monk.instanceId,
+      ),
+    ).toBe(true);
+
+    s = mustApply(s, { kind: "enterBattle" });
+    s = mustApply(s, {
+      kind: "attack",
+      attackerInstanceId: monk.instanceId,
+      defenderInstanceId: defender.instanceId,
+    });
+    s = mustApply(s, {
+      kind: "attack",
+      attackerInstanceId: monk.instanceId,
+      defenderInstanceId: defender.instanceId,
+    });
+    expect(s.players.player1.field[0]?.currentHealth).toBe(8000); // 2 x 500
+
+    const third = attackOnce(s, monk, defender);
+    expect(third.ok).toBe(false);
+    if (!third.ok) expect(third.error.code).toBe("WARRIOR_EXHAUSTED");
+  });
+
+  it("an unused extra attack expires at end of turn", () => {
+    const { state, monk } = monkBattle();
+    const item = realCard("choir-of-pyrois");
+    state.players.player2.hand.push(item);
+
+    let s = mustApply(state, {
+      kind: "playItem",
+      cardId: item.id,
+      targetInstanceId: monk.instanceId,
+    });
+    expect(s.players.player2.field[0]?.attacksRemaining).toBe(2);
+
+    s = mustApply(s, { kind: "endTurn" }); // turn 3, P1
+    expect(s.players.player2.field[0]?.attacksRemaining).toBe(1); // capped
+
+    s = mustApply(s, { kind: "endTurn" }); // turn 4, back to P2
+    expect(s.players.player2.field[0]?.attacksRemaining).toBe(1); // not 2
+  });
+
+  it("does not bypass the one-direct-attack-per-turn limit", () => {
+    const game = mustApply(createGame({ decks: makeDecks(), seed: 1 }), {
+      kind: "endTurn",
+    });
+    game.players.player2.hand = [];
+    const monk = putWarriorOnField(game, "player2", {
+      card: makeWarriorCard({ faction: "Monk" }),
+    });
+    const item = realCard("choir-of-pyrois");
+    game.players.player2.hand.push(item);
+
+    let s = mustApply(game, {
+      kind: "playItem",
+      cardId: item.id,
+      targetInstanceId: monk.instanceId,
+    });
+    s = mustApply(s, { kind: "enterBattle" });
+    s = mustApply(s, { kind: "directAttack", attackerInstanceId: monk.instanceId });
+    expect(s.players.player2.field[0]?.attacksRemaining).toBe(1); // one left...
+
+    const second = applyAction(s, {
+      kind: "directAttack",
+      attackerInstanceId: monk.instanceId,
+    });
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.error.code).toBe("DIRECT_ATTACK_LIMIT");
+  });
+
+  it("rejects a non-Monk friendly target (faction from the target keyword)", () => {
+    const game = newGame();
+    const dwarf = putWarriorOnField(game, "player1", {
+      card: makeWarriorCard({ faction: "Dwarf" }),
+    });
+    const item = realCard("choir-of-pyrois");
+
+    const { outcome, state } = defaultEffectRegistry.resolve(game, item, {
+      player: "player1",
+      targetInstanceId: dwarf.instanceId,
+    });
+
+    expect(outcome.resolved).toBe(false);
+    if (!outcome.resolved) {
+      expect(outcome.reason).toContain("Monk");
+    }
+    expect(state).toBe(game);
+    expect(game.players.player1.field[0]?.attacksRemaining).toBe(1);
+  });
+
+  it("rejects an enemy Monk target (wrong side)", () => {
+    const game = newGame();
+    const enemyMonk = putWarriorOnField(game, "player2", {
+      card: makeWarriorCard({ faction: "Monk" }),
+    });
+    const item = realCard("choir-of-pyrois");
+
+    const { outcome, state } = defaultEffectRegistry.resolve(game, item, {
+      player: "player1",
+      targetInstanceId: enemyMonk.instanceId,
+    });
+
+    expect(outcome.resolved).toBe(false);
+    if (!outcome.resolved) {
+      expect(outcome.reason).toContain("friendly");
+    }
+    expect(state).toBe(game);
+  });
+
+  it("fails safely for missing and invalid targets", () => {
+    const game = newGame();
+    putWarriorOnField(game, "player1", {
+      card: makeWarriorCard({ faction: "Monk" }),
+    });
+    const item = realCard("choir-of-pyrois");
+
+    const missing = defaultEffectRegistry.resolve(game, item, {
+      player: "player1",
+    });
+    expect(missing.outcome.resolved).toBe(false);
+    expect(missing.state).toBe(game);
+
+    const invalid = defaultEffectRegistry.resolve(game, item, {
+      player: "player1",
+      targetInstanceId: "ghost",
+    });
+    expect(invalid.outcome.resolved).toBe(false);
+    expect(invalid.state).toBe(game);
+    expect(game.players.player1.field[0]?.attacksRemaining).toBe(1);
   });
 });

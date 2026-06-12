@@ -352,7 +352,7 @@ describe("attack cards resolve through the registry", () => {
       defender.card.id,
     ]);
     expect(state.events.some((e) => e.type === "warriorAttacked")).toBe(false);
-    expect(state.players.player2.field[0]?.exhausted).toBe(true);
+    expect(state.players.player2.field[0]?.attacksRemaining).toBe(0);
   });
 
   it("a custom registry passed to applyAction is honored", () => {

@@ -53,8 +53,12 @@ export interface WarriorInPlay {
   currentAttack: number;
   currentHealth: number;
   maxHealth: number;
-  /** Set when the Warrior attacks; cleared at the start of the owner's turn. */
-  exhausted: boolean;
+  /**
+   * Attacks left this turn (default 1). Decremented by each attack or
+   * direct attack; reset to 1 at the start of the owner's turn. Effects
+   * may grant extras, which expire at the end of the owner's turn.
+   */
+  attacksRemaining: number;
   /** One Weapon per Warrior; it cannot be replaced or moved and dies with the Warrior. */
   attachedWeapon?: Card;
   temporaryAttackBuffs: TemporaryAttackBuff[];
