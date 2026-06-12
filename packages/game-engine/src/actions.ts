@@ -1,6 +1,10 @@
 import type { Card } from "@euphoria/card-data";
 import { defaultEffectRegistry, type EffectRegistry } from "./effects";
 import {
+  findAttackPreventionStatus,
+  findAttackTargetProtection,
+} from "./status";
+import {
   createWarriorInPlay,
   destroyWarrior,
   opponentOf,
@@ -23,7 +27,9 @@ export type EngineErrorCode =
   | "OPPONENT_HAS_WARRIORS"
   | "DIRECT_ATTACK_LIMIT"
   | "ATTACK_CARD_CHOICE_REQUIRED"
-  | "ATTACK_CARD_INCOMPATIBLE";
+  | "ATTACK_CARD_INCOMPATIBLE"
+  | "ATTACKS_PREVENTED"
+  | "ATTACK_TARGET_PROTECTED";
 
 export interface EngineError {
   code: EngineErrorCode;
@@ -117,6 +123,15 @@ function validateAttacker(
       ),
     };
   }
+  // Gorgon's Eye blocks all attack declarations, the controller's included.
+  if (findAttackPreventionStatus(state) !== undefined) {
+    return {
+      error: fail(
+        "ATTACKS_PREVENTED",
+        "No attacks can be declared while an attack-prevention status is active.",
+      ),
+    };
+  }
   const attacker = state.players[state.activePlayer].field.find(
     (w) => w.instanceId === attackerInstanceId,
   );
@@ -185,13 +200,26 @@ function attackWarrior(
   if ("error" in gate) return gate.error;
 
   const opponentId = opponentOf(state.activePlayer);
-  const defenderExists = state.players[opponentId].field.some(
+  const declaredDefender = state.players[opponentId].field.find(
     (w) => w.instanceId === action.defenderInstanceId,
   );
-  if (!defenderExists) {
+  if (declaredDefender === undefined) {
     return fail(
       "WARRIOR_NOT_FOUND",
       `${opponentId} controls no Warrior "${action.defenderInstanceId}" to attack.`,
+    );
+  }
+  if (
+    findAttackTargetProtection(
+      state,
+      state.activePlayer,
+      opponentId,
+      declaredDefender,
+    ) !== undefined
+  ) {
+    return fail(
+      "ATTACK_TARGET_PROTECTED",
+      `${declaredDefender.card.name} is protected by a status and cannot be attacked this turn.`,
     );
   }
 
@@ -572,14 +600,24 @@ export function getLegalActions(state: GameState): GameAction[] {
   if (state.phase === "battle") {
     const player = state.players[state.activePlayer];
     const opponent = state.players[opponentOf(state.activePlayer)];
-    const attacksAllowed = !(
-      state.config.noAttacksOnFirstTurn && state.turn === 1
-    );
+    const attacksAllowed =
+      !(state.config.noAttacksOnFirstTurn && state.turn === 1) &&
+      findAttackPreventionStatus(state) === undefined;
     if (attacksAllowed) {
       for (const attacker of player.field) {
         if (attacker.attacksRemaining <= 0) continue;
         const attackCards = getCompatibleAttackCards(state, attacker.instanceId);
         for (const defender of opponent.field) {
+          if (
+            findAttackTargetProtection(
+              state,
+              state.activePlayer,
+              opponent.id,
+              defender,
+            ) !== undefined
+          ) {
+            continue;
+          }
           if (attackCards.length === 0) {
             actions.push({
               kind: "attack",

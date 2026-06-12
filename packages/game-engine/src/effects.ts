@@ -5,6 +5,7 @@
  * the caller's state — the untouched input state is returned instead.
  */
 import type { Card } from "@euphoria/card-data";
+import { addStatus } from "./status";
 import {
   createWarriorInPlay,
   destroyWarrior,
@@ -689,6 +690,48 @@ const weaponAttackBonusFactionBonusHandler: EffectHandler = (state, params, cont
   return { resolved: true };
 };
 
+/**
+ * Gorgon's Eye: "No attacks can be declared until your next turn." Blocks
+ * both players (the controller too — battle follows main, so the controller
+ * gives up their own attacks this turn). Expires at the start of the
+ * controller's next turn.
+ */
+const noAttacksUntilNextTurnHandler: EffectHandler = (state, params, context) => {
+  addStatus(state, {
+    code: "PREVENT_ALL_ATTACKS",
+    controller: context.player,
+    expiry: { player: context.player, timing: "startOfTurn", turnsRemaining: 1 },
+    metadata: { ...params },
+  });
+  return { resolved: true };
+};
+
+/**
+ * Orange Court: "Your opponent cannot attack <faction> Warriors on their
+ * next turn." The opponent only attacks on their own turn, so a status
+ * active from now until the end of their next turn enforces exactly that.
+ */
+const preventAttacksAgainstFactionNextTurnHandler: EffectHandler = (
+  state,
+  params,
+  context,
+) => {
+  const faction = factionConstraint(params);
+  if (faction === undefined) {
+    return targetFailure("targetFaction param missing from card data.");
+  }
+  const opponent = opponentOf(context.player);
+  addStatus(state, {
+    code: "PREVENT_ATTACKS_AGAINST_FACTION",
+    controller: context.player,
+    affectedPlayer: opponent,
+    faction,
+    expiry: { player: opponent, timing: "endOfTurn", turnsRemaining: 1 },
+    metadata: { ...params },
+  });
+  return { resolved: true };
+};
+
 /** Pool both players' Spirit; the activator takes the rounded-up half. */
 const slushFundHandler: EffectHandler = (state, _params, context) => {
   const me = state.players[context.player];
@@ -748,6 +791,13 @@ export function createDefaultEffectRegistry(): EffectRegistry {
     weaponAttackBonusFactionBonusHandler,
   );
   registry.register("SLUSH_FUND", slushFundHandler);
+
+  // Group 5A: status/aura foundation — attack-prevention statuses.
+  registry.register("NO_ATTACKS_UNTIL_NEXT_TURN", noAttacksUntilNextTurnHandler);
+  registry.register(
+    "PREVENT_ATTACKS_AGAINST_FACTION_NEXT_TURN",
+    preventAttacksAgainstFactionNextTurnHandler,
+  );
   return registry;
 }
 

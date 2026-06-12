@@ -1,4 +1,4 @@
-import type { Phase, PlayerId } from "./types";
+import type { Phase, PlayerId, StatusCode } from "./types";
 
 export type GameEvent =
   | { type: "startingHandDrawn"; player: PlayerId; count: number }
@@ -32,4 +32,7 @@ export type GameEvent =
   | { type: "gameWon"; winner: PlayerId }
   | { type: "effectResolved"; player: PlayerId; cardId: string; effectCode: string }
   | { type: "warriorAttackModified"; player: PlayerId; instanceId: string; amount: number; newAttack: number }
-  | { type: "warriorHealthModified"; player: PlayerId; instanceId: string; amount: number; newHealth: number };
+  | { type: "warriorHealthModified"; player: PlayerId; instanceId: string; amount: number; newHealth: number }
+  /** player = the status's controller. */
+  | { type: "statusApplied"; player: PlayerId; statusId: string; code: StatusCode }
+  | { type: "statusExpired"; player: PlayerId; statusId: string; code: StatusCode };

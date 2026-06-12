@@ -3,6 +3,7 @@
  * applyAction clones before calling them so the public API stays pure.
  */
 import type { Card } from "@euphoria/card-data";
+import { expireStatuses } from "./status";
 import type { GameState, PlayerId, PlayerState, WarriorInPlay } from "./types";
 
 export function opponentOf(player: PlayerId): PlayerId {
@@ -105,6 +106,7 @@ export function runStartPhase(state: GameState): void {
   state.events.push({ type: "warriorsRefreshed", player: player.id });
 
   expireTemporaryBuffs(state, player);
+  expireStatuses(state, player.id, "startOfTurn");
   resolveDelayedEffects(state, player);
 
   gainSpirit(state, player, state.config.spiritGainPerTurn);
@@ -124,6 +126,7 @@ export function runEndPhase(state: GameState): void {
   for (const warrior of player.field) {
     warrior.attacksRemaining = Math.min(warrior.attacksRemaining, 1);
   }
+  expireStatuses(state, player.id, "endOfTurn");
 
   state.activePlayer = opponentOf(state.activePlayer);
   state.turn += 1;

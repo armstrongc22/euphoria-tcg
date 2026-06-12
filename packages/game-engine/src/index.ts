@@ -6,10 +6,20 @@ export type {
   PlayerId,
   PlayerState,
   RulesConfig,
+  StatusCode,
+  StatusEffect,
+  StatusExpiry,
+  StatusExpiryTiming,
   TemporaryAttackBuff,
   WarriorInPlay,
 } from "./types";
 export { PLAYER_IDS } from "./types";
+export {
+  addStatus,
+  expireStatuses,
+  findAttackPreventionStatus,
+  findAttackTargetProtection,
+} from "./status";
 export type { GameEvent } from "./events";
 export { DEFAULT_RULES } from "./config";
 export { createRng, shuffleCards } from "./rng";

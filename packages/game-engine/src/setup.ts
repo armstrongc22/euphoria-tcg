@@ -49,8 +49,10 @@ export function createGame(options: CreateGameOptions): GameState {
       player2: createPlayer("player2", config),
     },
     winner: null,
+    statuses: [],
     events: [],
     nextInstanceId: 1,
+    nextStatusId: 1,
   };
 
   for (const id of PLAYER_IDS) {

@@ -71,6 +71,51 @@ export interface DelayedEffect {
   turnsRemaining: number;
 }
 
+/** What a StatusEffect does; handlers in actions/turn dispatch on this. */
+export type StatusCode =
+  /** Gorgon's Eye: no attacks (including direct) may be declared by anyone. */
+  | "PREVENT_ALL_ATTACKS"
+  /** Orange Court: affectedPlayer cannot attack the controller's Warriors of `faction`. */
+  | "PREVENT_ATTACKS_AGAINST_FACTION";
+
+/**
+ * Which turn boundary a status expires on. "startOfTurn" fires during
+ * `expiry.player`'s Start Phase (before Spirit gain and draw); "endOfTurn"
+ * fires during their End Phase (before the turn passes).
+ */
+export type StatusExpiryTiming = "startOfTurn" | "endOfTurn";
+
+export interface StatusExpiry {
+  /** Whose turn boundary counts down this status. */
+  player: PlayerId;
+  timing: StatusExpiryTiming;
+  /** Matching boundaries left to pass; the status expires when it reaches 0. */
+  turnsRemaining: number;
+}
+
+/**
+ * A temporary game-wide modifier (aura) created by a card effect. Statuses
+ * live on GameState (not on a player) because some — Gorgon's Eye — affect
+ * both players at once. Scope fields are optional; an unset field means
+ * "unrestricted" along that axis.
+ */
+export interface StatusEffect {
+  /** Unique per game ("status-1", "status-2", ...). */
+  id: string;
+  code: StatusCode;
+  /** The player whose card created the status. */
+  controller: PlayerId;
+  /** The player the status constrains, if player-scoped. */
+  affectedPlayer?: PlayerId;
+  /** The Warrior the status is attached to, if Warrior-scoped. */
+  affectedInstanceId?: string;
+  /** Only Warriors of this faction are covered, if set. */
+  faction?: string;
+  expiry: StatusExpiry;
+  /** Free-form per-status data (e.g. the source card's effectParams). */
+  metadata?: Record<string, unknown>;
+}
+
 export interface PlayerState {
   id: PlayerId;
   lives: number;
@@ -91,10 +136,14 @@ export interface GameState {
   phase: Phase;
   players: Record<PlayerId, PlayerState>;
   winner: PlayerId | null;
+  /** Active temporary statuses/auras, game-wide (see StatusEffect). */
+  statuses: StatusEffect[];
   /** Append-only structured log (the Python engine's print-based log). */
   events: GameEvent[];
   /** Counter for unique WarriorInPlay instance ids. */
   nextInstanceId: number;
+  /** Counter for unique StatusEffect ids. */
+  nextStatusId: number;
 }
 
 export type GameAction =
