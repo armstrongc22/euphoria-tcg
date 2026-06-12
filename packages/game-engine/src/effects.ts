@@ -267,6 +267,12 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   registry.register("modifyAttack", modifyAttackHandler);
   registry.register("modifyHealth", modifyHealthHandler);
   registry.register("dealDamageToWarrior", dealDamageToWarriorHandler);
+
+  // Aliases for effectCode values already used in cards.json whose mapping
+  // to a generic handler is obvious. (GAIN_SPIRIT and DRAW_CARDS need no
+  // alias: normalization already matches them to gainSpirit/drawCards.)
+  registry.register("DAMAGE_TARGET", dealDamageToWarriorHandler);
+  registry.register("HEAL_TARGET", modifyHealthHandler);
   return registry;
 }
 

@@ -50,9 +50,9 @@ export function applyAction(
     case "playWarrior":
       return playWarrior(state, action.cardId);
     case "playItem":
-      return playItem(state, action.cardId);
+      return playItem(state, action, effects);
     case "equipWeapon":
-      return equipWeapon(state, action.cardId, action.warriorInstanceId);
+      return equipWeapon(state, action.cardId, action.warriorInstanceId, effects);
     case "attack":
       return attackWarrior(state, action, effects);
     case "directAttack":
@@ -430,11 +430,15 @@ function playWarrior(state: GameState, cardId: string): ActionResult {
   return { ok: true, state: next };
 }
 
-function playItem(state: GameState, cardId: string): ActionResult {
-  const validated = validateMainPhasePlay(state, cardId, "Item", "played");
+function playItem(
+  state: GameState,
+  action: Extract<GameAction, { kind: "playItem" }>,
+  effects: EffectRegistry,
+): ActionResult {
+  const validated = validateMainPhasePlay(state, action.cardId, "Item", "played");
   if ("error" in validated) return validated.error;
 
-  const next = structuredClone(state);
+  let next = structuredClone(state);
   const nextPlayer = next.players[next.activePlayer];
   const card = nextPlayer.hand[validated.handIndex]!;
 
@@ -448,13 +452,23 @@ function playItem(state: GameState, cardId: string): ActionResult {
     cardId: card.id,
     cost: card.cost,
   });
-  // Effect registry lands in a later step; per project decision, uncoded
-  // cards still resolve (Spirit spent) and are marked for handlers later.
-  next.events.push({
-    type: "effectNotImplemented",
-    player: nextPlayer.id,
-    cardId: card.id,
+
+  // Per project decision, an Item is spent (Spirit paid, card to the Out
+  // Deck) whether or not its effect resolves; unknown or failed effects
+  // just leave the pending marker instead.
+  const resolution = effects.resolve(next, card, {
+    player: next.activePlayer,
+    targetInstanceId: action.targetInstanceId,
   });
+  if (resolution.outcome.resolved) {
+    next = resolution.state;
+  } else {
+    next.events.push({
+      type: "effectNotImplemented",
+      player: nextPlayer.id,
+      cardId: card.id,
+    });
+  }
   return { ok: true, state: next };
 }
 
@@ -462,6 +476,7 @@ function equipWeapon(
   state: GameState,
   cardId: string,
   warriorInstanceId: string,
+  effects: EffectRegistry,
 ): ActionResult {
   const validated = validateMainPhasePlay(state, cardId, "Weapon", "equipped");
   if ("error" in validated) return validated.error;
@@ -499,7 +514,19 @@ function equipWeapon(
     warriorInstanceId,
     cost: card.cost,
   });
-  // Weapon passive effects (e.g. Xiwanghao) need coded handlers later.
+
+  // Only effects the data explicitly marks as on_equip resolve here.
+  // while_equipped passives (every current Weapon stat bonus) need combat
+  // hooks and stay pending — no stat behavior is invented for them.
+  if (card.effectCode !== undefined && card.timing === "on_equip") {
+    const resolution = effects.resolve(next, card, {
+      player: nextPlayer.id,
+      targetInstanceId: warriorInstanceId,
+    });
+    if (resolution.outcome.resolved) {
+      return { ok: true, state: resolution.state };
+    }
+  }
   next.events.push({
     type: "effectNotImplemented",
     player: nextPlayer.id,
