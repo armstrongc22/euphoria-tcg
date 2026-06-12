@@ -266,46 +266,53 @@ describe("WEAPON_ATTACK_BONUS_FACTION_BONUS (Fafnir)", () => {
     expectResolved(state, weapon.id);
   });
 
-  it("buffs a friendly non-Monk Warrior with the base bonus", () => {
-    const game = newGame();
-    const dwarf = putWarriorOnField(game, "player1", {
-      card: makeWarriorCard({ faction: "Dwarf" }),
-    });
-    const weapon = realCard("fafnir");
-    game.players.player1.hand.push(weapon);
+  it.each(["Dwarf", "Sonic", "Surfer", "Shaman"] as const)(
+    "buffs a friendly %s Warrior with the base bonus (+500)",
+    (faction) => {
+      const game = newGame();
+      const warrior = putWarriorOnField(game, "player1", {
+        card: makeWarriorCard({ faction }),
+      });
+      const weapon = realCard("fafnir");
+      game.players.player1.hand.push(weapon);
 
-    const state = mustApply(game, {
-      kind: "equipWeapon",
-      cardId: weapon.id,
-      warriorInstanceId: dwarf.instanceId,
-    });
-
-    expect(state.players.player1.field[0]?.attachedWeapon?.id).toBe(weapon.id);
-    expect(state.players.player1.field[0]?.currentAttack).toBe(1500); // +500
-    expectResolved(state, weapon.id);
-  });
-
-  it("cannot target an enemy Warrior", () => {
-    const game = newGame();
-    const enemy = putWarriorOnField(game, "player2", {
-      card: makeWarriorCard({ faction: "Monk" }),
-    });
-    const weapon = realCard("fafnir");
-    game.players.player1.hand.push(weapon);
-
-    expectError(
-      game,
-      {
+      const state = mustApply(game, {
         kind: "equipWeapon",
         cardId: weapon.id,
-        warriorInstanceId: enemy.instanceId,
-      },
-      "WARRIOR_NOT_FOUND",
-    );
-    // Nothing changed: enemy stats intact, weapon still in hand.
-    expect(game.players.player2.field[0]?.currentAttack).toBe(enemy.currentAttack);
-    expect(game.players.player1.hand.map((c) => c.id)).toEqual([weapon.id]);
-  });
+        warriorInstanceId: warrior.instanceId,
+      });
+
+      expect(state.players.player1.field[0]?.attachedWeapon?.id).toBe(weapon.id);
+      expect(state.players.player1.field[0]?.currentAttack).toBe(1500); // +500
+      expectResolved(state, weapon.id);
+    },
+  );
+
+  it.each(["Monk", "Dwarf", "Sonic", "Surfer", "Shaman"] as const)(
+    "cannot target an enemy %s Warrior",
+    (faction) => {
+      const game = newGame();
+      const enemy = putWarriorOnField(game, "player2", {
+        card: makeWarriorCard({ faction }),
+      });
+      const weapon = realCard("fafnir");
+      game.players.player1.hand.push(weapon);
+
+      expectError(
+        game,
+        {
+          kind: "equipWeapon",
+          cardId: weapon.id,
+          warriorInstanceId: enemy.instanceId,
+        },
+        "WARRIOR_NOT_FOUND",
+      );
+      // Nothing changed: enemy stats intact, weapon still in hand.
+      expect(game.players.player2.field[0]?.currentAttack).toBe(enemy.currentAttack);
+      expect(game.players.player2.field[0]?.attachedWeapon).toBeUndefined();
+      expect(game.players.player1.hand.map((c) => c.id)).toEqual([weapon.id]);
+    },
+  );
 
   it("rejects an invalid warriorInstanceId safely", () => {
     const game = newGame();
