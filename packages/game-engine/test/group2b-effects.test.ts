@@ -170,3 +170,97 @@ describe("REVIVE_WARRIOR via Totem's Creation", () => {
     expect(game.players.player2.outDeck.map((c) => c.id)).toEqual([fallen.id]);
   });
 });
+
+describe("HEALTH_PER_ITEM_IN_OUT_DECK via Vibrant Pastures", () => {
+  function play(game: GameState, targetInstanceId?: string): GameState {
+    const item = realCard("vibrant-pastures");
+    game.players.player1.hand.push(item);
+    return mustApply(game, {
+      kind: "playItem",
+      cardId: item.id,
+      targetInstanceId,
+    });
+  }
+
+  it("heals nothing with no Items in the Out Deck (does not count itself)", () => {
+    const game = newGame();
+    const warrior = putWarriorOnField(game, "player1", { currentHealth: 900 });
+
+    const state = play(game, warrior.instanceId);
+
+    expect(state.players.player1.field[0]?.currentHealth).toBe(900);
+    expect(
+      state.events.some(
+        (e) =>
+          e.type === "effectResolved" && e.effectCode === "HEALTH_PER_ITEM_IN_OUT_DECK",
+      ),
+    ).toBe(true);
+  });
+
+  it("heals 500 with one Item in the Out Deck", () => {
+    const game = newGame();
+    const warrior = putWarriorOnField(game, "player1", { currentHealth: 900 });
+    game.players.player1.outDeck.push(realCard("gunder-love"));
+
+    const state = play(game, warrior.instanceId);
+    expect(state.players.player1.field[0]?.currentHealth).toBe(1400);
+  });
+
+  it("heals 500 per Item with multiple Items, overhealing past max", () => {
+    const game = newGame();
+    const warrior = putWarriorOnField(game, "player1"); // 2000/2000
+    game.players.player1.outDeck.push(
+      realCard("gunder-love"),
+      realCard("slush-fund"),
+      realCard("cryraven-circus"),
+    );
+
+    const state = play(game, warrior.instanceId);
+    expect(state.players.player1.field[0]?.currentHealth).toBe(3500);
+    expect(state.players.player1.field[0]?.maxHealth).toBe(3500);
+  });
+
+  it("counts only Items: Warriors and Weapons in the Out Deck are ignored", () => {
+    const game = newGame();
+    const warrior = putWarriorOnField(game, "player1", { currentHealth: 900 });
+    game.players.player1.outDeck.push(
+      realCard("bit-schneider"), // Warrior
+      realCard("fafnir"), // Weapon
+      realCard("gunder-love"), // the only Item
+    );
+
+    const state = play(game, warrior.instanceId);
+    expect(state.players.player1.field[0]?.currentHealth).toBe(1400); // +500
+  });
+
+  it("fails safely with a missing target", () => {
+    const game = newGame();
+    const warrior = putWarriorOnField(game, "player1", { currentHealth: 900 });
+    game.players.player1.outDeck.push(realCard("gunder-love"));
+
+    const state = play(game); // no targetInstanceId
+
+    expect(state.players.player1.field[0]?.currentHealth).toBe(900);
+    expect(state.players.player1.spirit).toBe(1); // spent per current behavior
+    expect(
+      state.events.some((e) => e.type === "effectNotImplemented"),
+    ).toBe(true);
+  });
+
+  it("fails safely with an invalid target and does not corrupt state", () => {
+    const game = newGame();
+    game.players.player1.outDeck.push(realCard("gunder-love"));
+    const item = realCard("vibrant-pastures");
+
+    const { outcome, state } = defaultEffectRegistry.resolve(game, item, {
+      player: "player1",
+      targetInstanceId: "ghost",
+    });
+
+    expect(outcome.resolved).toBe(false);
+    if (!outcome.resolved) {
+      expect(outcome.code).toBe("EFFECT_FAILED");
+    }
+    expect(state).toBe(game);
+  });
+});

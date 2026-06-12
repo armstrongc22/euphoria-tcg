@@ -440,7 +440,6 @@ function playItem(
 
   nextPlayer.spirit -= card.cost;
   nextPlayer.hand.splice(validated.handIndex, 1);
-  nextPlayer.outDeck.push(card);
 
   next.events.push({
     type: "itemPlayed",
@@ -449,9 +448,10 @@ function playItem(
     cost: card.cost,
   });
 
-  // Per project decision, an Item is spent (Spirit paid, card to the Out
-  // Deck) whether or not its effect resolves; unknown or failed effects
-  // just leave the pending marker instead.
+  // Resolve while the Item is in limbo (not yet in the Out Deck), so
+  // effects that count Out Deck Items never count the resolving card.
+  // Per project decision, the Item is spent whether or not its effect
+  // resolves; unknown or failed effects just leave the pending marker.
   const resolution = effects.resolve(next, card, {
     player: next.activePlayer,
     targetInstanceId: action.targetInstanceId,
@@ -466,6 +466,7 @@ function playItem(
       cardId: card.id,
     });
   }
+  next.players[next.activePlayer].outDeck.push(card);
   return { ok: true, state: next };
 }
 

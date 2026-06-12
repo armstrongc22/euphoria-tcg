@@ -381,6 +381,19 @@ const reviveWarriorHandler: EffectHandler = (state, _params, context) => {
   return { resolved: true };
 };
 
+/** "Pick 1 Warrior. It gets 500 HEALTH for every Item in your Out deck." */
+const healthPerItemInOutDeckHandler: EffectHandler = (state, params, context) => {
+  const target = requireWarriorTarget(state, params, context, "any");
+  if (!target.ok) return target.outcome;
+
+  const perItem = numberParam(params, ["amount"], 0);
+  const itemCount = state.players[context.player].outDeck.filter(
+    (c) => c.type === "Item",
+  ).length;
+  modifyWarriorHealth(state, target.owner, target.warrior, perItem * itemCount);
+  return { resolved: true };
+};
+
 /** "Destroy 1 Warrior on your opponent's side of the field." */
 const destroyTargetWarriorHandler: EffectHandler = (state, params, context) => {
   const target = requireWarriorTarget(state, params, context, "enemy", context.defenderInstanceId);
@@ -536,6 +549,8 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   registry.register("DESTROY_TARGET_WARRIOR", destroyTargetWarriorHandler);
   // Group 2B-1: revive from the controller's own Out Deck.
   registry.register("REVIVE_WARRIOR", reviveWarriorHandler);
+  // Group 2B-2: computed heal scaling with Out Deck Items.
+  registry.register("HEALTH_PER_ITEM_IN_OUT_DECK", healthPerItemInOutDeckHandler);
   // +2000-damage Attack cards buff the attacker for the turn.
   registry.register("ATTACK_DAMAGE_BONUS", modifyAttackHandler);
 
