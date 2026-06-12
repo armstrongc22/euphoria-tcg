@@ -1,5 +1,9 @@
 import type { Card } from "@euphoria/card-data";
-import { defaultEffectRegistry, type EffectRegistry } from "./effects";
+import {
+  defaultEffectRegistry,
+  normalizeEffectCode,
+  type EffectRegistry,
+} from "./effects";
 import {
   findAttackPreventionStatus,
   findAttackTargetProtection,
@@ -208,6 +212,36 @@ export function getCompatibleAttackCards(
   return compatible;
 }
 
+function attachedWeaponCode(warrior: WarriorInPlay): string | undefined {
+  const code = warrior.attachedWeapon?.effectCode;
+  return code === undefined ? undefined : normalizeEffectCode(code);
+}
+
+/**
+ * Combat damage with Weapon combat passives applied. Passives are read
+ * straight from the attached Weapon card: Weapons never detach and go to
+ * the Out Deck with their Warrior, so attachment is exactly the passive's
+ * lifetime. The attacker's outgoing modifier applies first (Xīwànghǎo
+ * adds the attack difference), then the defender's incoming one (Skeleton
+ * Key halves what arrives).
+ */
+function computeCombatDamage(
+  attacker: WarriorInPlay,
+  defender: WarriorInPlay,
+): number {
+  let damage = attacker.currentAttack;
+  if (attachedWeaponCode(attacker) === "WEAPON_ADD_ATTACK_DIFFERENCE_DAMAGE") {
+    damage += Math.abs(attacker.currentAttack - defender.currentAttack);
+  }
+  if (attachedWeaponCode(defender) === "WEAPON_HALVE_INCOMING_DAMAGE") {
+    const amount = defender.attachedWeapon?.effectParams?.["amount"];
+    const multiplier =
+      typeof amount === "number" && amount > 0 && amount < 1 ? amount : 0.5;
+    damage = Math.floor(damage * multiplier);
+  }
+  return damage;
+}
+
 function attackWarrior(
   state: GameState,
   action: Extract<GameAction, { kind: "attack" }>,
@@ -343,7 +377,7 @@ function attackWarrior(
     const defenderFaction = defender.card.faction;
     // The attacker takes no counter damage (CLAUDE.md overrides the spec's
     // "simultaneous" wording; see RulesConfig.combatDamageSimultaneous).
-    const damage = attacker.currentAttack;
+    const damage = computeCombatDamage(attacker, defender);
     defender.currentHealth -= damage;
     next.events.push({
       type: "warriorAttacked",

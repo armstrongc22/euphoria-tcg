@@ -975,6 +975,23 @@ const damageUpToTwoDisableHandler: EffectHandler = (state, params, context) => {
   return { resolved: true };
 };
 
+/**
+ * Combat-time Weapon passives (Skeleton Key, Xīwànghǎo): nothing happens
+ * at equip time — actions.ts reads the passive from the attached Weapon
+ * during damage calculation, and the attachment's lifetime is the
+ * passive's. Resolving here (after validating the equip target) keeps the
+ * card from being flagged effectNotImplemented, with no Spirit beyond the
+ * equip cost. Scythe Cycle (WEAPON_ATTACK_BONUS_SPLASH) is deliberately
+ * NOT registered: its per-attack "select one" splash needs target
+ * plumbing that does not exist, and resolving only its static +500 would
+ * hide the pending splash.
+ */
+const weaponCombatPassiveHandler: EffectHandler = (state, params, context) => {
+  const target = requireWarriorTarget(state, params, context, "friendly");
+  if (!target.ok) return target.outcome;
+  return { resolved: true };
+};
+
 /** Pool both players' Spirit; the activator takes the rounded-up half. */
 const slushFundHandler: EffectHandler = (state, _params, context) => {
   const me = state.players[context.player];
@@ -1059,6 +1076,14 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   // Group 4B: Attack-card combat modifiers with disable riders.
   registry.register("ATTACK_DAMAGE_BONUS_DISABLE", attackDamageBonusDisableHandler);
   registry.register("DAMAGE_UP_TO_TWO_DISABLE", damageUpToTwoDisableHandler);
+
+  // Group 4C: Weapon combat passives, enforced in computeCombatDamage
+  // (actions.ts); these equip-time registrations just clear the marker.
+  registry.register("WEAPON_HALVE_INCOMING_DAMAGE", weaponCombatPassiveHandler);
+  registry.register(
+    "WEAPON_ADD_ATTACK_DIFFERENCE_DAMAGE",
+    weaponCombatPassiveHandler,
+  );
   return registry;
 }
 

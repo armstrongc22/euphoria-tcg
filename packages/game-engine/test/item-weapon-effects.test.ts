@@ -129,9 +129,9 @@ describe("Weapons and the effect registry", () => {
     const game = newGame();
     const warrior = putWarriorOnField(game, "player1"); // 1000 atk, 2000 hp
     const weapon = makeWeaponCard({
-      effectCode: "WEAPON_HALVE_INCOMING_DAMAGE",
+      effectCode: "WEAPON_NEGATE_ONCE_REDUCE_ATTACKER",
       timing: "while_equipped",
-      effectParams: { amount: 0.5 },
+      effectParams: { amount: 500 },
     });
     game.players.player1.hand.push(weapon);
 
