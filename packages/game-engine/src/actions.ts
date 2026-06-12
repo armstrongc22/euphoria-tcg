@@ -456,6 +456,7 @@ function playItem(
     player: next.activePlayer,
     targetInstanceId: action.targetInstanceId,
     targetOutDeckCardId: action.targetOutDeckCardId,
+    targetDeckCardId: action.targetDeckCardId,
   });
   if (resolution.outcome.resolved) {
     next = resolution.state;

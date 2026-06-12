@@ -26,6 +26,8 @@ export interface EffectContext {
   targetInstanceId?: string;
   /** Chosen card in the controller's own Out Deck (e.g. revive target). */
   targetOutDeckCardId?: string;
+  /** Chosen card in the controller's own deck (e.g. search target). */
+  targetDeckCardId?: string;
 }
 
 export type EffectOutcome =
@@ -241,6 +243,16 @@ function stringParam(
   return undefined;
 }
 
+function stringArrayParam(
+  params: EffectParams,
+  key: string,
+): string[] | undefined {
+  const value = params[key];
+  if (!Array.isArray(value)) return undefined;
+  const items = value.filter((item): item is string => typeof item === "string");
+  return items.length > 0 ? items : undefined;
+}
+
 /** Health change with the shared rules: overheal raises max, <= 0 destroys. */
 function modifyWarriorHealth(
   state: GameState,
@@ -377,6 +389,71 @@ const reviveWarriorHandler: EffectHandler = (state, _params, context) => {
     player: context.player,
     cardId: target.card.id,
     instanceId: warrior.instanceId,
+  });
+  return { resolved: true };
+};
+
+/**
+ * Shared selection of a card from the controller's own deck, validated
+ * against the effect's search constraints (params.targetTypes and
+ * params.targetFaction). Missing choices, ids not in the deck, and
+ * constraint mismatches all fail safely.
+ */
+function requireDeckCard(
+  state: GameState,
+  params: EffectParams,
+  context: EffectContext,
+): { ok: true; card: Card; index: number } | { ok: false; outcome: EffectOutcome } {
+  const cardId = context.targetDeckCardId;
+  if (cardId === undefined) {
+    return {
+      ok: false,
+      outcome: targetFailure("a deck card is required (targetDeckCardId missing)."),
+    };
+  }
+  const deck = state.players[context.player].deck;
+  const index = deck.findIndex((c) => c.id === cardId);
+  if (index === -1) {
+    return {
+      ok: false,
+      outcome: targetFailure(`No card "${cardId}" in ${context.player}'s deck.`),
+    };
+  }
+  const card = deck[index]!;
+  const types = stringArrayParam(params, "targetTypes");
+  if (types !== undefined && !types.includes(card.type)) {
+    return {
+      ok: false,
+      outcome: targetFailure(
+        `${card.name} is a ${card.type}; this search needs a ${types.join(" or ")} card.`,
+      ),
+    };
+  }
+  const faction = stringParam(params, ["targetFaction"]);
+  if (faction !== undefined && card.faction !== faction) {
+    return {
+      ok: false,
+      outcome: targetFailure(
+        `${card.name} is ${card.faction}; this search needs a ${faction} card.`,
+      ),
+    };
+  }
+  return { ok: true, card, index };
+}
+
+/** "Add 1 <matching> card from your deck to your hand." No shuffle: neither
+ *  the card texts nor effectParams call for one. */
+const searchDeckHandler: EffectHandler = (state, params, context) => {
+  const target = requireDeckCard(state, params, context);
+  if (!target.ok) return target.outcome;
+
+  const player = state.players[context.player];
+  player.deck.splice(target.index, 1);
+  player.hand.push(target.card);
+  state.events.push({
+    type: "deckSearched",
+    player: context.player,
+    cardId: target.card.id,
   });
   return { resolved: true };
 };
@@ -594,6 +671,8 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   registry.register("HEALTH_PER_ITEM_IN_OUT_DECK", healthPerItemInOutDeckHandler);
   // Group 2B-3: one additional attack this turn for a friendly Warrior.
   registry.register("EXTRA_ATTACK_THIS_TURN", extraAttackThisTurnHandler);
+  // Group 3A: tutor a constrained card from the deck to hand.
+  registry.register("SEARCH_DECK", searchDeckHandler);
   // +2000-damage Attack cards buff the attacker for the turn.
   registry.register("ATTACK_DAMAGE_BONUS", modifyAttackHandler);
 

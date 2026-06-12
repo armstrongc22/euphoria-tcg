@@ -106,6 +106,8 @@ export type GameAction =
       targetInstanceId?: string;
       /** Card id in the player's own Out Deck (e.g. the Warrior to revive). */
       targetOutDeckCardId?: string;
+      /** Card id in the player's own deck (e.g. the search target). */
+      targetDeckCardId?: string;
     }
   | { kind: "equipWeapon"; cardId: string; warriorInstanceId: string }
   /**
