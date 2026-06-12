@@ -2,7 +2,8 @@
  * Turn lifecycle internals. These functions mutate the state they are given;
  * applyAction clones before calling them so the public API stays pure.
  */
-import type { GameState, PlayerId, PlayerState } from "./types";
+import type { Card } from "@euphoria/card-data";
+import type { GameState, PlayerId, PlayerState, WarriorInPlay } from "./types";
 
 export function opponentOf(player: PlayerId): PlayerId {
   return player === "player1" ? "player2" : "player1";
@@ -40,6 +41,21 @@ export function drawCards(
     player.hand.push(card);
     state.events.push({ type: "cardDrawn", player: player.id, cardId: card.id });
   }
+}
+
+/** Builds a fresh WarriorInPlay at full stats with a unique instance id. */
+export function createWarriorInPlay(state: GameState, card: Card): WarriorInPlay {
+  const instanceId = `warrior-${state.nextInstanceId}`;
+  state.nextInstanceId += 1;
+  return {
+    instanceId,
+    card,
+    currentAttack: card.attack ?? 0,
+    currentHealth: card.health ?? 0,
+    maxHealth: card.health ?? 0,
+    exhausted: false,
+    temporaryAttackBuffs: [],
+  };
 }
 
 /** Removes a Warrior from the field; it and any attached Weapon go to the Out Deck. */

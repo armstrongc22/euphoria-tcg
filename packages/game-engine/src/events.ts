@@ -14,6 +14,7 @@ export type GameEvent =
   | { type: "phaseChanged"; phase: Phase }
   | { type: "turnEnded"; player: PlayerId }
   | { type: "warriorSummoned"; player: PlayerId; cardId: string; instanceId: string; cost: number }
+  | { type: "warriorRevived"; player: PlayerId; cardId: string; instanceId: string }
   | { type: "itemPlayed"; player: PlayerId; cardId: string; cost: number }
   | { type: "weaponEquipped"; player: PlayerId; cardId: string; warriorInstanceId: string; cost: number }
   /** The card resolved with no effect — it needs a coded handler later. */

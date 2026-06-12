@@ -1,6 +1,11 @@
 import type { Card } from "@euphoria/card-data";
 import { defaultEffectRegistry, type EffectRegistry } from "./effects";
-import { destroyWarrior, opponentOf, runEndPhase } from "./turn";
+import {
+  createWarriorInPlay,
+  destroyWarrior,
+  opponentOf,
+  runEndPhase,
+} from "./turn";
 import type { GameAction, GameState, WarriorInPlay } from "./types";
 
 export type EngineErrorCode =
@@ -408,24 +413,14 @@ function playWarrior(state: GameState, cardId: string): ActionResult {
   nextPlayer.spirit -= card.cost;
   nextPlayer.hand.splice(validated.handIndex, 1);
 
-  const instanceId = `warrior-${next.nextInstanceId}`;
-  next.nextInstanceId += 1;
-  const warrior: WarriorInPlay = {
-    instanceId,
-    card,
-    currentAttack: card.attack ?? 0,
-    currentHealth: card.health ?? 0,
-    maxHealth: card.health ?? 0,
-    exhausted: false,
-    temporaryAttackBuffs: [],
-  };
+  const warrior = createWarriorInPlay(next, card);
   nextPlayer.field.push(warrior);
 
   next.events.push({
     type: "warriorSummoned",
     player: nextPlayer.id,
     cardId: card.id,
-    instanceId,
+    instanceId: warrior.instanceId,
     cost: card.cost,
   });
   return { ok: true, state: next };
@@ -460,6 +455,7 @@ function playItem(
   const resolution = effects.resolve(next, card, {
     player: next.activePlayer,
     targetInstanceId: action.targetInstanceId,
+    targetOutDeckCardId: action.targetOutDeckCardId,
   });
   if (resolution.outcome.resolved) {
     next = resolution.state;

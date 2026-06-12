@@ -95,7 +95,14 @@ export interface GameState {
 
 export type GameAction =
   | { kind: "playWarrior"; cardId: string }
-  | { kind: "playItem"; cardId: string; targetPlayer?: PlayerId; targetInstanceId?: string }
+  | {
+      kind: "playItem";
+      cardId: string;
+      targetPlayer?: PlayerId;
+      targetInstanceId?: string;
+      /** Card id in the player's own Out Deck (e.g. the Warrior to revive). */
+      targetOutDeckCardId?: string;
+    }
   | { kind: "equipWeapon"; cardId: string; warriorInstanceId: string }
   /**
    * If the attacking player holds a compatible (same-faction, affordable)

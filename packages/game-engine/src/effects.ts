@@ -5,7 +5,13 @@
  * the caller's state — the untouched input state is returned instead.
  */
 import type { Card } from "@euphoria/card-data";
-import { destroyWarrior, drawCards, gainSpirit, opponentOf } from "./turn";
+import {
+  createWarriorInPlay,
+  destroyWarrior,
+  drawCards,
+  gainSpirit,
+  opponentOf,
+} from "./turn";
 import type { GameState, PlayerId, WarriorInPlay } from "./types";
 
 export type EffectParams = Readonly<Record<string, unknown>>;
@@ -18,6 +24,8 @@ export interface EffectContext {
   defenderInstanceId?: string;
   /** Explicit target chosen by the player, if any. */
   targetInstanceId?: string;
+  /** Chosen card in the controller's own Out Deck (e.g. revive target). */
+  targetOutDeckCardId?: string;
 }
 
 export type EffectOutcome =
@@ -316,6 +324,63 @@ const dealDamageToWarriorHandler: EffectHandler = (state, params, context) => {
   return { resolved: true };
 };
 
+/**
+ * Shared selection of a Warrior card from the controller's own Out Deck.
+ * Missing choices, ids not in the Out Deck, and non-Warrior cards all fail
+ * (and EffectRegistry.resolve discards any partial work on failure).
+ */
+function requireOutDeckWarrior(
+  state: GameState,
+  context: EffectContext,
+): { ok: true; card: Card; index: number } | { ok: false; outcome: EffectOutcome } {
+  const cardId = context.targetOutDeckCardId;
+  if (cardId === undefined) {
+    return {
+      ok: false,
+      outcome: targetFailure("an Out Deck card is required (targetOutDeckCardId missing)."),
+    };
+  }
+  const outDeck = state.players[context.player].outDeck;
+  const index = outDeck.findIndex((c) => c.id === cardId);
+  if (index === -1) {
+    return {
+      ok: false,
+      outcome: targetFailure(`No card "${cardId}" in ${context.player}'s Out Deck.`),
+    };
+  }
+  const card = outDeck[index]!;
+  if (card.type !== "Warrior") {
+    return {
+      ok: false,
+      outcome: targetFailure(`${card.name} is not a Warrior and cannot be revived.`),
+    };
+  }
+  return { ok: true, card, index };
+}
+
+/** "Revive 1 Warrior that's been destroyed to your side of the field." */
+const reviveWarriorHandler: EffectHandler = (state, _params, context) => {
+  const player = state.players[context.player];
+  if (player.field.length >= state.config.warriorSlots) {
+    return targetFailure(
+      `the Warrior field is full (${state.config.warriorSlots} slots).`,
+    );
+  }
+  const target = requireOutDeckWarrior(state, context);
+  if (!target.ok) return target.outcome;
+
+  player.outDeck.splice(target.index, 1);
+  const warrior = createWarriorInPlay(state, target.card);
+  player.field.push(warrior);
+  state.events.push({
+    type: "warriorRevived",
+    player: context.player,
+    cardId: target.card.id,
+    instanceId: warrior.instanceId,
+  });
+  return { resolved: true };
+};
+
 /** "Destroy 1 Warrior on your opponent's side of the field." */
 const destroyTargetWarriorHandler: EffectHandler = (state, params, context) => {
   const target = requireWarriorTarget(state, params, context, "enemy", context.defenderInstanceId);
@@ -469,6 +534,8 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   registry.register("HEAL_TARGET", modifyHealthHandler);
   // Group 2A: enemy-only targeted destruction.
   registry.register("DESTROY_TARGET_WARRIOR", destroyTargetWarriorHandler);
+  // Group 2B-1: revive from the controller's own Out Deck.
+  registry.register("REVIVE_WARRIOR", reviveWarriorHandler);
   // +2000-damage Attack cards buff the attacker for the turn.
   registry.register("ATTACK_DAMAGE_BONUS", modifyAttackHandler);
 
