@@ -19,7 +19,10 @@ export {
   expireStatuses,
   findAttackPreventionStatus,
   findAttackTargetProtection,
+  findAttackerRestriction,
   findDestructionProtection,
+  findRetaliationStatuses,
+  recordAttackDeclaration,
   triggerExpiredStatuses,
 } from "./status";
 export type { GameEvent } from "./events";

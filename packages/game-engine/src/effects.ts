@@ -838,6 +838,64 @@ const spiritEscrowHandler: EffectHandler = (state, params, context) => {
   return { resolved: true };
 };
 
+/**
+ * Primetime Interview: "Select 1 Warrior on your opponent's side of the
+ * field. It is the only Warrior that can attack until your next turn."
+ * Scoped to the opponent's attack declarations per the effect key
+ * (restrict_opponent_attacks_to_selected_warrior); validateAttacker
+ * enforces it, covering direct attacks too.
+ */
+const restrictOpponentAttackTargetHandler: EffectHandler = (state, params, context) => {
+  const target = requireWarriorTarget(state, params, context, "enemy");
+  if (!target.ok) return target.outcome;
+
+  addStatus(state, {
+    code: "RESTRICT_ATTACKER_TO_WARRIOR",
+    controller: context.player,
+    affectedPlayer: target.owner,
+    affectedInstanceId: target.warrior.instanceId,
+    expiry: { player: context.player, timing: "startOfTurn", turnsRemaining: 1 },
+  });
+  return { resolved: true };
+};
+
+/**
+ * Moral Determination Authrotity: "Any of your opponent's Warriors that
+ * attack next turn can't attack on their next turn." Stage 1: a watch
+ * status through the opponent's next turn; recordAttackDeclaration turns
+ * each attack into a stage-2 DISABLE_WARRIOR_ATTACKS for the turn after.
+ */
+const punishAttackersDisableHandler: EffectHandler = (state, _params, context) => {
+  const opponent = opponentOf(context.player);
+  addStatus(state, {
+    code: "PUNISH_ATTACKERS_WATCH",
+    controller: context.player,
+    affectedPlayer: opponent,
+    expiry: { player: opponent, timing: "endOfTurn", turnsRemaining: 1 },
+  });
+  return { resolved: true };
+};
+
+/**
+ * A Dragon's Judgement: "Until your next turn, any Warrior that attacks a
+ * Monk loses 1000 HEALTH." Side-agnostic per the card text ("any
+ * Warrior"); attackWarrior applies the loss after damage resolution.
+ */
+const monkRetaliationHandler: EffectHandler = (state, params, context) => {
+  const faction = factionConstraint(params); // "warriors_attacking_monk" -> Monk
+  if (faction === undefined) {
+    return targetFailure("retaliation faction missing from card data.");
+  }
+  addStatus(state, {
+    code: "RETALIATE_AGAINST_FACTION_ATTACKERS",
+    controller: context.player,
+    faction,
+    expiry: { player: context.player, timing: "startOfTurn", turnsRemaining: 1 },
+    metadata: { amount: numberParam(params, ["amount"], 0) },
+  });
+  return { resolved: true };
+};
+
 /** Pool both players' Spirit; the activator takes the rounded-up half. */
 const slushFundHandler: EffectHandler = (state, _params, context) => {
   const me = state.players[context.player];
@@ -910,6 +968,14 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   registry.register("NEXT_TURN_FACTION_BUFF", nextTurnFactionBuffHandler);
   registry.register("DELAYED_ATTACK_BUFF", delayedAttackBuffHandler);
   registry.register("SPIRIT_ESCROW", spiritEscrowHandler);
+
+  // Group 4A: combat hooks riding the status/aura system.
+  registry.register(
+    "RESTRICT_OPPONENT_ATTACK_TARGET",
+    restrictOpponentAttackTargetHandler,
+  );
+  registry.register("PUNISH_ATTACKERS_DISABLE", punishAttackersDisableHandler);
+  registry.register("MONK_RETALIATION", monkRetaliationHandler);
   return registry;
 }
 

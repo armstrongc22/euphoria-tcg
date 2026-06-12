@@ -102,7 +102,32 @@ export type StatusCode =
    * metadata.durationTurns of its owner's turns. Fizzles if the Warrior
    * left the field while pending.
    */
-  | "DELAYED_ATTACK_BUFF";
+  | "DELAYED_ATTACK_BUFF"
+  /**
+   * Primetime Interview: while active, the Warrior in affectedInstanceId
+   * is the only one affectedPlayer may declare attacks (direct included)
+   * with.
+   */
+  | "RESTRICT_ATTACKER_TO_WARRIOR"
+  /**
+   * Moral Determination Authrotity, stage 1: while active, every attack
+   * declared by one of affectedPlayer's Warriors earns that Warrior a
+   * DISABLE_WARRIOR_ATTACKS status.
+   */
+  | "PUNISH_ATTACKERS_WATCH"
+  /**
+   * Moral Determination Authrotity, stage 2: dormant until expiry (the
+   * start of the punished Warrior's owner's next turn), then sets that
+   * Warrior's attacksRemaining to 0 for the turn. Fizzles if the Warrior
+   * left the field.
+   */
+  | "DISABLE_WARRIOR_ATTACKS"
+  /**
+   * A Dragon's Judgement: while active, any Warrior that attacks a
+   * `faction` Warrior loses metadata.amount health after damage resolves
+   * (side-agnostic, per the card text's "any Warrior").
+   */
+  | "RETALIATE_AGAINST_FACTION_ATTACKERS";
 
 /**
  * Which turn boundary a status expires on. "startOfTurn" fires during

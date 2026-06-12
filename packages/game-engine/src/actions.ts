@@ -3,6 +3,10 @@ import { defaultEffectRegistry, type EffectRegistry } from "./effects";
 import {
   findAttackPreventionStatus,
   findAttackTargetProtection,
+  findAttackerRestriction,
+  findRetaliationStatuses,
+  recordAttackDeclaration,
+  retaliationHealthLoss,
 } from "./status";
 import {
   createWarriorInPlay,
@@ -29,7 +33,8 @@ export type EngineErrorCode =
   | "ATTACK_CARD_CHOICE_REQUIRED"
   | "ATTACK_CARD_INCOMPATIBLE"
   | "ATTACKS_PREVENTED"
-  | "ATTACK_TARGET_PROTECTED";
+  | "ATTACK_TARGET_PROTECTED"
+  | "ATTACKER_RESTRICTED";
 
 export interface EngineError {
   code: EngineErrorCode;
@@ -140,6 +145,18 @@ function validateAttacker(
       error: fail(
         "WARRIOR_NOT_FOUND",
         `${state.activePlayer} controls no Warrior "${attackerInstanceId}".`,
+      ),
+    };
+  }
+  // Primetime Interview: a different Warrior is the only one allowed to attack.
+  if (
+    findAttackerRestriction(state, state.activePlayer, attackerInstanceId) !==
+    undefined
+  ) {
+    return {
+      error: fail(
+        "ATTACKER_RESTRICTED",
+        `${attacker.card.name} cannot attack: another Warrior is currently the only one that can attack.`,
       ),
     };
   }
@@ -317,8 +334,13 @@ function attackWarrior(
   );
   if (attacker !== undefined) {
     attacker.attacksRemaining -= 1;
+    // After-attack-declaration hook (Moral Determination Authrotity).
+    recordAttackDeclaration(next, next.activePlayer, attacker.instanceId);
   }
   if (attacker !== undefined && defender !== undefined) {
+    // The defender's faction drives retaliation even if the attack
+    // destroys the defender (it was still "a Monk that was attacked").
+    const defenderFaction = defender.card.faction;
     // The attacker takes no counter damage (CLAUDE.md overrides the spec's
     // "simultaneous" wording; see RulesConfig.combatDamageSimultaneous).
     const damage = attacker.currentAttack;
@@ -332,6 +354,28 @@ function attackWarrior(
     });
     if (defender.currentHealth <= 0) {
       destroyWarrior(next, opponentId, defender.instanceId);
+    }
+
+    // After-damage-resolution hook (A Dragon's Judgement): each active
+    // retaliation status costs the attacker health, possibly killing it.
+    for (const retaliation of findRetaliationStatuses(next, defenderFaction)) {
+      const stillFielded = next.players[next.activePlayer].field.some(
+        (w) => w.instanceId === attacker.instanceId,
+      );
+      if (!stillFielded) break;
+      const loss = retaliationHealthLoss(retaliation);
+      if (loss <= 0) continue;
+      attacker.currentHealth -= loss;
+      next.events.push({
+        type: "warriorHealthModified",
+        player: next.activePlayer,
+        instanceId: attacker.instanceId,
+        amount: -loss,
+        newHealth: attacker.currentHealth,
+      });
+      if (attacker.currentHealth <= 0) {
+        destroyWarrior(next, next.activePlayer, attacker.instanceId);
+      }
     }
   }
   return { ok: true, state: next };
@@ -361,6 +405,8 @@ function directAttack(state: GameState, attackerInstanceId: string): ActionResul
   const attacker = player.field.find((w) => w.instanceId === attackerInstanceId)!;
 
   attacker.attacksRemaining -= 1;
+  // After-attack-declaration hook (Moral Determination Authrotity).
+  recordAttackDeclaration(next, next.activePlayer, attackerInstanceId);
   player.directAttackUsedThisTurn = true;
   opponent.lives -= 1;
   next.events.push({
@@ -606,6 +652,12 @@ export function getLegalActions(state: GameState): GameAction[] {
     if (attacksAllowed) {
       for (const attacker of player.field) {
         if (attacker.attacksRemaining <= 0) continue;
+        if (
+          findAttackerRestriction(state, state.activePlayer, attacker.instanceId) !==
+          undefined
+        ) {
+          continue;
+        }
         const attackCards = getCompatibleAttackCards(state, attacker.instanceId);
         for (const defender of opponent.field) {
           if (

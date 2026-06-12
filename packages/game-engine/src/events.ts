@@ -37,4 +37,6 @@ export type GameEvent =
   | { type: "statusApplied"; player: PlayerId; statusId: string; code: StatusCode }
   | { type: "statusExpired"; player: PlayerId; statusId: string; code: StatusCode }
   /** A PREVENT_DESTRUCTION status absorbed a destruction; player = the Warrior's owner. */
-  | { type: "destructionPrevented"; player: PlayerId; instanceId: string; statusId: string; newHealth: number };
+  | { type: "destructionPrevented"; player: PlayerId; instanceId: string; statusId: string; newHealth: number }
+  /** A DISABLE_WARRIOR_ATTACKS status fired; player = the Warrior's owner. */
+  | { type: "warriorAttacksDisabled"; player: PlayerId; instanceId: string };

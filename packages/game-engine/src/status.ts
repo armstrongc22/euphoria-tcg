@@ -147,6 +147,21 @@ export function triggerExpiredStatuses(
         );
         break;
       }
+      case "DISABLE_WARRIOR_ATTACKS": {
+        // Fires during the punished Warrior's owner's Start Phase, after
+        // the refresh reset attacksRemaining to 1 — so the Warrior simply
+        // has no attacks this turn, and the existing WARRIOR_EXHAUSTED /
+        // getLegalActions machinery enforces the disable.
+        const found = findWarriorAnywhere(state, status.affectedInstanceId);
+        if (found === undefined) break;
+        found.warrior.attacksRemaining = 0;
+        state.events.push({
+          type: "warriorAttacksDisabled",
+          player: found.owner,
+          instanceId: found.warrior.instanceId,
+        });
+        break;
+      }
       default:
         break;
     }
@@ -171,6 +186,79 @@ export function findDestructionProtection(
 /** The health a prevented destruction costs the protected Warrior. */
 export function destructionPreventionPenalty(status: StatusEffect): number {
   return numberMetadata(status, "penalty", 0);
+}
+
+/**
+ * The status forbidding this attacker because a different Warrior is "the
+ * only Warrior that can attack", if any (Primetime Interview). The
+ * designated Warrior itself is never restricted.
+ */
+export function findAttackerRestriction(
+  state: GameState,
+  attackingPlayer: PlayerId,
+  attackerInstanceId: string,
+): StatusEffect | undefined {
+  return state.statuses.find(
+    (s) =>
+      s.code === "RESTRICT_ATTACKER_TO_WARRIOR" &&
+      (s.affectedPlayer === undefined || s.affectedPlayer === attackingPlayer) &&
+      s.affectedInstanceId !== attackerInstanceId,
+  );
+}
+
+/**
+ * After-attack-declaration hook (Moral Determination Authrotity): while a
+ * PUNISH_ATTACKERS_WATCH covers the attacking player, each attacking
+ * Warrior earns a delayed DISABLE_WARRIOR_ATTACKS for its owner's next
+ * turn. Called by attackWarrior and directAttack once the attack is
+ * declared; repeat attacks by the same Warrior do not stack disables.
+ */
+export function recordAttackDeclaration(
+  state: GameState,
+  attackingPlayer: PlayerId,
+  attackerInstanceId: string,
+): void {
+  const watch = state.statuses.find(
+    (s) =>
+      s.code === "PUNISH_ATTACKERS_WATCH" &&
+      (s.affectedPlayer === undefined || s.affectedPlayer === attackingPlayer),
+  );
+  if (watch === undefined) return;
+  const alreadyPunished = state.statuses.some(
+    (s) =>
+      s.code === "DISABLE_WARRIOR_ATTACKS" &&
+      s.affectedInstanceId === attackerInstanceId,
+  );
+  if (alreadyPunished) return;
+  addStatus(state, {
+    code: "DISABLE_WARRIOR_ATTACKS",
+    controller: watch.controller,
+    affectedPlayer: attackingPlayer,
+    affectedInstanceId: attackerInstanceId,
+    expiry: { player: attackingPlayer, timing: "startOfTurn", turnsRemaining: 1 },
+  });
+}
+
+/**
+ * The statuses retaliating against attacks on `defenderFaction` Warriors
+ * (A Dragon's Judgement). Side-agnostic: the card text punishes "any
+ * Warrior that attacks a Monk". Damage application stays in actions.ts
+ * (it needs destroyWarrior, which would cycle the imports here).
+ */
+export function findRetaliationStatuses(
+  state: GameState,
+  defenderFaction: string,
+): StatusEffect[] {
+  return state.statuses.filter(
+    (s) =>
+      s.code === "RETALIATE_AGAINST_FACTION_ATTACKERS" &&
+      (s.faction === undefined || s.faction === defenderFaction),
+  );
+}
+
+/** The health an attacker loses to one retaliation status. */
+export function retaliationHealthLoss(status: StatusEffect): number {
+  return numberMetadata(status, "amount", 0);
 }
 
 /**
