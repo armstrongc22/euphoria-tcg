@@ -164,6 +164,55 @@ function targetFailure(reason: string): EffectOutcome {
   return { resolved: false, code: "EFFECT_FAILED", reason };
 }
 
+/** Which side of the field an effect may target, relative to its controller. */
+export type TargetSide = "friendly" | "enemy" | "any";
+
+type TargetResult =
+  | { ok: true; warrior: WarriorInPlay; owner: PlayerId }
+  | { ok: false; outcome: EffectOutcome };
+
+/**
+ * Shared target resolution for effects that need a Warrior on the field:
+ * picks the instance id (params.target keyword > context target > fallback),
+ * then validates existence and side. Out-Deck targets (revive) will get a
+ * sibling helper when they land.
+ */
+function requireWarriorTarget(
+  state: GameState,
+  params: EffectParams,
+  context: EffectContext,
+  side: TargetSide,
+  fallbackId?: string,
+): TargetResult {
+  const targetId = resolveTargetInstanceId(params, context, fallbackId);
+  if (targetId === undefined) {
+    return {
+      ok: false,
+      outcome: targetFailure("a target Warrior is required (targetInstanceId missing)."),
+    };
+  }
+  const found = findWarrior(state, targetId);
+  if (found === undefined) {
+    return {
+      ok: false,
+      outcome: targetFailure(`No Warrior "${targetId}" on the field.`),
+    };
+  }
+  if (side === "friendly" && found.owner !== context.player) {
+    return {
+      ok: false,
+      outcome: targetFailure("the target must be a friendly Warrior."),
+    };
+  }
+  if (side === "enemy" && found.owner === context.player) {
+    return {
+      ok: false,
+      outcome: targetFailure("the target must be an enemy Warrior."),
+    };
+  }
+  return { ok: true, warrior: found.warrior, owner: found.owner };
+}
+
 const TEMPORARY_DURATIONS = new Set([
   "THIS_TURN",
   "TURN",
@@ -246,24 +295,33 @@ const modifyAttackHandler: EffectHandler = (state, params, context) => {
   return { resolved: true };
 };
 
-/** Positive amounts heal (overheal raises max health); negative ones harm. */
+/**
+ * Positive amounts heal (overheal raises max health); negative ones harm.
+ * Side is unrestricted: the HEAL_TARGET card text says "Choose 1 Warrior".
+ */
 const modifyHealthHandler: EffectHandler = (state, params, context) => {
-  const targetId = resolveTargetInstanceId(params, context, context.attackerInstanceId);
-  if (targetId === undefined) return targetFailure("modifyHealth needs a target Warrior.");
-  const found = findWarrior(state, targetId);
-  if (found === undefined) return targetFailure(`No Warrior "${targetId}" on the field.`);
+  const target = requireWarriorTarget(state, params, context, "any", context.attackerInstanceId);
+  if (!target.ok) return target.outcome;
 
-  modifyWarriorHealth(state, found.owner, found.warrior, numberParam(params, ["amount"], 0));
+  modifyWarriorHealth(state, target.owner, target.warrior, numberParam(params, ["amount"], 0));
   return { resolved: true };
 };
 
+/** Damage targets enemy Warriors only. */
 const dealDamageToWarriorHandler: EffectHandler = (state, params, context) => {
-  const targetId = resolveTargetInstanceId(params, context, context.defenderInstanceId);
-  if (targetId === undefined) return targetFailure("dealDamageToWarrior needs a target Warrior.");
-  const found = findWarrior(state, targetId);
-  if (found === undefined) return targetFailure(`No Warrior "${targetId}" on the field.`);
+  const target = requireWarriorTarget(state, params, context, "enemy", context.defenderInstanceId);
+  if (!target.ok) return target.outcome;
 
-  modifyWarriorHealth(state, found.owner, found.warrior, -numberParam(params, ["amount"], 0));
+  modifyWarriorHealth(state, target.owner, target.warrior, -numberParam(params, ["amount"], 0));
+  return { resolved: true };
+};
+
+/** "Destroy 1 Warrior on your opponent's side of the field." */
+const destroyTargetWarriorHandler: EffectHandler = (state, params, context) => {
+  const target = requireWarriorTarget(state, params, context, "enemy", context.defenderInstanceId);
+  if (!target.ok) return target.outcome;
+
+  destroyWarrior(state, target.owner, target.warrior.instanceId);
   return { resolved: true };
 };
 
@@ -332,24 +390,22 @@ const buffFriendlyFactionThisTurnHandler: EffectHandler = (state, params, contex
  * the Out Deck with the Warrior, so the bonus lasts exactly as long.
  */
 const weaponAttackHealthBonusHandler: EffectHandler = (state, params, context) => {
-  const targetId = context.targetInstanceId;
-  if (targetId === undefined) return targetFailure("needs the equipped Warrior.");
-  const found = findWarrior(state, targetId);
-  if (found === undefined) return targetFailure(`No Warrior "${targetId}" on the field.`);
+  const target = requireWarriorTarget(state, params, context, "friendly");
+  if (!target.ok) return target.outcome;
 
   const attackBonus = numberParam(params, ["amount"], 0);
-  found.warrior.currentAttack += attackBonus;
+  target.warrior.currentAttack += attackBonus;
   state.events.push({
     type: "warriorAttackModified",
-    player: found.owner,
-    instanceId: targetId,
+    player: target.owner,
+    instanceId: target.warrior.instanceId,
     amount: attackBonus,
-    newAttack: found.warrior.currentAttack,
+    newAttack: target.warrior.currentAttack,
   });
   modifyWarriorHealth(
     state,
-    found.owner,
-    found.warrior,
+    target.owner,
+    target.warrior,
     numberParam(params, ["secondaryAmount"], 0),
   );
   return { resolved: true };
@@ -357,10 +413,8 @@ const weaponAttackHealthBonusHandler: EffectHandler = (state, params, context) =
 
 /** Fafnir: `secondaryAmount` attack for params.targetFaction, `amount` otherwise. */
 const weaponAttackBonusFactionBonusHandler: EffectHandler = (state, params, context) => {
-  const targetId = context.targetInstanceId;
-  if (targetId === undefined) return targetFailure("needs the equipped Warrior.");
-  const found = findWarrior(state, targetId);
-  if (found === undefined) return targetFailure(`No Warrior "${targetId}" on the field.`);
+  const target = requireWarriorTarget(state, params, context, "friendly");
+  if (!target.ok) return target.outcome;
 
   const faction = stringParam(params, ["targetFaction", "faction"]);
   if (faction === undefined) {
@@ -369,16 +423,16 @@ const weaponAttackBonusFactionBonusHandler: EffectHandler = (state, params, cont
     return targetFailure("targetFaction param missing from card data.");
   }
   const amount =
-    found.warrior.card.faction === faction
+    target.warrior.card.faction === faction
       ? numberParam(params, ["secondaryAmount"], 0)
       : numberParam(params, ["amount"], 0);
-  found.warrior.currentAttack += amount;
+  target.warrior.currentAttack += amount;
   state.events.push({
     type: "warriorAttackModified",
-    player: found.owner,
-    instanceId: targetId,
+    player: target.owner,
+    instanceId: target.warrior.instanceId,
     amount,
-    newAttack: found.warrior.currentAttack,
+    newAttack: target.warrior.currentAttack,
   });
   return { resolved: true };
 };
@@ -413,6 +467,8 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   // alias: normalization already matches them to gainSpirit/drawCards.)
   registry.register("DAMAGE_TARGET", dealDamageToWarriorHandler);
   registry.register("HEAL_TARGET", modifyHealthHandler);
+  // Group 2A: enemy-only targeted destruction.
+  registry.register("DESTROY_TARGET_WARRIOR", destroyTargetWarriorHandler);
   // +2000-damage Attack cards buff the attacker for the turn.
   registry.register("ATTACK_DAMAGE_BONUS", modifyAttackHandler);
 

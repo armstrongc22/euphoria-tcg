@@ -262,6 +262,7 @@ function attackWarrior(
       player: next.activePlayer,
       attackerInstanceId: action.attackerInstanceId,
       defenderInstanceId: action.defenderInstanceId,
+      targetInstanceId: action.effectTargetInstanceId,
     });
     if (resolution.outcome.resolved) {
       next = resolution.state;

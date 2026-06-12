@@ -25,6 +25,7 @@ export {
   type EffectOutcome,
   type EffectParams,
   type EffectResolution,
+  type TargetSide,
 } from "./effects";
 export {
   applyAction,

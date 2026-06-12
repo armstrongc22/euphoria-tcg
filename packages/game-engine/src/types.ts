@@ -109,6 +109,11 @@ export type GameAction =
       defenderInstanceId: string;
       selectedAttackCardId?: string;
       skipAttackCard?: boolean;
+      /**
+       * Explicit target for the selected Attack card's effect (e.g. which
+       * Warrior to destroy). Defaults per handler, usually the defender.
+       */
+      effectTargetInstanceId?: string;
     }
   | { kind: "directAttack"; attackerInstanceId: string }
   | { kind: "enterBattle" }
