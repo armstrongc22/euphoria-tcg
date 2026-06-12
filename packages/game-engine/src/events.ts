@@ -35,4 +35,6 @@ export type GameEvent =
   | { type: "warriorHealthModified"; player: PlayerId; instanceId: string; amount: number; newHealth: number }
   /** player = the status's controller. */
   | { type: "statusApplied"; player: PlayerId; statusId: string; code: StatusCode }
-  | { type: "statusExpired"; player: PlayerId; statusId: string; code: StatusCode };
+  | { type: "statusExpired"; player: PlayerId; statusId: string; code: StatusCode }
+  /** A PREVENT_DESTRUCTION status absorbed a destruction; player = the Warrior's owner. */
+  | { type: "destructionPrevented"; player: PlayerId; instanceId: string; statusId: string; newHealth: number };

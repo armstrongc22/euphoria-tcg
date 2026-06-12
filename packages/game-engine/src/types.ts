@@ -43,6 +43,13 @@ export interface RulesConfig {
 /** Python engine's "temporary_attack_buffs" status; expires at the start of the owner's next turn. */
 export interface TemporaryAttackBuff {
   amount: number;
+  /**
+   * Owner start-of-turn boundaries left before the buff expires; counted
+   * down each Start Phase. Unset = 1 (the classic this-turn buff). Multi-
+   * turn buffs (Training Arc's "for 2 turns") set 2: the buff covers two
+   * of the owner's turns.
+   */
+  turnsRemaining?: number;
 }
 
 /** Python engine's Permanent: a Warrior on the field. */
@@ -76,7 +83,26 @@ export type StatusCode =
   /** Gorgon's Eye: no attacks (including direct) may be declared by anyone. */
   | "PREVENT_ALL_ATTACKS"
   /** Orange Court: affectedPlayer cannot attack the controller's Warriors of `faction`. */
-  | "PREVENT_ATTACKS_AGAINST_FACTION";
+  | "PREVENT_ATTACKS_AGAINST_FACTION"
+  /**
+   * High Tea: the Warrior in affectedInstanceId cannot be destroyed; a
+   * prevented destruction costs it metadata.penalty health (floored at 1,
+   * since the protection is absolute for the turn).
+   */
+  | "PREVENT_DESTRUCTION"
+  /**
+   * Heaven's Door Izakaya: dormant until expiry, then all of the
+   * controller's `faction` Warriors gain metadata.amount attack for that
+   * turn. Delayed statuses fire as a side effect of expiring.
+   */
+  | "DELAYED_FACTION_ATTACK_BUFF"
+  /**
+   * Training Arc: dormant until expiry, then the Warrior in
+   * affectedInstanceId gains metadata.amount attack for
+   * metadata.durationTurns of its owner's turns. Fizzles if the Warrior
+   * left the field while pending.
+   */
+  | "DELAYED_ATTACK_BUFF";
 
 /**
  * Which turn boundary a status expires on. "startOfTurn" fires during

@@ -3,8 +3,19 @@
  * applyAction clones before calling them so the public API stays pure.
  */
 import type { Card } from "@euphoria/card-data";
-import { expireStatuses } from "./status";
-import type { GameState, PlayerId, PlayerState, WarriorInPlay } from "./types";
+import {
+  destructionPreventionPenalty,
+  expireStatuses,
+  findDestructionProtection,
+  triggerExpiredStatuses,
+} from "./status";
+import type {
+  GameState,
+  PlayerId,
+  PlayerState,
+  TemporaryAttackBuff,
+  WarriorInPlay,
+} from "./types";
 
 export function opponentOf(player: PlayerId): PlayerId {
   return player === "player1" ? "player2" : "player1";
@@ -69,6 +80,26 @@ export function destroyWarrior(
   const index = owner.field.findIndex((w) => w.instanceId === instanceId);
   if (index === -1) return;
   const warrior = owner.field[index]!;
+
+  // High Tea: a protected Warrior survives any destruction this turn. The
+  // prevented destruction costs it the status's penalty instead, floored
+  // at 1 — the protection is absolute, so the penalty (or the lethal
+  // damage that brought us here) can never finish the job.
+  const protection = findDestructionProtection(state, instanceId);
+  if (protection !== undefined) {
+    warrior.currentHealth = Math.max(
+      1,
+      warrior.currentHealth - destructionPreventionPenalty(protection),
+    );
+    state.events.push({
+      type: "destructionPrevented",
+      player: ownerId,
+      instanceId,
+      statusId: protection.id,
+      newHealth: warrior.currentHealth,
+    });
+    return;
+  }
   owner.field.splice(index, 1);
 
   owner.outDeck.push(warrior.card);
@@ -106,7 +137,7 @@ export function runStartPhase(state: GameState): void {
   state.events.push({ type: "warriorsRefreshed", player: player.id });
 
   expireTemporaryBuffs(state, player);
-  expireStatuses(state, player.id, "startOfTurn");
+  triggerExpiredStatuses(state, expireStatuses(state, player.id, "startOfTurn"));
   resolveDelayedEffects(state, player);
 
   gainSpirit(state, player, state.config.spiritGainPerTurn);
@@ -126,7 +157,7 @@ export function runEndPhase(state: GameState): void {
   for (const warrior of player.field) {
     warrior.attacksRemaining = Math.min(warrior.attacksRemaining, 1);
   }
-  expireStatuses(state, player.id, "endOfTurn");
+  triggerExpiredStatuses(state, expireStatuses(state, player.id, "endOfTurn"));
 
   state.activePlayer = opponentOf(state.activePlayer);
   state.turn += 1;
@@ -140,7 +171,13 @@ export function runEndPhase(state: GameState): void {
  */
 function expireTemporaryBuffs(state: GameState, player: PlayerState): void {
   for (const warrior of player.field) {
+    const remaining: TemporaryAttackBuff[] = [];
     for (const buff of warrior.temporaryAttackBuffs) {
+      const turnsRemaining = (buff.turnsRemaining ?? 1) - 1;
+      if (turnsRemaining > 0) {
+        remaining.push({ amount: buff.amount, turnsRemaining });
+        continue;
+      }
       warrior.currentAttack -= buff.amount;
       state.events.push({
         type: "buffExpired",
@@ -149,7 +186,7 @@ function expireTemporaryBuffs(state: GameState, player: PlayerState): void {
         amount: buff.amount,
       });
     }
-    warrior.temporaryAttackBuffs = [];
+    warrior.temporaryAttackBuffs = remaining;
   }
 }
 

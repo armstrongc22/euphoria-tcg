@@ -19,6 +19,8 @@ export {
   expireStatuses,
   findAttackPreventionStatus,
   findAttackTargetProtection,
+  findDestructionProtection,
+  triggerExpiredStatuses,
 } from "./status";
 export type { GameEvent } from "./events";
 export { DEFAULT_RULES } from "./config";

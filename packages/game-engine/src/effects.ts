@@ -732,6 +732,112 @@ const preventAttacksAgainstFactionNextTurnHandler: EffectHandler = (
   return { resolved: true };
 };
 
+/**
+ * High Tea: "If you have 2 or more Warriors on your side of the field:
+ * select 1. That Warrior cannot be destroyed this turn. If it would be
+ * destroyed, it loses 1000 HEALTH instead." destroyWarrior enforces the
+ * status; the health loss is floored at 1 since the protection is absolute.
+ */
+const protectWarriorThisTurnHandler: EffectHandler = (state, params, context) => {
+  if (state.players[context.player].field.length < 2) {
+    return targetFailure(
+      "you need 2 or more Warriors on your side of the field.",
+    );
+  }
+  const target = requireWarriorTarget(state, params, context, "friendly");
+  if (!target.ok) return target.outcome;
+
+  addStatus(state, {
+    code: "PREVENT_DESTRUCTION",
+    controller: context.player,
+    affectedInstanceId: target.warrior.instanceId,
+    expiry: { player: context.player, timing: "endOfTurn", turnsRemaining: 1 },
+    metadata: { penalty: numberParam(params, ["amount"], 0) },
+  });
+  return { resolved: true };
+};
+
+/**
+ * Heaven's Door Izakaya: "On your next turn, all <faction> Warriors on
+ * your side of the field gain 1000 ATTACK." A delayed status that fires at
+ * the start of the controller's next turn; the buff then lasts that turn.
+ */
+const nextTurnFactionBuffHandler: EffectHandler = (state, params, context) => {
+  const faction = factionConstraint(params);
+  if (faction === undefined) {
+    return targetFailure("targetFaction param missing from card data.");
+  }
+  addStatus(state, {
+    code: "DELAYED_FACTION_ATTACK_BUFF",
+    controller: context.player,
+    faction,
+    expiry: { player: context.player, timing: "startOfTurn", turnsRemaining: 1 },
+    metadata: { amount: numberParam(params, ["amount"], 0) },
+  });
+  return { resolved: true };
+};
+
+/**
+ * Training Arc: "Next turn, add 1500 ATTACK to 1 Warrior for 2 turns."
+ * The Warrior is chosen now (any side, per the HEAL_TARGET precedent for
+ * "1 Warrior"); the buff lands at the start of the controller's next turn
+ * and covers secondaryAmount of the Warrior's owner's turns. Fizzles if
+ * the Warrior is destroyed while the status is pending.
+ */
+const delayedAttackBuffHandler: EffectHandler = (state, params, context) => {
+  const target = requireWarriorTarget(state, params, context, "any");
+  if (!target.ok) return target.outcome;
+
+  addStatus(state, {
+    code: "DELAYED_ATTACK_BUFF",
+    controller: context.player,
+    affectedInstanceId: target.warrior.instanceId,
+    expiry: { player: context.player, timing: "startOfTurn", turnsRemaining: 1 },
+    metadata: {
+      amount: numberParam(params, ["amount"], 0),
+      durationTurns: numberParam(params, ["secondaryAmount"], 1),
+    },
+  });
+  return { resolved: true };
+};
+
+/**
+ * Secure Deposits: "Place 1 Spirit in escrow. In 3 turns, gain 3 Spirit."
+ * Rides the existing DelayedEffect system: pay `amount` now, gain
+ * `secondaryAmount` after the duration's worth of the controller's turn
+ * starts. The escrow payment is on top of the card's Spirit cost (already
+ * paid by playItem); too little Spirit left fails safely.
+ */
+const spiritEscrowHandler: EffectHandler = (state, params, context) => {
+  const escrow = numberParam(params, ["amount"], 1);
+  const gain = numberParam(params, ["secondaryAmount"], escrow);
+  const duration = stringParam(params, ["duration"]);
+  const parsed = duration === undefined ? null : /(\d+)/.exec(duration);
+  const turns = parsed !== null ? Number(parsed[1]) : numberParam(params, ["turns"], 0);
+  if (turns <= 0) {
+    return targetFailure("escrow duration missing from card data.");
+  }
+  const player = state.players[context.player];
+  if (player.spirit < escrow) {
+    return targetFailure(
+      `placing ${escrow} Spirit in escrow needs ${escrow}; ${player.id} has ${player.spirit}.`,
+    );
+  }
+  player.spirit -= escrow;
+  state.events.push({
+    type: "spiritChanged",
+    player: player.id,
+    amount: -escrow,
+    total: player.spirit,
+  });
+  player.delayedEffects.push({
+    type: "gainSpirit",
+    amount: gain,
+    turnsRemaining: turns,
+  });
+  return { resolved: true };
+};
+
 /** Pool both players' Spirit; the activator takes the rounded-up half. */
 const slushFundHandler: EffectHandler = (state, _params, context) => {
   const me = state.players[context.player];
@@ -798,6 +904,12 @@ export function createDefaultEffectRegistry(): EffectRegistry {
     "PREVENT_ATTACKS_AGAINST_FACTION_NEXT_TURN",
     preventAttacksAgainstFactionNextTurnHandler,
   );
+
+  // Group 5B: remaining simple status/delayed effects.
+  registry.register("PROTECT_WARRIOR_THIS_TURN", protectWarriorThisTurnHandler);
+  registry.register("NEXT_TURN_FACTION_BUFF", nextTurnFactionBuffHandler);
+  registry.register("DELAYED_ATTACK_BUFF", delayedAttackBuffHandler);
+  registry.register("SPIRIT_ESCROW", spiritEscrowHandler);
   return registry;
 }
 
