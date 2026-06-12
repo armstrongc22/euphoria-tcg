@@ -5,7 +5,7 @@
  * the caller's state — the untouched input state is returned instead.
  */
 import type { Card } from "@euphoria/card-data";
-import { destroyWarrior, drawCards, gainSpirit } from "./turn";
+import { destroyWarrior, drawCards, gainSpirit, opponentOf } from "./turn";
 import type { GameState, PlayerId, WarriorInPlay } from "./types";
 
 export type EffectParams = Readonly<Record<string, unknown>>;
@@ -170,7 +170,40 @@ const TEMPORARY_DURATIONS = new Set([
   "END_OF_TURN",
   "THIS_ATTACK",
   "WHEN_ATTACKING",
+  "NEXT_ATTACK",
 ]);
+
+function stringParam(
+  params: EffectParams,
+  keys: readonly string[],
+): string | undefined {
+  for (const key of keys) {
+    const value = params[key];
+    if (typeof value === "string" && value !== "") return value;
+  }
+  return undefined;
+}
+
+/** Health change with the shared rules: overheal raises max, <= 0 destroys. */
+function modifyWarriorHealth(
+  state: GameState,
+  owner: PlayerId,
+  warrior: WarriorInPlay,
+  amount: number,
+): void {
+  warrior.currentHealth += amount;
+  warrior.maxHealth = Math.max(warrior.maxHealth, warrior.currentHealth);
+  state.events.push({
+    type: "warriorHealthModified",
+    player: owner,
+    instanceId: warrior.instanceId,
+    amount,
+    newHealth: warrior.currentHealth,
+  });
+  if (warrior.currentHealth <= 0) {
+    destroyWarrior(state, owner, warrior.instanceId);
+  }
+}
 
 function isTemporary(params: EffectParams): boolean {
   return (
@@ -220,22 +253,7 @@ const modifyHealthHandler: EffectHandler = (state, params, context) => {
   const found = findWarrior(state, targetId);
   if (found === undefined) return targetFailure(`No Warrior "${targetId}" on the field.`);
 
-  const amount = numberParam(params, ["amount"], 0);
-  found.warrior.currentHealth += amount;
-  found.warrior.maxHealth = Math.max(
-    found.warrior.maxHealth,
-    found.warrior.currentHealth,
-  );
-  state.events.push({
-    type: "warriorHealthModified",
-    player: found.owner,
-    instanceId: targetId,
-    amount,
-    newHealth: found.warrior.currentHealth,
-  });
-  if (found.warrior.currentHealth <= 0) {
-    destroyWarrior(state, found.owner, targetId);
-  }
+  modifyWarriorHealth(state, found.owner, found.warrior, numberParam(params, ["amount"], 0));
   return { resolved: true };
 };
 
@@ -245,18 +263,140 @@ const dealDamageToWarriorHandler: EffectHandler = (state, params, context) => {
   const found = findWarrior(state, targetId);
   if (found === undefined) return targetFailure(`No Warrior "${targetId}" on the field.`);
 
+  modifyWarriorHealth(state, found.owner, found.warrior, -numberParam(params, ["amount"], 0));
+  return { resolved: true };
+};
+
+/** Every Warrior the opponent controls takes `amount` damage. */
+const damageAllOpponentWarriorsHandler: EffectHandler = (state, params, context) => {
   const amount = numberParam(params, ["amount"], 0);
-  found.warrior.currentHealth -= amount;
+  const opponentId = opponentOf(context.player);
+  // Iterate a copy: lethal damage splices the field mid-loop.
+  for (const warrior of [...state.players[opponentId].field]) {
+    modifyWarriorHealth(state, opponentId, warrior, -amount);
+  }
+  return { resolved: true };
+};
+
+/** Every Warrior you control gains `amount` health. */
+const healAllYourWarriorsHandler: EffectHandler = (state, params, context) => {
+  const amount = numberParam(params, ["amount"], 0);
+  for (const warrior of [...state.players[context.player].field]) {
+    modifyWarriorHealth(state, context.player, warrior, amount);
+  }
+  return { resolved: true };
+};
+
+/** Best Friend's Bond: the condition may be false — that still resolves. */
+const gainSpiritIfTwoSameFactionWarriorsHandler: EffectHandler = (
+  state,
+  params,
+  context,
+) => {
+  const player = state.players[context.player];
+  const counts = new Map<string, number>();
+  for (const warrior of player.field) {
+    counts.set(warrior.card.faction, (counts.get(warrior.card.faction) ?? 0) + 1);
+  }
+  if ([...counts.values()].some((n) => n >= 2)) {
+    gainSpirit(state, player, numberParam(params, ["amount"], 2));
+  }
+  return { resolved: true };
+};
+
+/** All friendly Warriors of params.targetFaction gain a this-turn attack buff. */
+const buffFriendlyFactionThisTurnHandler: EffectHandler = (state, params, context) => {
+  const faction = stringParam(params, ["targetFaction", "faction"]);
+  if (faction === undefined) {
+    return targetFailure("buffFriendlyFactionThisTurn needs a targetFaction param.");
+  }
+  const amount = numberParam(params, ["amount"], 0);
+  for (const warrior of state.players[context.player].field) {
+    if (warrior.card.faction !== faction) continue;
+    warrior.currentAttack += amount;
+    warrior.temporaryAttackBuffs.push({ amount });
+    state.events.push({
+      type: "warriorAttackModified",
+      player: context.player,
+      instanceId: warrior.instanceId,
+      amount,
+      newAttack: warrior.currentAttack,
+    });
+  }
+  return { resolved: true };
+};
+
+/**
+ * Static Weapon stat bonuses applied at equip time. Safe for
+ * "while_equipped" wording because Weapons can never detach — they go to
+ * the Out Deck with the Warrior, so the bonus lasts exactly as long.
+ */
+const weaponAttackHealthBonusHandler: EffectHandler = (state, params, context) => {
+  const targetId = context.targetInstanceId;
+  if (targetId === undefined) return targetFailure("needs the equipped Warrior.");
+  const found = findWarrior(state, targetId);
+  if (found === undefined) return targetFailure(`No Warrior "${targetId}" on the field.`);
+
+  const attackBonus = numberParam(params, ["amount"], 0);
+  found.warrior.currentAttack += attackBonus;
   state.events.push({
-    type: "warriorHealthModified",
+    type: "warriorAttackModified",
     player: found.owner,
     instanceId: targetId,
-    amount: -amount,
-    newHealth: found.warrior.currentHealth,
+    amount: attackBonus,
+    newAttack: found.warrior.currentAttack,
   });
-  if (found.warrior.currentHealth <= 0) {
-    destroyWarrior(state, found.owner, targetId);
+  modifyWarriorHealth(
+    state,
+    found.owner,
+    found.warrior,
+    numberParam(params, ["secondaryAmount"], 0),
+  );
+  return { resolved: true };
+};
+
+/** Fafnir: `secondaryAmount` attack for params.targetFaction, `amount` otherwise. */
+const weaponAttackBonusFactionBonusHandler: EffectHandler = (state, params, context) => {
+  const targetId = context.targetInstanceId;
+  if (targetId === undefined) return targetFailure("needs the equipped Warrior.");
+  const found = findWarrior(state, targetId);
+  if (found === undefined) return targetFailure(`No Warrior "${targetId}" on the field.`);
+
+  const faction = stringParam(params, ["targetFaction", "faction"]);
+  if (faction === undefined) {
+    // Without the faction param we cannot honor the bonus clause; stay
+    // pending rather than resolve incorrectly (cards.json data fix needed).
+    return targetFailure("targetFaction param missing from card data.");
   }
+  const amount =
+    found.warrior.card.faction === faction
+      ? numberParam(params, ["secondaryAmount"], 0)
+      : numberParam(params, ["amount"], 0);
+  found.warrior.currentAttack += amount;
+  state.events.push({
+    type: "warriorAttackModified",
+    player: found.owner,
+    instanceId: targetId,
+    amount,
+    newAttack: found.warrior.currentAttack,
+  });
+  return { resolved: true };
+};
+
+/** Pool both players' Spirit; the activator takes the rounded-up half. */
+const slushFundHandler: EffectHandler = (state, _params, context) => {
+  const me = state.players[context.player];
+  const opponent = state.players[opponentOf(context.player)];
+  const pot = me.spirit + opponent.spirit;
+  const mine = Math.ceil(pot / 2);
+  const theirs = pot - mine;
+
+  state.events.push(
+    { type: "spiritChanged", player: me.id, amount: mine - me.spirit, total: mine },
+    { type: "spiritChanged", player: opponent.id, amount: theirs - opponent.spirit, total: theirs },
+  );
+  me.spirit = mine;
+  opponent.spirit = theirs;
   return { resolved: true };
 };
 
@@ -273,6 +413,23 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   // alias: normalization already matches them to gainSpirit/drawCards.)
   registry.register("DAMAGE_TARGET", dealDamageToWarriorHandler);
   registry.register("HEAL_TARGET", modifyHealthHandler);
+  // +2000-damage Attack cards buff the attacker for the turn.
+  registry.register("ATTACK_DAMAGE_BONUS", modifyAttackHandler);
+
+  // Group 1: no-choice effects resolvable with existing engine state.
+  registry.register("DAMAGE_ALL_OPPONENT_WARRIORS", damageAllOpponentWarriorsHandler);
+  registry.register("HEAL_ALL_YOUR_WARRIORS", healAllYourWarriorsHandler);
+  registry.register(
+    "GAIN_SPIRIT_IF_TWO_SAME_FACTION_WARRIORS",
+    gainSpiritIfTwoSameFactionWarriorsHandler,
+  );
+  registry.register("BUFF_FRIENDLY_FACTION_THIS_TURN", buffFriendlyFactionThisTurnHandler);
+  registry.register("WEAPON_ATTACK_HEALTH_BONUS", weaponAttackHealthBonusHandler);
+  registry.register(
+    "WEAPON_ATTACK_BONUS_FACTION_BONUS",
+    weaponAttackBonusFactionBonusHandler,
+  );
+  registry.register("SLUSH_FUND", slushFundHandler);
   return registry;
 }
 

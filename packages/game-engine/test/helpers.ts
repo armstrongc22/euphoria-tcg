@@ -1,4 +1,4 @@
-import type { Card } from "@euphoria/card-data";
+import { loadCards, type Card } from "@euphoria/card-data";
 import {
   applyAction,
   type GameAction,
@@ -8,6 +8,16 @@ import {
 } from "../src/index";
 
 let counter = 0;
+
+let allRealCards: Card[] | undefined;
+
+/** A real card from data/cards/cards.json, looked up by slug. */
+export function realCard(slug: string): Card {
+  allRealCards ??= loadCards();
+  const card = allRealCards.find((c) => c.slug === slug);
+  if (card === undefined) throw new Error(`No card with slug "${slug}" in cards.json`);
+  return card;
+}
 
 export function makeWarriorCard(overrides: Partial<Card> = {}): Card {
   counter += 1;

@@ -515,10 +515,10 @@ function equipWeapon(
     cost: card.cost,
   });
 
-  // Only effects the data explicitly marks as on_equip resolve here.
-  // while_equipped passives (every current Weapon stat bonus) need combat
-  // hooks and stay pending — no stat behavior is invented for them.
-  if (card.effectCode !== undefined && card.timing === "on_equip") {
+  // The registry only holds equip-time-safe Weapon handlers (static stat
+  // bonuses, safe because Weapons never detach). Combat-hook passives are
+  // not registered, so they fall through to the pending marker.
+  if (card.effectCode !== undefined) {
     const resolution = effects.resolve(next, card, {
       player: nextPlayer.id,
       targetInstanceId: warriorInstanceId,

@@ -125,13 +125,13 @@ describe("Items resolve through the effect registry", () => {
 });
 
 describe("Weapons and the effect registry", () => {
-  it("a Weapon with a while_equipped passive equips normally with no invented stats", () => {
+  it("a Weapon with an unimplemented combat-hook passive equips normally with no invented stats", () => {
     const game = newGame();
     const warrior = putWarriorOnField(game, "player1"); // 1000 atk, 2000 hp
     const weapon = makeWeaponCard({
-      effectCode: "WEAPON_ATTACK_HEALTH_BONUS",
+      effectCode: "WEAPON_HALVE_INCOMING_DAMAGE",
       timing: "while_equipped",
-      effectParams: { amount: 1000, secondaryAmount: 1000 },
+      effectParams: { amount: 0.5 },
     });
     game.players.player1.hand.push(weapon);
 

@@ -6,6 +6,8 @@ export type GameEvent =
   | { type: "warriorsRefreshed"; player: PlayerId }
   | { type: "buffExpired"; player: PlayerId; warriorInstanceId: string; amount: number }
   | { type: "spiritGained"; player: PlayerId; amount: number; total: number }
+  /** Spirit set by an effect; amount is the delta and may be negative. */
+  | { type: "spiritChanged"; player: PlayerId; amount: number; total: number }
   | { type: "cardDrawn"; player: PlayerId; cardId: string }
   /** Deck-out is not a loss for now — flagged as a rule to revisit. */
   | { type: "drawFailedDeckEmpty"; player: PlayerId }
