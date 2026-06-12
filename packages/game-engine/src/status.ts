@@ -230,13 +230,33 @@ export function recordAttackDeclaration(
       s.affectedInstanceId === attackerInstanceId,
   );
   if (alreadyPunished) return;
-  addStatus(state, {
-    code: "DISABLE_WARRIOR_ATTACKS",
-    controller: watch.controller,
-    affectedPlayer: attackingPlayer,
-    affectedInstanceId: attackerInstanceId,
-    expiry: { player: attackingPlayer, timing: "startOfTurn", turnsRemaining: 1 },
-  });
+  addWarriorAttackDisable(state, watch.controller, attackingPlayer, attackerInstanceId, 1);
+}
+
+/**
+ * Disables a Warrior's attacks for `turns` of its owner's turns: one
+ * staggered delayed DISABLE_WARRIOR_ATTACKS per turn, each firing at a
+ * successive owner Start Phase (after the refresh, see the trigger).
+ * Used by the punish watch (1 turn) and by Attack-card riders like
+ * Pīsubaipā ("cannot attack for 2 turns"). Each status fizzles if the
+ * Warrior has left the field by its boundary.
+ */
+export function addWarriorAttackDisable(
+  state: GameState,
+  controller: PlayerId,
+  ownerId: PlayerId,
+  instanceId: string,
+  turns: number,
+): void {
+  for (let turn = 1; turn <= turns; turn++) {
+    addStatus(state, {
+      code: "DISABLE_WARRIOR_ATTACKS",
+      controller,
+      affectedPlayer: ownerId,
+      affectedInstanceId: instanceId,
+      expiry: { player: ownerId, timing: "startOfTurn", turnsRemaining: turn },
+    });
+  }
 }
 
 /**

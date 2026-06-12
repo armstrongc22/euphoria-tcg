@@ -5,7 +5,7 @@
  * the caller's state — the untouched input state is returned instead.
  */
 import type { Card } from "@euphoria/card-data";
-import { addStatus } from "./status";
+import { addStatus, addWarriorAttackDisable } from "./status";
 import {
   createWarriorInPlay,
   destroyWarrior,
@@ -282,6 +282,19 @@ function isTemporary(params: EffectParams): boolean {
     typeof params["duration"] === "string" &&
     TEMPORARY_DURATIONS.has(normalizeEffectCode(params["duration"]))
   );
+}
+
+/**
+ * Turn count from a duration param: "2_turns" -> 2, "3_turns" -> 3;
+ * digit-less durations like "next_turn" (and a missing param) fall back.
+ */
+function durationTurns(params: EffectParams, fallback: number): number {
+  const duration = stringParam(params, ["duration"]);
+  if (duration !== undefined) {
+    const match = /(\d+)/.exec(duration);
+    if (match !== null) return Number(match[1]);
+  }
+  return fallback;
 }
 
 const gainSpiritHandler: EffectHandler = (state, params, context) => {
@@ -811,9 +824,7 @@ const delayedAttackBuffHandler: EffectHandler = (state, params, context) => {
 const spiritEscrowHandler: EffectHandler = (state, params, context) => {
   const escrow = numberParam(params, ["amount"], 1);
   const gain = numberParam(params, ["secondaryAmount"], escrow);
-  const duration = stringParam(params, ["duration"]);
-  const parsed = duration === undefined ? null : /(\d+)/.exec(duration);
-  const turns = parsed !== null ? Number(parsed[1]) : numberParam(params, ["turns"], 0);
+  const turns = durationTurns(params, numberParam(params, ["turns"], 0));
   if (turns <= 0) {
     return targetFailure("escrow duration missing from card data.");
   }
@@ -893,6 +904,74 @@ const monkRetaliationHandler: EffectHandler = (state, params, context) => {
     expiry: { player: context.player, timing: "startOfTurn", turnsRemaining: 1 },
     metadata: { amount: numberParam(params, ["amount"], 0) },
   });
+  return { resolved: true };
+};
+
+/**
+ * Pīsubaipā: "Add 1000 damage this turn. The Warrior attacked by this
+ * card cannot attack for 2 turns." The bonus buffs the attacker for the
+ * turn — the card's damageFormula (attacker_attack + amount) confirms the
+ * attack's damage includes it, since effects resolve before combat damage.
+ * The defender is then disabled for 2 of its owner's turns.
+ */
+const attackDamageBonusDisableHandler: EffectHandler = (state, params, context) => {
+  if (
+    context.attackerInstanceId === undefined ||
+    context.defenderInstanceId === undefined
+  ) {
+    return targetFailure("this Attack card can only be used during an attack.");
+  }
+  const attacker = findWarrior(state, context.attackerInstanceId);
+  const defender = findWarrior(state, context.defenderInstanceId);
+  if (attacker === undefined || defender === undefined) {
+    return targetFailure("the attacker and defender must both be on the field.");
+  }
+  const amount = numberParam(params, ["amount"], 0);
+  attacker.warrior.currentAttack += amount;
+  attacker.warrior.temporaryAttackBuffs.push({ amount });
+  state.events.push({
+    type: "warriorAttackModified",
+    player: attacker.owner,
+    instanceId: attacker.warrior.instanceId,
+    amount,
+    newAttack: attacker.warrior.currentAttack,
+  });
+  addWarriorAttackDisable(
+    state,
+    context.player,
+    defender.owner,
+    defender.warrior.instanceId,
+    durationTurns(params, 1),
+  );
+  return { resolved: true };
+};
+
+/**
+ * Serf's Bondage: "Deal 1000 damage to up to 2 Warriors on your
+ * opponent's side of the field. These Warriors cannot attack on their
+ * next turn." First-target version: the attack action carries a single
+ * effectTargetInstanceId, so one Warrior is hit (a legal "up to 2"
+ * choice), defaulting to the defender. A target the damage destroys
+ * gets no disable.
+ */
+const damageUpToTwoDisableHandler: EffectHandler = (state, params, context) => {
+  const target = requireWarriorTarget(state, params, context, "enemy", context.defenderInstanceId);
+  if (!target.ok) return target.outcome;
+
+  const instanceId = target.warrior.instanceId;
+  modifyWarriorHealth(state, target.owner, target.warrior, -numberParam(params, ["amount"], 0));
+  const stillFielded = state.players[target.owner].field.some(
+    (w) => w.instanceId === instanceId,
+  );
+  if (stillFielded) {
+    addWarriorAttackDisable(
+      state,
+      context.player,
+      target.owner,
+      instanceId,
+      durationTurns(params, 1),
+    );
+  }
   return { resolved: true };
 };
 
@@ -976,6 +1055,10 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   );
   registry.register("PUNISH_ATTACKERS_DISABLE", punishAttackersDisableHandler);
   registry.register("MONK_RETALIATION", monkRetaliationHandler);
+
+  // Group 4B: Attack-card combat modifiers with disable riders.
+  registry.register("ATTACK_DAMAGE_BONUS_DISABLE", attackDamageBonusDisableHandler);
+  registry.register("DAMAGE_UP_TO_TWO_DISABLE", damageUpToTwoDisableHandler);
   return registry;
 }
 

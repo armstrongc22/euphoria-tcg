@@ -16,6 +16,7 @@ export type {
 export { PLAYER_IDS } from "./types";
 export {
   addStatus,
+  addWarriorAttackDisable,
   expireStatuses,
   findAttackPreventionStatus,
   findAttackTargetProtection,
