@@ -457,6 +457,7 @@ function playItem(
     targetInstanceId: action.targetInstanceId,
     targetOutDeckCardId: action.targetOutDeckCardId,
     targetDeckCardId: action.targetDeckCardId,
+    targetOpponentHandCardId: action.targetOpponentHandCardId,
   });
   if (resolution.outcome.resolved) {
     next = resolution.state;

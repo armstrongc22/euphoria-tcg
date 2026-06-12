@@ -177,3 +177,110 @@ describe("SEARCH_DECK", () => {
     expect(state).toBe(game);
   });
 });
+
+describe("STEAL_ITEM_FROM_HAND via A Thief's Pride", () => {
+  it("moves the chosen Item from the opponent's hand to the controller's hand", () => {
+    const game = newGame();
+    const loot = realCard("gunder-love"); // Item in opponent's hand
+    const keeper = realCard("bit-schneider"); // Warrior stays behind
+    game.players.player2.hand = [loot, keeper];
+    const thief = realCard("a-thiefs-pride");
+    game.players.player1.hand.push(thief);
+
+    const state = mustApply(game, {
+      kind: "playItem",
+      cardId: thief.id,
+      targetOpponentHandCardId: loot.id,
+    });
+
+    expect(state.players.player1.hand.map((c) => c.id)).toEqual([loot.id]);
+    expect(state.players.player2.hand.map((c) => c.id)).toEqual([keeper.id]);
+    expect(state.players.player1.spirit).toBe(1);
+    expect(state.players.player1.outDeck.map((c) => c.id)).toEqual([thief.id]);
+    expect(
+      state.events.some(
+        (e) =>
+          e.type === "cardStolenFromHand" &&
+          e.cardId === loot.id &&
+          e.fromPlayer === "player2",
+      ),
+    ).toBe(true);
+    expect(
+      state.events.some((e) => e.type === "effectResolved" && e.cardId === thief.id),
+    ).toBe(true);
+  });
+
+  it("fails safely when targetOpponentHandCardId is missing", () => {
+    const game = newGame();
+    game.players.player2.hand = [realCard("gunder-love")];
+    const thief = realCard("a-thiefs-pride");
+    game.players.player1.hand.push(thief);
+
+    const state = mustApply(game, { kind: "playItem", cardId: thief.id });
+
+    expect(state.players.player1.hand).toHaveLength(0);
+    expect(state.players.player2.hand).toHaveLength(1);
+    expect(state.players.player1.outDeck.map((c) => c.id)).toEqual([thief.id]);
+    expect(
+      state.events.some(
+        (e) => e.type === "effectNotImplemented" && e.cardId === thief.id,
+      ),
+    ).toBe(true);
+  });
+
+  it("fails safely for a card id that is not in the opponent's hand", () => {
+    const game = newGame();
+    const thief = realCard("a-thiefs-pride");
+
+    const { outcome, state } = defaultEffectRegistry.resolve(game, thief, {
+      player: "player1",
+      targetOpponentHandCardId: "ghost",
+    });
+
+    expect(outcome.resolved).toBe(false);
+    if (!outcome.resolved) {
+      expect(outcome.code).toBe("EFFECT_FAILED");
+      expect(outcome.reason).toContain("opponent's hand");
+    }
+    expect(state).toBe(game);
+  });
+
+  it("rejects stealing a non-Item from the opponent's hand", () => {
+    const game = newGame();
+    const warrior = realCard("bit-schneider");
+    game.players.player2.hand = [warrior];
+    const thief = realCard("a-thiefs-pride");
+
+    const { outcome, state } = defaultEffectRegistry.resolve(game, thief, {
+      player: "player1",
+      targetOpponentHandCardId: warrior.id,
+    });
+
+    expect(outcome.resolved).toBe(false);
+    if (!outcome.resolved) {
+      expect(outcome.reason).toContain("not an Item");
+    }
+    expect(state).toBe(game);
+    expect(game.players.player2.hand.map((c) => c.id)).toEqual([warrior.id]);
+  });
+
+  it("cannot select a card that is only in the controller's own hand", () => {
+    const game = newGame();
+    const ownItem = realCard("gunder-love");
+    game.players.player1.hand.push(ownItem); // own hand, not opponent's
+    game.players.player2.hand = [];
+    const thief = realCard("a-thiefs-pride");
+
+    const { outcome, state } = defaultEffectRegistry.resolve(game, thief, {
+      player: "player1",
+      targetOpponentHandCardId: ownItem.id,
+    });
+
+    expect(outcome.resolved).toBe(false);
+    if (!outcome.resolved) {
+      expect(outcome.reason).toContain("opponent's hand");
+    }
+    expect(state).toBe(game);
+    expect(game.players.player1.hand.map((c) => c.id)).toEqual([ownItem.id]);
+  });
+});

@@ -28,6 +28,8 @@ export interface EffectContext {
   targetOutDeckCardId?: string;
   /** Chosen card in the controller's own deck (e.g. search target). */
   targetDeckCardId?: string;
+  /** Chosen card in the opponent's hand (e.g. steal target). */
+  targetOpponentHandCardId?: string;
 }
 
 export type EffectOutcome =
@@ -458,6 +460,60 @@ const searchDeckHandler: EffectHandler = (state, params, context) => {
   return { resolved: true };
 };
 
+/**
+ * Shared selection of a card from the opponent's hand. A card id that only
+ * exists in the controller's own hand is "not in the opponent's hand" and
+ * fails. (Revealing the hand is a UI concern; engine state is open.)
+ */
+function requireOpponentHandCard(
+  state: GameState,
+  context: EffectContext,
+  requiredType?: Card["type"],
+): { ok: true; card: Card; index: number } | { ok: false; outcome: EffectOutcome } {
+  const cardId = context.targetOpponentHandCardId;
+  if (cardId === undefined) {
+    return {
+      ok: false,
+      outcome: targetFailure(
+        "an opponent hand card is required (targetOpponentHandCardId missing).",
+      ),
+    };
+  }
+  const hand = state.players[opponentOf(context.player)].hand;
+  const index = hand.findIndex((c) => c.id === cardId);
+  if (index === -1) {
+    return {
+      ok: false,
+      outcome: targetFailure(`No card "${cardId}" in the opponent's hand.`),
+    };
+  }
+  const card = hand[index]!;
+  if (requiredType !== undefined && card.type !== requiredType) {
+    return {
+      ok: false,
+      outcome: targetFailure(`${card.name} is not an ${requiredType} card.`),
+    };
+  }
+  return { ok: true, card, index };
+}
+
+/** "Your opponent reveals their hand. Take 1 Item card and add it to your hand." */
+const stealItemFromHandHandler: EffectHandler = (state, _params, context) => {
+  const target = requireOpponentHandCard(state, context, "Item");
+  if (!target.ok) return target.outcome;
+
+  const opponent = state.players[opponentOf(context.player)];
+  opponent.hand.splice(target.index, 1);
+  state.players[context.player].hand.push(target.card);
+  state.events.push({
+    type: "cardStolenFromHand",
+    player: context.player,
+    fromPlayer: opponent.id,
+    cardId: target.card.id,
+  });
+  return { resolved: true };
+};
+
 /** "Pick 1 Warrior. It gets 500 HEALTH for every Item in your Out deck." */
 const healthPerItemInOutDeckHandler: EffectHandler = (state, params, context) => {
   const target = requireWarriorTarget(state, params, context, "any");
@@ -673,6 +729,8 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   registry.register("EXTRA_ATTACK_THIS_TURN", extraAttackThisTurnHandler);
   // Group 3A: tutor a constrained card from the deck to hand.
   registry.register("SEARCH_DECK", searchDeckHandler);
+  // Group 3B: take an Item from the opponent's hand.
+  registry.register("STEAL_ITEM_FROM_HAND", stealItemFromHandHandler);
   // +2000-damage Attack cards buff the attacker for the turn.
   registry.register("ATTACK_DAMAGE_BONUS", modifyAttackHandler);
 

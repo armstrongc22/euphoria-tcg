@@ -108,6 +108,8 @@ export type GameAction =
       targetOutDeckCardId?: string;
       /** Card id in the player's own deck (e.g. the search target). */
       targetDeckCardId?: string;
+      /** Card id in the opponent's hand (e.g. the steal target). */
+      targetOpponentHandCardId?: string;
     }
   | { kind: "equipWeapon"; cardId: string; warriorInstanceId: string }
   /**

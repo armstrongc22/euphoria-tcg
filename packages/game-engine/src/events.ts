@@ -17,6 +17,7 @@ export type GameEvent =
   | { type: "warriorRevived"; player: PlayerId; cardId: string; instanceId: string }
   | { type: "extraAttackGranted"; player: PlayerId; instanceId: string; amount: number; attacksRemaining: number }
   | { type: "deckSearched"; player: PlayerId; cardId: string }
+  | { type: "cardStolenFromHand"; player: PlayerId; fromPlayer: PlayerId; cardId: string }
   | { type: "itemPlayed"; player: PlayerId; cardId: string; cost: number }
   | { type: "weaponEquipped"; player: PlayerId; cardId: string; warriorInstanceId: string; cost: number }
   /** The card resolved with no effect — it needs a coded handler later. */
