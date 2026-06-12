@@ -3,7 +3,13 @@
  * from data/cards/cards.json that carry each effectCode.
  */
 import { describe, expect, it } from "vitest";
-import { createGame, type GameState } from "../src/index";
+import {
+  applyAction,
+  createGame,
+  defaultEffectRegistry,
+  type GameAction,
+  type GameState,
+} from "../src/index";
 import {
   makeDecks,
   makeWarriorCard,
@@ -232,10 +238,18 @@ describe("WEAPON_ATTACK_HEALTH_BONUS", () => {
   });
 });
 
-describe("WEAPON_ATTACK_BONUS_FACTION_BONUS", () => {
-  it("real Fafnir stays safely pending: its data lacks the targetFaction param", () => {
+describe("WEAPON_ATTACK_BONUS_FACTION_BONUS (Fafnir)", () => {
+  function expectError(state: GameState, action: GameAction, code: string): void {
+    const result = applyAction(state, action);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe(code);
+    }
+  }
+
+  it("buffs a friendly Monk Warrior with the larger bonus", () => {
     const game = newGame();
-    const warrior = putWarriorOnField(game, "player1", {
+    const monk = putWarriorOnField(game, "player1", {
       card: makeWarriorCard({ faction: "Monk" }),
     });
     const weapon = realCard("fafnir");
@@ -244,55 +258,81 @@ describe("WEAPON_ATTACK_BONUS_FACTION_BONUS", () => {
     const state = mustApply(game, {
       kind: "equipWeapon",
       cardId: weapon.id,
-      warriorInstanceId: warrior.instanceId,
+      warriorInstanceId: monk.instanceId,
     });
 
-    // Attached, but no stat change and the pending marker is emitted.
     expect(state.players.player1.field[0]?.attachedWeapon?.id).toBe(weapon.id);
-    expect(state.players.player1.field[0]?.currentAttack).toBe(1000);
-    expect(
-      state.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === weapon.id,
-      ),
-    ).toBe(true);
+    expect(state.players.player1.field[0]?.currentAttack).toBe(2000); // +1000
+    expectResolved(state, weapon.id);
   });
 
-  it("with a targetFaction param, matching factions get the larger bonus", () => {
+  it("buffs a friendly non-Monk Warrior with the base bonus", () => {
     const game = newGame();
-    game.players.player1.spirit = 4;
-    const monk = putWarriorOnField(game, "player1", {
-      card: makeWarriorCard({ faction: "Monk" }),
-    });
     const dwarf = putWarriorOnField(game, "player1", {
       card: makeWarriorCard({ faction: "Dwarf" }),
     });
-    const params = { amount: 500, secondaryAmount: 1000, targetFaction: "Monk" };
-    const forMonk = {
-      ...realCard("fafnir"),
-      id: "fafnir_fixed_a",
-      effectParams: params,
-    };
-    const forDwarf = {
-      ...realCard("fafnir"),
-      id: "fafnir_fixed_b",
-      effectParams: params,
-    };
-    game.players.player1.hand.push(forMonk, forDwarf);
+    const weapon = realCard("fafnir");
+    game.players.player1.hand.push(weapon);
 
-    let state = mustApply(game, {
+    const state = mustApply(game, {
       kind: "equipWeapon",
-      cardId: forMonk.id,
-      warriorInstanceId: monk.instanceId,
-    });
-    state = mustApply(state, {
-      kind: "equipWeapon",
-      cardId: forDwarf.id,
+      cardId: weapon.id,
       warriorInstanceId: dwarf.instanceId,
     });
 
-    const fields = state.players.player1.field;
-    expect(fields.find((w) => w.instanceId === monk.instanceId)?.currentAttack).toBe(2000); // +1000
-    expect(fields.find((w) => w.instanceId === dwarf.instanceId)?.currentAttack).toBe(1500); // +500
+    expect(state.players.player1.field[0]?.attachedWeapon?.id).toBe(weapon.id);
+    expect(state.players.player1.field[0]?.currentAttack).toBe(1500); // +500
+    expectResolved(state, weapon.id);
+  });
+
+  it("cannot target an enemy Warrior", () => {
+    const game = newGame();
+    const enemy = putWarriorOnField(game, "player2", {
+      card: makeWarriorCard({ faction: "Monk" }),
+    });
+    const weapon = realCard("fafnir");
+    game.players.player1.hand.push(weapon);
+
+    expectError(
+      game,
+      {
+        kind: "equipWeapon",
+        cardId: weapon.id,
+        warriorInstanceId: enemy.instanceId,
+      },
+      "WARRIOR_NOT_FOUND",
+    );
+    // Nothing changed: enemy stats intact, weapon still in hand.
+    expect(game.players.player2.field[0]?.currentAttack).toBe(enemy.currentAttack);
+    expect(game.players.player1.hand.map((c) => c.id)).toEqual([weapon.id]);
+  });
+
+  it("rejects an invalid warriorInstanceId safely", () => {
+    const game = newGame();
+    const weapon = realCard("fafnir");
+    game.players.player1.hand.push(weapon);
+
+    expectError(
+      game,
+      { kind: "equipWeapon", cardId: weapon.id, warriorInstanceId: "ghost" },
+      "WARRIOR_NOT_FOUND",
+    );
+    expect(game.players.player1.spirit).toBe(2); // nothing spent
+  });
+
+  it("the handler itself fails cleanly when the context has no target", () => {
+    const game = newGame();
+    const { outcome, state } = defaultEffectRegistry.resolve(
+      game,
+      realCard("fafnir"),
+      { player: "player1" }, // no targetInstanceId
+    );
+
+    expect(outcome.resolved).toBe(false);
+    if (!outcome.resolved) {
+      expect(outcome.code).toBe("EFFECT_FAILED");
+    }
+    expect(state).toBe(game); // untouched input returned
   });
 });
 

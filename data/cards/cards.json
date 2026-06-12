@@ -2684,7 +2684,8 @@
       "amount": 500,
       "secondaryAmount": 1000,
       "target": "equipped_warrior_attack",
-      "duration": "while_equipped"
+      "duration": "while_equipped",
+      "targetFaction": "Monk"
     }
   },
   {
