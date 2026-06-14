@@ -42,6 +42,9 @@ export function createCardDetail(base: string): {
 } {
   const dialog = document.createElement("dialog");
   dialog.className = "detail";
+  // Associate the dialog with its card-name heading so screen readers announce
+  // the card when the modal opens (the heading carries the matching id).
+  dialog.setAttribute("aria-labelledby", "detail-title");
   // Close when the backdrop (the dialog element itself) is clicked.
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close();
@@ -70,12 +73,19 @@ function buildContent(card: Card, base: string, onClose: () => void): HTMLElemen
   img.className = "detail__art";
   img.src = cardImageUrl(card, base);
   img.alt = card.name;
+  // Mirror the grid: degrade gracefully to a styled placeholder if art is
+  // missing instead of showing a broken-image icon.
+  img.addEventListener("error", () => {
+    img.removeAttribute("src");
+    img.classList.add("detail__art--missing");
+  });
 
   const info = document.createElement("div");
   info.className = "detail__info";
 
   const title = document.createElement("h2");
   title.className = "detail__name";
+  title.id = "detail-title";
   title.textContent = card.name;
 
   const stats = document.createElement("dl");

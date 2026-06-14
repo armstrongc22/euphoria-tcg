@@ -272,9 +272,22 @@ body {
 }
 
 .detail__art {
+  display: block;
   width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
   border-radius: 10px;
   background: #0b0d11;
+}
+
+.detail__art--missing {
+  background: repeating-linear-gradient(
+    45deg,
+    #0b0d11,
+    #0b0d11 8px,
+    #12151b 8px,
+    #12151b 16px
+  );
 }
 
 .detail__name {
