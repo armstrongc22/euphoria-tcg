@@ -39,4 +39,6 @@ export type GameEvent =
   /** A PREVENT_DESTRUCTION status absorbed a destruction; player = the Warrior's owner. */
   | { type: "destructionPrevented"; player: PlayerId; instanceId: string; statusId: string; newHealth: number }
   /** A DISABLE_WARRIOR_ATTACKS status fired; player = the Warrior's owner. */
-  | { type: "warriorAttacksDisabled"; player: PlayerId; instanceId: string };
+  | { type: "warriorAttacksDisabled"; player: PlayerId; instanceId: string }
+  /** Ontology negated an attack; player = the equipped (defending) Warrior's owner. */
+  | { type: "attackNegated"; player: PlayerId; instanceId: string; attackerInstanceId: string };

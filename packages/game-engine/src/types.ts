@@ -69,6 +69,13 @@ export interface WarriorInPlay {
   /** One Weapon per Warrior; it cannot be replaced or moved and dies with the Warrior. */
   attachedWeapon?: Card;
   temporaryAttackBuffs: TemporaryAttackBuff[];
+  /**
+   * Ontology (WEAPON_NEGATE_ONCE_REDUCE_ATTACKER): the game turn on which
+   * this Warrior last negated an attack against it. Keyed on the turn number
+   * (which is unique per turn) so the "negate 1 attack per turn" limit needs
+   * no separate reset. Unset = never negated.
+   */
+  negatedAttackTurn?: number;
 }
 
 /**

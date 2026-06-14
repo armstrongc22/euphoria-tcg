@@ -1311,6 +1311,14 @@ export function createDefaultEffectRegistry(): EffectRegistry {
     weaponStaticAttackBonusHandler,
   );
 
+  // Ontology: negate the first attack against the equipped Warrior each turn
+  // and debuff any attacker that hits it — both enforced in attackWarrior
+  // (actions.ts); equip just clears the marker.
+  registry.register(
+    "WEAPON_NEGATE_ONCE_REDUCE_ATTACKER",
+    weaponCombatPassiveHandler,
+  );
+
   // Group 4F: splash / adjacency combat targeting (shared splash.ts
   // geometry). Apex Forest splashes all other enemy Warriors when its
   // Attack card resolves; Scythe Cycle adds static ATTACK at equip and

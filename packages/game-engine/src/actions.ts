@@ -498,7 +498,36 @@ function attackWarrior(
     const opponentCountBeforeCombat = next.players[opponentId].field.length;
     // The attacker takes no counter damage (CLAUDE.md overrides the spec's
     // "simultaneous" wording; see RulesConfig.combatDamageSimultaneous).
-    const damage = computeCombatDamage(next, next.activePlayer, attacker, defender);
+    let damage = computeCombatDamage(next, next.activePlayer, attacker, defender);
+    // Ontology (WEAPON_NEGATE_ONCE_REDUCE_ATTACKER): the equipped Warrior
+    // negates the first attack against it each turn (keyed on the unique turn
+    // number), and any Warrior that attacks it loses ATTACK. Both clauses are
+    // independent — a negated attack still debuffs the attacker.
+    if (attachedWeaponCode(defender) === "WEAPON_NEGATE_ONCE_REDUCE_ATTACKER") {
+      if (defender.negatedAttackTurn !== next.turn) {
+        defender.negatedAttackTurn = next.turn;
+        damage = 0;
+        next.events.push({
+          type: "attackNegated",
+          player: opponentId,
+          instanceId: defender.instanceId,
+          attackerInstanceId: attacker.instanceId,
+        });
+      }
+      const reduction = defender.attachedWeapon?.effectParams?.["secondaryAmount"];
+      const loss = typeof reduction === "number" ? Math.abs(reduction) : 500;
+      const newAttack = Math.max(0, attacker.currentAttack - loss);
+      if (newAttack !== attacker.currentAttack) {
+        next.events.push({
+          type: "warriorAttackModified",
+          player: next.activePlayer,
+          instanceId: attacker.instanceId,
+          amount: newAttack - attacker.currentAttack,
+          newAttack,
+        });
+        attacker.currentAttack = newAttack;
+      }
+    }
     defender.currentHealth -= damage;
     next.events.push({
       type: "warriorAttacked",
