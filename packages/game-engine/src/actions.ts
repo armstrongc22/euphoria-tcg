@@ -55,6 +55,17 @@ function fail(code: EngineErrorCode, message: string): ActionResult {
 }
 
 /**
+ * Attack-card effects that replace the normal combat hit with their own
+ * damage (the handler deals it), so the declared defender is not
+ * double-counted. Silurian Period's lingering tick and Gylippus's flat
+ * damage both land this way.
+ */
+const REPLACE_COMBAT_EFFECTS = new Set([
+  "LINGERING_EXISTING_DAMAGE",
+  "GYLIPPUS",
+]);
+
+/**
  * Pure action reducer: validates, then returns a new state (the input state
  * is never mutated). Illegal actions return a typed error instead of throwing.
  */
@@ -402,10 +413,10 @@ function attackWarrior(
 
   let next = structuredClone(state);
 
-  // Silurian Period swaps the normal combat hit for its own lingering
-  // effect, so the declared defender takes no combat damage. The "replace"
-  // is keyed on the effectCode, not the timing: every Attack card shares
-  // timing "on_attack_replace", so it cannot discriminate this one.
+  // Some Attack cards swap the normal combat hit for their own damage, so
+  // the declared defender is not double-counted. The "replace" is keyed on
+  // the effectCode, not the timing: every Attack card shares timing
+  // "on_attack_replace", so it cannot discriminate these.
   let replacesAttack = false;
 
   if (action.selectedAttackCardId !== undefined) {
@@ -416,7 +427,7 @@ function attackWarrior(
     const card = player.hand[handIndex]!;
     replacesAttack =
       card.effectCode !== undefined &&
-      normalizeEffectCode(card.effectCode) === "LINGERING_EXISTING_DAMAGE";
+      REPLACE_COMBAT_EFFECTS.has(normalizeEffectCode(card.effectCode));
     player.spirit -= card.cost;
     player.hand.splice(handIndex, 1);
     player.outDeck.push(card);

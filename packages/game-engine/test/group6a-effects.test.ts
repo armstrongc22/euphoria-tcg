@@ -1,16 +1,15 @@
 /**
  * Group 6A: GYLIPPUS (Gylippus).
  *
- * A Monk Attack card targeting two Warriors: the declared defender takes
- * the attack with +2000 ATTACK (combat hit = attacker_attack + primaryBonus,
- * like Pīsubaipā), and a second, distinct enemy Warrior (effectTargetInstanceId)
- * takes 1000 direct damage. A missing / invalid / friendly second target,
- * or re-using the defender, fails the effect safely — the attack then lands
- * for base damage.
+ * A Monk Attack card that deals 2000 flat damage to the Warrior you attack
+ * (replacing the normal combat hit, so the damage is independent of the
+ * attacker's ATTACK) plus 1000 additional damage to one additional enemy
+ * Warrior (effectTargetInstanceId). A missing / invalid / friendly /
+ * same-as-defender second target simply skips the additional hit — the 2000
+ * still lands.
  */
 import { describe, expect, it } from "vitest";
 import {
-  applyAction,
   createGame,
   defaultEffectRegistry,
   type GameState,
@@ -35,15 +34,16 @@ function toPlayer1Turn3(game: GameState): GameState {
 
 /**
  * Player 1, turn 3: a Monk attacker with Gylippus in hand, facing a primary
- * defender and a second enemy Warrior (the secondary target).
+ * defender and a second enemy Warrior (the additional target).
  */
 function gylippusBattle(
   defenderHealth = 5000,
   secondHealth = 5000,
+  attackerOverrides: Parameters<typeof putWarriorOnField>[2] = {},
   secondOverrides: Parameters<typeof putWarriorOnField>[2] = {},
 ) {
   let game = toPlayer1Turn3(newGame());
-  const attacker = putWarriorOnField(game, "player1"); // Monk, 1000 ATTACK
+  const attacker = putWarriorOnField(game, "player1", attackerOverrides); // Monk
   const defender = putWarriorOnField(game, "player2", {
     currentHealth: defenderHealth,
     maxHealth: defenderHealth,
@@ -65,7 +65,7 @@ function healthOf(game: GameState, instanceId: string): number | undefined {
 }
 
 describe("GYLIPPUS (Gylippus)", () => {
-  it("hits the defender for attack+2000 and the second enemy for 1000", () => {
+  it("deals 2000 flat to the attacked Warrior and 1000 to one additional enemy", () => {
     let { game, attacker, defender, second, gylippus } = gylippusBattle();
     game = mustApply(game, {
       kind: "attack",
@@ -75,18 +75,36 @@ describe("GYLIPPUS (Gylippus)", () => {
       effectTargetInstanceId: second.instanceId,
     });
 
-    expect(healthOf(game, defender.instanceId)).toBe(2000); // 5000 - (1000 + 2000)
+    expect(healthOf(game, defender.instanceId)).toBe(3000); // 5000 - 2000 flat
     expect(healthOf(game, second.instanceId)).toBe(4000); // 5000 - 1000
-    expect(
-      game.events.some((e) => e.type === "warriorAttacked" && e.damage === 3000),
-    ).toBe(true);
+    // The flat damage replaces the combat hit: no warriorAttacked event.
+    expect(game.events.some((e) => e.type === "warriorAttacked")).toBe(false);
   });
 
-  it("can destroy the second target and move it and its Weapon to the Out Deck", () => {
-    const weapon = makeWeaponCard();
-    let { game, attacker, defender, second, gylippus } = gylippusBattle(5000, 1000, {
-      attachedWeapon: weapon,
+  it("deals a flat 2000 regardless of the attacker's ATTACK", () => {
+    let { game, attacker, defender, second, gylippus } = gylippusBattle(
+      5000,
+      5000,
+      { currentAttack: 5000 }, // a much stronger attacker
+    );
+    game = mustApply(game, {
+      kind: "attack",
+      attackerInstanceId: attacker.instanceId,
+      defenderInstanceId: defender.instanceId,
+      selectedAttackCardId: gylippus.id,
+      effectTargetInstanceId: second.instanceId,
     });
+    expect(healthOf(game, defender.instanceId)).toBe(3000); // still exactly 2000
+  });
+
+  it("can destroy the additional target and move it and its Weapon to the Out Deck", () => {
+    const weapon = makeWeaponCard();
+    let { game, attacker, defender, second, gylippus } = gylippusBattle(
+      5000,
+      1000,
+      {},
+      { attachedWeapon: weapon },
+    );
     game = mustApply(game, {
       kind: "attack",
       attackerInstanceId: attacker.instanceId,
@@ -101,10 +119,36 @@ describe("GYLIPPUS (Gylippus)", () => {
     const outDeckIds = game.players.player2.outDeck.map((c) => c.id);
     expect(outDeckIds).toContain(second.card.id);
     expect(outDeckIds).toContain(weapon.id);
-    expect(healthOf(game, defender.instanceId)).toBe(2000); // defender still hit for 3000
+    expect(healthOf(game, defender.instanceId)).toBe(3000); // defender still -2000
   });
 
-  it("fails safely with no second target: attack lands for base damage only", () => {
+  it("can destroy the attacked Warrior with the flat 2000, Weapon to the Out Deck", () => {
+    const weapon = makeWeaponCard();
+    let { game, attacker, defender, second, gylippus } = gylippusBattle(
+      2000,
+      5000,
+      {},
+    );
+    game.players.player2.field.find(
+      (w) => w.instanceId === defender.instanceId,
+    )!.attachedWeapon = weapon;
+    game = mustApply(game, {
+      kind: "attack",
+      attackerInstanceId: attacker.instanceId,
+      defenderInstanceId: defender.instanceId,
+      selectedAttackCardId: gylippus.id,
+      effectTargetInstanceId: second.instanceId,
+    });
+    expect(
+      game.players.player2.field.some((w) => w.instanceId === defender.instanceId),
+    ).toBe(false);
+    const outDeckIds = game.players.player2.outDeck.map((c) => c.id);
+    expect(outDeckIds).toContain(defender.card.id);
+    expect(outDeckIds).toContain(weapon.id);
+    expect(healthOf(game, second.instanceId)).toBe(4000); // additional hit still lands
+  });
+
+  it("with no additional target, only the flat 2000 lands", () => {
     let { game, attacker, defender, second, gylippus } = gylippusBattle();
     game = mustApply(game, {
       kind: "attack",
@@ -113,18 +157,16 @@ describe("GYLIPPUS (Gylippus)", () => {
       selectedAttackCardId: gylippus.id,
       // no effectTargetInstanceId
     });
-
-    expect(healthOf(game, defender.instanceId)).toBe(4000); // base 1000, no +2000
+    expect(healthOf(game, defender.instanceId)).toBe(3000); // 2000 flat
     expect(healthOf(game, second.instanceId)).toBe(5000); // untouched
     expect(
       game.events.some(
         (e) => e.type === "effectNotImplemented" && e.cardId === gylippus.id,
       ),
-    ).toBe(true);
-    expect(game.players.player1.outDeck.some((c) => c.id === gylippus.id)).toBe(true);
+    ).toBe(false); // it still resolves
   });
 
-  it("rejects a friendly second target (effect fails, no friendly damage)", () => {
+  it("ignores a friendly additional target (no friendly damage)", () => {
     let { game, attacker, defender, gylippus } = gylippusBattle();
     const friendly = putWarriorOnField(game, "player1", {
       currentHealth: 4000,
@@ -137,15 +179,14 @@ describe("GYLIPPUS (Gylippus)", () => {
       selectedAttackCardId: gylippus.id,
       effectTargetInstanceId: friendly.instanceId,
     });
-
     expect(
       game.players.player1.field.find((w) => w.instanceId === friendly.instanceId)!
         .currentHealth,
     ).toBe(4000); // untouched
-    expect(healthOf(game, defender.instanceId)).toBe(4000); // base damage only
+    expect(healthOf(game, defender.instanceId)).toBe(3000); // flat 2000 still lands
   });
 
-  it("rejects re-using the defender as the second target", () => {
+  it("ignores re-using the attacked Warrior as the additional target (no double hit)", () => {
     let { game, attacker, defender, gylippus } = gylippusBattle();
     game = mustApply(game, {
       kind: "attack",
@@ -154,11 +195,10 @@ describe("GYLIPPUS (Gylippus)", () => {
       selectedAttackCardId: gylippus.id,
       effectTargetInstanceId: defender.instanceId, // same Warrior
     });
-    // No +2000 and no extra 1000: just the base combat hit.
-    expect(healthOf(game, defender.instanceId)).toBe(4000);
+    expect(healthOf(game, defender.instanceId)).toBe(3000); // only the 2000, not 3000 off
   });
 
-  it("an invalid second target id fails safely (base damage, state intact)", () => {
+  it("ignores an invalid additional target id (flat 2000 only)", () => {
     let { game, attacker, defender, second, gylippus } = gylippusBattle();
     game = mustApply(game, {
       kind: "attack",
@@ -167,7 +207,7 @@ describe("GYLIPPUS (Gylippus)", () => {
       selectedAttackCardId: gylippus.id,
       effectTargetInstanceId: "no-such-warrior",
     });
-    expect(healthOf(game, defender.instanceId)).toBe(4000);
+    expect(healthOf(game, defender.instanceId)).toBe(3000);
     expect(healthOf(game, second.instanceId)).toBe(5000);
   });
 
@@ -180,7 +220,7 @@ describe("GYLIPPUS (Gylippus)", () => {
     expect(resolution.state).toBe(game); // untouched original
   });
 
-  it("does not let Gylippus destroy the attacker or change the attacker's own health", () => {
+  it("does not change the attacker's own health or ATTACK", () => {
     let { game, attacker, defender, second, gylippus } = gylippusBattle();
     game = mustApply(game, {
       kind: "attack",
@@ -192,7 +232,7 @@ describe("GYLIPPUS (Gylippus)", () => {
     const atk = game.players.player1.field.find(
       (w) => w.instanceId === attacker.instanceId,
     )!;
-    expect(atk.currentHealth).toBe(2000); // attacker takes no counter damage
-    expect(atk.currentAttack).toBe(3000); // 1000 + 2000 buff this turn
+    expect(atk.currentHealth).toBe(2000); // no counter damage
+    expect(atk.currentAttack).toBe(1000); // flat damage, no attacker buff
   });
 });

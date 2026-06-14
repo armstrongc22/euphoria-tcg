@@ -977,17 +977,16 @@ const damageUpToTwoDisableHandler: EffectHandler = (state, params, context) => {
 };
 
 /**
- * Gylippus (GYLIPPUS): "Target 2 Warriors. 1. Deal 2000 additional damage
- * when you attack. 2. Deal 1000 total damage." Used as an Attack card, so
- * it resolves before combat. Target 1 is the declared defender: the
- * attacker gains `primaryBonus` ATTACK for the turn, so the combat hit lands
- * as attacker_attack + primaryBonus (the card's damageFormula, exactly like
- * Pīsubaipā's bonus). Target 2 is a second, distinct enemy Warrior chosen
- * via effectTargetInstanceId and takes `secondaryDamage` directly (lethal
- * damage moves it and its Weapon to the Out Deck). A missing / invalid /
- * friendly second target, or re-using the defender, fails the whole effect
- * safely — the registry discards the partial work and the attack then lands
- * for base damage.
+ * Gylippus (GYLIPPUS): "Deal 2000 flat damage to the Warrior you attack,
+ * plus 1000 additional damage to 1 additional Warrior on your opponent's
+ * side of the field." Used as an Attack card; it replaces the normal combat
+ * hit (actions.ts), so the attacked Warrior takes a flat `primaryBonus`
+ * (2000) regardless of the attacker's ATTACK — never attacker_attack +
+ * bonus. A second, distinct enemy Warrior chosen via effectTargetInstanceId
+ * additionally takes `secondaryDamage` (1000); a missing / invalid /
+ * friendly / same-as-defender second target simply skips that hit (the
+ * 2000 still lands). Lethal damage moves a Warrior and its Weapon to the
+ * Out Deck.
  */
 const gylippusHandler: EffectHandler = (state, params, context) => {
   if (
@@ -996,36 +995,32 @@ const gylippusHandler: EffectHandler = (state, params, context) => {
   ) {
     return targetFailure("Gylippus can only be used during an attack.");
   }
-  const attacker = findWarrior(state, context.attackerInstanceId);
-  if (attacker === undefined) {
-    return targetFailure("the attacker must be on the field.");
-  }
-  // Target 2: a second, distinct enemy Warrior (effectTargetInstanceId).
-  const second = requireWarriorTarget(state, params, context, "enemy");
-  if (!second.ok) return second.outcome;
-  if (second.warrior.instanceId === context.defenderInstanceId) {
-    return targetFailure("Gylippus must target two different Warriors.");
+  const defender = findWarrior(state, context.defenderInstanceId);
+  if (defender === undefined || defender.owner === context.player) {
+    return targetFailure("the attacked Warrior must be an enemy on the field.");
   }
 
-  // Effect 1: +primaryBonus to this attack's damage (buff the attacker).
-  const primaryBonus = numberParam(params, ["primaryBonus"], 0);
-  attacker.warrior.currentAttack += primaryBonus;
-  attacker.warrior.temporaryAttackBuffs.push({ amount: primaryBonus });
-  state.events.push({
-    type: "warriorAttackModified",
-    player: attacker.owner,
-    instanceId: attacker.warrior.instanceId,
-    amount: primaryBonus,
-    newAttack: attacker.warrior.currentAttack,
-  });
-
-  // Effect 2: secondaryDamage to the second target.
+  // Flat damage to the attacked Warrior (this replaces the combat hit).
   modifyWarriorHealth(
     state,
-    second.owner,
-    second.warrior,
-    -numberParam(params, ["secondaryDamage"], 0),
+    defender.owner,
+    defender.warrior,
+    -numberParam(params, ["primaryBonus"], 0),
   );
+
+  // Additional damage to one other enemy Warrior, when one is validly chosen.
+  const secondId = context.targetInstanceId;
+  if (secondId !== undefined && secondId !== context.defenderInstanceId) {
+    const second = findWarrior(state, secondId);
+    if (second !== undefined && second.owner !== context.player) {
+      modifyWarriorHealth(
+        state,
+        second.owner,
+        second.warrior,
+        -numberParam(params, ["secondaryDamage"], 0),
+      );
+    }
+  }
   return { resolved: true };
 };
 
@@ -1271,8 +1266,8 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   // delayedEffects system (resolveDelayedEffects in turn.ts).
   registry.register("LINGERING_EXISTING_DAMAGE", lingeringExistingDamageHandler);
 
-  // Group 6A: Gylippus — +primaryBonus to the attack on the defender plus
-  // secondaryDamage to a second distinct enemy Warrior.
+  // Group 6A: Gylippus — flat primaryBonus to the attacked Warrior (replaces
+  // the combat hit, see actions.ts) plus secondaryDamage to one other enemy.
   registry.register("GYLIPPUS", gylippusHandler);
   return registry;
 }
