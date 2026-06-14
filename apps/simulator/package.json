@@ -6,6 +6,7 @@
   "scripts": {
     "start": "tsx src/main.ts",
     "balance": "tsx src/balance-main.ts",
+    "trace": "tsx src/trace-main.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
