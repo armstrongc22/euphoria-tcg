@@ -26,6 +26,12 @@ export {
   recordAttackDeclaration,
   triggerExpiredStatuses,
 } from "./status";
+export {
+  adjacentWarriorList,
+  adjacentWarriors,
+  fieldSlot,
+  otherWarriors,
+} from "./splash";
 export type { GameEvent } from "./events";
 export { DEFAULT_RULES } from "./config";
 export { createRng, shuffleCards } from "./rng";

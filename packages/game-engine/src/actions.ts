@@ -289,6 +289,39 @@ function grantOtherWarriorExtraAttack(
   });
 }
 
+/**
+ * Scythe Cycle's on-attack splash: when the equipped Warrior attacks and
+ * the opponent has more than one Warrior, the chosen enemy Warrior (via the
+ * attack's effectTargetInstanceId) takes the Weapon's `amount` of splash
+ * damage. Missing, invalid, or friendly targets splash nothing; lethal
+ * splash routes through destroyWarrior, moving the slain Warrior and its
+ * Weapon to the Out Deck. Only Warrior-vs-Warrior attacks reach here, so
+ * direct attacks never trigger it.
+ */
+function applySelectedEnemySplash(
+  state: GameState,
+  opponentId: PlayerId,
+  amount: number,
+  targetInstanceId: string | undefined,
+): void {
+  if (amount <= 0 || targetInstanceId === undefined) return;
+  const target = state.players[opponentId].field.find(
+    (w) => w.instanceId === targetInstanceId,
+  );
+  if (target === undefined) return; // invalid id, or a friendly Warrior
+  target.currentHealth -= amount;
+  state.events.push({
+    type: "warriorHealthModified",
+    player: opponentId,
+    instanceId: target.instanceId,
+    amount: -amount,
+    newHealth: target.currentHealth,
+  });
+  if (target.currentHealth <= 0) {
+    destroyWarrior(state, opponentId, target.instanceId);
+  }
+}
+
 function attackWarrior(
   state: GameState,
   action: Extract<GameAction, { kind: "attack" }>,
@@ -422,6 +455,9 @@ function attackWarrior(
     // The defender's faction drives retaliation even if the attack
     // destroys the defender (it was still "a Monk that was attacked").
     const defenderFaction = defender.card.faction;
+    // Scythe Cycle checks "opponent has more than 1 Warrior" at attack
+    // time, before combat damage can thin the field.
+    const opponentCountBeforeCombat = next.players[opponentId].field.length;
     // The attacker takes no counter damage (CLAUDE.md overrides the spec's
     // "simultaneous" wording; see RulesConfig.combatDamageSimultaneous).
     const damage = computeCombatDamage(next, next.activePlayer, attacker, defender);
@@ -468,6 +504,25 @@ function attackWarrior(
         next,
         next.activePlayer,
         attacker.instanceId,
+        action.effectTargetInstanceId,
+      );
+    }
+
+    // Scythe Cycle (WEAPON_ATTACK_BONUS_SPLASH): when the equipped Warrior
+    // attacks and the opponent had more than one Warrior, the chosen enemy
+    // Warrior (the attack's effectTargetInstanceId) takes the Weapon's
+    // splash damage. Read live from the attachment, so it stops once the
+    // equipped Warrior dies and the Weapon leaves with it.
+    if (
+      attachedWeaponCode(attacker) === "WEAPON_ATTACK_BONUS_SPLASH" &&
+      opponentCountBeforeCombat > 1
+    ) {
+      const splash = attacker.attachedWeapon?.effectParams?.["secondaryAmount"];
+      const amount = typeof splash === "number" ? splash : 500;
+      applySelectedEnemySplash(
+        next,
+        opponentId,
+        amount,
         action.effectTargetInstanceId,
       );
     }

@@ -1,8 +1,8 @@
 /**
  * Group 4C: Weapon combat passives — WEAPON_HALVE_INCOMING_DAMAGE
  * (Skeleton Key) and WEAPON_ADD_ATTACK_DIFFERENCE_DAMAGE (Xīwànghǎo),
- * read from the attached Weapon during damage calculation. Also verifies
- * WEAPON_ATTACK_BONUS_SPLASH (Scythe Cycle) stays safely unimplemented.
+ * read from the attached Weapon during damage calculation.
+ * (Scythe Cycle / WEAPON_ATTACK_BONUS_SPLASH is covered in Group 4F.)
  */
 import { describe, expect, it } from "vitest";
 import { applyAction, createGame, type GameState } from "../src/index";
@@ -251,33 +251,5 @@ describe("WEAPON_ADD_ATTACK_DIFFERENCE_DAMAGE (Xīwànghǎo)", () => {
       (w) => w.instanceId === defender.instanceId,
     )!;
     expect(hit.currentHealth).toBe(3500); // floor((1000 + 2000) * 0.5) = 1500
-  });
-});
-
-describe("WEAPON_ATTACK_BONUS_SPLASH (Scythe Cycle) stays unimplemented", () => {
-  it("equips with the pending marker, no stat change, no statuses", () => {
-    let game = newGame();
-    game = mustApply(game, { kind: "endTurn" });
-    game = mustApply(game, { kind: "endTurn" }); // player1, turn 3
-    const warrior = putWarriorOnField(game, "player1");
-    const scythe = realCard("scythe-cycle");
-    game.players.player1.hand.push(scythe);
-    game = mustApply(game, {
-      kind: "equipWeapon",
-      cardId: scythe.id,
-      warriorInstanceId: warrior.instanceId,
-    });
-
-    expect(
-      game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === scythe.id,
-      ),
-    ).toBe(true);
-    const equipped = game.players.player1.field.find(
-      (w) => w.instanceId === warrior.instanceId,
-    )!;
-    expect(equipped.currentAttack).toBe(1000); // no +500: effect fully pending
-    expect(equipped.attachedWeapon?.id).toBe(scythe.id);
-    expect(game.statuses).toHaveLength(0);
   });
 });

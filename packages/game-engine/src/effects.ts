@@ -5,6 +5,7 @@
  * the caller's state — the untouched input state is returned instead.
  */
 import type { Card } from "@euphoria/card-data";
+import { otherWarriors } from "./splash";
 import { addStatus, addWarriorAttackDisable } from "./status";
 import {
   createWarriorInPlay,
@@ -982,14 +983,69 @@ const damageUpToTwoDisableHandler: EffectHandler = (state, params, context) => {
  * lifetime is the passive's. Resolving here (after validating the equip
  * target) keeps the
  * card from being flagged effectNotImplemented, with no Spirit beyond the
- * equip cost. Scythe Cycle (WEAPON_ATTACK_BONUS_SPLASH) is deliberately
- * NOT registered: its per-attack "select one" splash needs target
- * plumbing that does not exist, and resolving only its static +500 would
- * hide the pending splash.
+ * equip cost.
  */
 const weaponCombatPassiveHandler: EffectHandler = (state, params, context) => {
   const target = requireWarriorTarget(state, params, context, "friendly");
   if (!target.ok) return target.outcome;
+  return { resolved: true };
+};
+
+/**
+ * Apex Forest (ATTACK_TARGET_SPLASH): "Pick one Warrior. Attack it. All
+ * other Warriors on your opponent's side of the field take <amount>
+ * damage." The chosen defender takes normal combat damage in
+ * attackWarrior; this effect (resolved before that, like every other
+ * Attack card) splashes every *other* enemy Warrior. Faithful to the card
+ * text, the splash is the whole enemy side rather than just the defender's
+ * neighbours — the shared splash.ts geometry (otherWarriors) selects them,
+ * and adjacency lives in the same module for cards whose text calls for it.
+ * Friendly Warriors are never touched (only the opponent's field is read),
+ * and lethal splash routes through modifyWarriorHealth -> destroyWarrior,
+ * moving slain Warriors and their Weapons to the Out Deck.
+ */
+const attackTargetSplashHandler: EffectHandler = (state, params, context) => {
+  if (context.defenderInstanceId === undefined) {
+    return targetFailure("this Attack card can only be used during an attack.");
+  }
+  const opponentId = opponentOf(context.player);
+  const amount = numberParam(params, ["amount"], 0);
+  // Snapshot the victims first: lethal splash splices the field mid-loop.
+  const victims = otherWarriors(
+    state.players[opponentId].field,
+    context.defenderInstanceId,
+  ).map((w) => w.instanceId);
+  for (const instanceId of victims) {
+    const warrior = state.players[opponentId].field.find(
+      (w) => w.instanceId === instanceId,
+    );
+    if (warrior === undefined) continue;
+    modifyWarriorHealth(state, opponentId, warrior, -amount);
+  }
+  return { resolved: true };
+};
+
+/**
+ * Scythe Cycle (WEAPON_ATTACK_BONUS_SPLASH) at equip time: the equipped
+ * Warrior gains `amount` ATTACK (static — Weapons never detach, so it
+ * lasts exactly as long as the attachment). The on-attack splash ("if your
+ * opponent has more than 1 Warrior, select one, it takes `secondaryAmount`
+ * damage") is a combat hook in attackWarrior (actions.ts) and is not
+ * applied here.
+ */
+const weaponAttackBonusSplashHandler: EffectHandler = (state, params, context) => {
+  const target = requireWarriorTarget(state, params, context, "friendly");
+  if (!target.ok) return target.outcome;
+
+  const attackBonus = numberParam(params, ["amount"], 0);
+  target.warrior.currentAttack += attackBonus;
+  state.events.push({
+    type: "warriorAttackModified",
+    player: target.owner,
+    instanceId: target.warrior.instanceId,
+    amount: attackBonus,
+    newAttack: target.warrior.currentAttack,
+  });
   return { resolved: true };
 };
 
@@ -1106,6 +1162,14 @@ export function createDefaultEffectRegistry(): EffectRegistry {
     "WEAPON_GRANT_OTHER_EXTRA_ATTACK",
     weaponCombatPassiveHandler,
   );
+
+  // Group 4F: splash / adjacency combat targeting (shared splash.ts
+  // geometry). Apex Forest splashes all other enemy Warriors when its
+  // Attack card resolves; Scythe Cycle adds static ATTACK at equip and
+  // splashes one selected enemy on attack (the splash hook lives in
+  // attackWarrior, actions.ts).
+  registry.register("ATTACK_TARGET_SPLASH", attackTargetSplashHandler);
+  registry.register("WEAPON_ATTACK_BONUS_SPLASH", weaponAttackBonusSplashHandler);
   return registry;
 }
 
