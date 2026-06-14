@@ -1074,14 +1074,15 @@ const attackTargetSplashHandler: EffectHandler = (state, params, context) => {
 };
 
 /**
- * Scythe Cycle (WEAPON_ATTACK_BONUS_SPLASH) at equip time: the equipped
- * Warrior gains `amount` ATTACK (static — Weapons never detach, so it
- * lasts exactly as long as the attachment). The on-attack splash ("if your
- * opponent has more than 1 Warrior, select one, it takes `secondaryAmount`
- * damage") is a combat hook in attackWarrior (actions.ts) and is not
- * applied here.
+ * Static +`amount` ATTACK at equip time, shared by Weapons whose only
+ * equip-time work is a flat ATTACK bonus; their combat behaviour lives in
+ * attackWarrior (actions.ts). Static is safe for "while_equipped" because
+ * Weapons never detach — they go to the Out Deck with the Warrior, so the
+ * bonus lasts exactly as long as the attachment. Used by Scythe Cycle
+ * (WEAPON_ATTACK_BONUS_SPLASH: +500, then on-attack splash) and Jesus
+ * (WEAPON_ATTACK_BONUS_LEAVE_AT_ONE: +1000, then the non-lethal clamp).
  */
-const weaponAttackBonusSplashHandler: EffectHandler = (state, params, context) => {
+const weaponStaticAttackBonusHandler: EffectHandler = (state, params, context) => {
   const target = requireWarriorTarget(state, params, context, "friendly");
   if (!target.ok) return target.outcome;
 
@@ -1303,13 +1304,20 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   // higher ATTACK (computeCombatDamage, actions.ts); equip clears the marker.
   registry.register("WEAPON_EQUALIZE_VS_HIGHER_ATTACK", weaponCombatPassiveHandler);
 
+  // Jesus: +amount ATTACK at equip; the "cannot destroy — leave at 1" clamp
+  // on the attacked Warrior is a combat hook in attackWarrior (actions.ts).
+  registry.register(
+    "WEAPON_ATTACK_BONUS_LEAVE_AT_ONE",
+    weaponStaticAttackBonusHandler,
+  );
+
   // Group 4F: splash / adjacency combat targeting (shared splash.ts
   // geometry). Apex Forest splashes all other enemy Warriors when its
   // Attack card resolves; Scythe Cycle adds static ATTACK at equip and
   // splashes one selected enemy on attack (the splash hook lives in
   // attackWarrior, actions.ts).
   registry.register("ATTACK_TARGET_SPLASH", attackTargetSplashHandler);
-  registry.register("WEAPON_ATTACK_BONUS_SPLASH", weaponAttackBonusSplashHandler);
+  registry.register("WEAPON_ATTACK_BONUS_SPLASH", weaponStaticAttackBonusHandler);
 
   // Group 4G: Silurian Period's recurring snapshot damage. Resolves through
   // this pipeline (an Attack card); the per-turn ticks ride the

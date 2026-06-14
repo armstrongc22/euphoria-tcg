@@ -508,7 +508,16 @@ function attackWarrior(
       damage,
     });
     if (defender.currentHealth <= 0) {
-      destroyWarrior(next, opponentId, defender.instanceId);
+      // Jesus (WEAPON_ATTACK_BONUS_LEAVE_AT_ONE): a Warrior attacked by the
+      // equipped Warrior cannot be destroyed by the battle — a lethal hit
+      // leaves its HEALTH at the Weapon's floor (1) instead. Read live from
+      // the attacker's attachment, so it stops once the Weapon leaves play.
+      if (attachedWeaponCode(attacker) === "WEAPON_ATTACK_BONUS_LEAVE_AT_ONE") {
+        const floor = attacker.attachedWeapon?.effectParams?.["secondaryAmount"];
+        defender.currentHealth = typeof floor === "number" ? floor : 1;
+      } else {
+        destroyWarrior(next, opponentId, defender.instanceId);
+      }
     }
 
     // Phobos (WEAPON_DISABLE_ATTACKED_ONE_TURN): a Warrior attacked by the
