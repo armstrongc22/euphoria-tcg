@@ -323,3 +323,278 @@ body {
   color: var(--text-dim);
   font-style: italic;
 }
+
+/* Tab navigation */
+.site-nav {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0 clamp(1rem, 4vw, 3rem);
+  border-bottom: 1px solid var(--border);
+}
+
+.site-nav__tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-weight: 600;
+  padding: 0.75rem 0.5rem;
+  cursor: pointer;
+}
+
+.site-nav__tab:hover {
+  color: var(--text);
+}
+
+.site-nav__tab--active {
+  color: var(--text);
+  border-bottom-color: var(--sonic);
+}
+
+/* Starter Decks page */
+.starter-intro {
+  padding: 1.5rem clamp(1rem, 4vw, 3rem) 0;
+}
+
+.starter-intro__title {
+  margin: 0 0 0.25rem;
+  font-size: 1.3rem;
+}
+
+.starter-intro__lead {
+  margin: 0;
+  color: var(--text-dim);
+}
+
+.starter-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: clamp(0.75rem, 2vw, 1.25rem);
+  padding: 1rem clamp(1rem, 4vw, 3rem);
+}
+
+.starter-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  text-align: left;
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--neutral);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.starter-tile:hover {
+  transform: translateY(-3px);
+}
+
+.starter-tile--selected {
+  outline: 2px solid var(--sonic);
+  outline-offset: -1px;
+}
+
+.starter-tile[data-faction="Monk"] {
+  border-top-color: var(--monk);
+}
+.starter-tile[data-faction="Dwarf"] {
+  border-top-color: var(--dwarf);
+}
+.starter-tile[data-faction="Sonic"] {
+  border-top-color: var(--sonic);
+}
+.starter-tile[data-faction="Surfer"] {
+  border-top-color: var(--surfer);
+}
+
+.starter-tile__name {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.starter-tile__flavor {
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.starter-tile__playstyle {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  line-height: 1.35;
+}
+
+.starter-tile__count {
+  margin-top: auto;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.starter-panel {
+  padding: 0 clamp(1rem, 4vw, 3rem) 2rem;
+}
+
+.deck-panel__header {
+  margin-bottom: 1rem;
+}
+
+.deck-panel__title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.deck-panel__meta {
+  margin: 0.2rem 0 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.deck-panel__list-heading,
+.starter-featured__heading {
+  font-size: 1rem;
+  margin: 1.5rem 0 0.6rem;
+}
+
+/* Featured cards spotlight */
+.starter-featured__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: clamp(0.75rem, 2vw, 1.25rem);
+}
+
+.starter-featured__card {
+  margin: 0;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.starter-featured__art {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  background: #0b0d11;
+}
+
+.starter-featured__art--missing {
+  background: repeating-linear-gradient(
+    45deg,
+    #0b0d11,
+    #0b0d11 8px,
+    #12151b 8px,
+    #12151b 16px
+  );
+}
+
+.starter-featured__caption {
+  padding: 0.5rem 0.6rem 0.65rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* Deck list */
+.deck-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.5rem;
+}
+
+.deck-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--neutral);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+}
+
+.deck-row[data-faction="Monk"] {
+  border-left-color: var(--monk);
+}
+.deck-row[data-faction="Dwarf"] {
+  border-left-color: var(--dwarf);
+}
+.deck-row[data-faction="Sonic"] {
+  border-left-color: var(--sonic);
+}
+.deck-row[data-faction="Surfer"] {
+  border-left-color: var(--surfer);
+}
+.deck-row[data-faction="Neutral"] {
+  border-left-color: var(--neutral);
+}
+
+.deck-row__qty {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 1.6rem;
+}
+
+.deck-row__art {
+  width: 34px;
+  height: 46px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #0b0d11;
+  flex: none;
+}
+
+.deck-row__art--missing {
+  background: repeating-linear-gradient(
+    45deg,
+    #0b0d11,
+    #0b0d11 6px,
+    #12151b 6px,
+    #12151b 12px
+  );
+}
+
+.deck-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.deck-row__name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.deck-row__type {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+/* Reward progression teaser */
+.starter-teaser {
+  margin-top: 1.75rem;
+  background: var(--bg-elev);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+}
+
+.starter-teaser__heading {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.starter-teaser__body {
+  margin: 0;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
