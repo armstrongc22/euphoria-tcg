@@ -402,12 +402,21 @@ function attackWarrior(
 
   let next = structuredClone(state);
 
+  // Silurian Period swaps the normal combat hit for its own lingering
+  // effect, so the declared defender takes no combat damage. The "replace"
+  // is keyed on the effectCode, not the timing: every Attack card shares
+  // timing "on_attack_replace", so it cannot discriminate this one.
+  let replacesAttack = false;
+
   if (action.selectedAttackCardId !== undefined) {
     const player = next.players[next.activePlayer];
     const handIndex = player.hand.findIndex(
       (c) => c.id === action.selectedAttackCardId,
     );
     const card = player.hand[handIndex]!;
+    replacesAttack =
+      card.effectCode !== undefined &&
+      normalizeEffectCode(card.effectCode) === "LINGERING_EXISTING_DAMAGE";
     player.spirit -= card.cost;
     player.hand.splice(handIndex, 1);
     player.outDeck.push(card);
@@ -451,7 +460,7 @@ function attackWarrior(
     // After-attack-declaration hook (Moral Determination Authrotity).
     recordAttackDeclaration(next, next.activePlayer, attacker.instanceId);
   }
-  if (attacker !== undefined && defender !== undefined) {
+  if (attacker !== undefined && defender !== undefined && !replacesAttack) {
     // The defender's faction drives retaliation even if the attack
     // destroys the defender (it was still "a Monk that was attacked").
     const defenderFaction = defender.card.faction;

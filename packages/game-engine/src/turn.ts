@@ -10,6 +10,7 @@ import {
   triggerExpiredStatuses,
 } from "./status";
 import type {
+  DelayedEffect,
   GameState,
   PlayerId,
   PlayerState,
@@ -193,6 +194,15 @@ function expireTemporaryBuffs(state: GameState, player: PlayerState): void {
 function resolveDelayedEffects(state: GameState, player: PlayerState): void {
   const remaining: PlayerState["delayedEffects"] = [];
   for (const effect of player.delayedEffects) {
+    // Silurian Period: recurring — fire this tick, then keep it until the
+    // scheduled ticks run out.
+    if (effect.type === "lingeringDamage") {
+      applyLingeringDamage(state, effect);
+      const turnsRemaining = effect.turnsRemaining - 1;
+      if (turnsRemaining > 0) remaining.push({ ...effect, turnsRemaining });
+      continue;
+    }
+    // Secure Deposits: one-shot — resolve when the countdown reaches 0.
     const turnsRemaining = effect.turnsRemaining - 1;
     if (turnsRemaining <= 0) {
       gainSpirit(state, player, effect.amount);
@@ -201,4 +211,33 @@ function resolveDelayedEffects(state: GameState, player: PlayerState): void {
     }
   }
   player.delayedEffects = remaining;
+}
+
+/**
+ * One tick of Silurian Period's lingering damage: each snapshot Warrior
+ * still on `targetPlayer`'s field takes `amount`. A Warrior that already
+ * left the field is skipped (no crash), and a lethal tick sends the Warrior
+ * and its attached Weapon to the Out Deck via destroyWarrior.
+ */
+function applyLingeringDamage(
+  state: GameState,
+  effect: Extract<DelayedEffect, { type: "lingeringDamage" }>,
+): void {
+  for (const instanceId of effect.targetInstanceIds) {
+    const target = state.players[effect.targetPlayer].field.find(
+      (w) => w.instanceId === instanceId,
+    );
+    if (target === undefined) continue;
+    target.currentHealth -= effect.amount;
+    state.events.push({
+      type: "warriorHealthModified",
+      player: effect.targetPlayer,
+      instanceId,
+      amount: -effect.amount,
+      newHealth: target.currentHealth,
+    });
+    if (target.currentHealth <= 0) {
+      destroyWarrior(state, effect.targetPlayer, instanceId);
+    }
+  }
 }

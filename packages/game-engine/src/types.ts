@@ -71,12 +71,26 @@ export interface WarriorInPlay {
   temporaryAttackBuffs: TemporaryAttackBuff[];
 }
 
-export interface DelayedEffect {
-  type: "gainSpirit";
-  amount: number;
-  /** Decremented at the start of the owner's turn; resolves when it reaches 0. */
-  turnsRemaining: number;
-}
+/**
+ * A pending effect stored on a player and processed at the start of that
+ * player's turns (resolveDelayedEffects). Two shapes today:
+ * - gainSpirit (Secure Deposits): one-shot — turnsRemaining counts down and
+ *   the Spirit is granted when it reaches 0.
+ * - lingeringDamage (Silurian Period): recurring — at each of the owner's
+ *   start phases it deals `amount` to every still-fielded Warrior in
+ *   `targetInstanceIds` on `targetPlayer`'s side, then `turnsRemaining` (the
+ *   count of ticks still to fire) decrements; the effect is dropped when it
+ *   reaches 0.
+ */
+export type DelayedEffect =
+  | { type: "gainSpirit"; amount: number; turnsRemaining: number }
+  | {
+      type: "lingeringDamage";
+      amount: number;
+      turnsRemaining: number;
+      targetPlayer: PlayerId;
+      targetInstanceIds: string[];
+    };
 
 /** What a StatusEffect does; handlers in actions/turn dispatch on this. */
 export type StatusCode =

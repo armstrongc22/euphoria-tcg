@@ -1049,6 +1049,48 @@ const weaponAttackBonusSplashHandler: EffectHandler = (state, params, context) =
   return { resolved: true };
 };
 
+/**
+ * Silurian Period (LINGERING_EXISTING_DAMAGE): "Deal <amount> damage to
+ * each of your opponent's Warriors that were on the field when this card
+ * was played, for the next <duration> turns." Played as an Attack card
+ * (timing on_attack_replace — attackWarrior skips the normal combat hit, so
+ * the chosen defender is never double-counted). The handler snapshots the
+ * opponent's current Warriors by instance id, deals the first tick now,
+ * then schedules the remaining ticks on the controller's delayedEffects so
+ * each of their next turns repeats it against the surviving snapshot.
+ * Warriors summoned later are never added; destroyed ones drop out; the
+ * controller's own Warriors are never touched (only the opponent's field is
+ * read). An empty enemy field resolves safely with nothing scheduled.
+ */
+const lingeringExistingDamageHandler: EffectHandler = (state, params, context) => {
+  const opponentId = opponentOf(context.player);
+  const amount = numberParam(params, ["amount"], 0);
+  const totalTicks = durationTurns(params, 4);
+  const snapshot = state.players[opponentId].field.map((w) => w.instanceId);
+
+  // Tick 1, immediately.
+  for (const instanceId of snapshot) {
+    const warrior = state.players[opponentId].field.find(
+      (w) => w.instanceId === instanceId,
+    );
+    if (warrior === undefined) continue;
+    modifyWarriorHealth(state, opponentId, warrior, -amount);
+  }
+
+  // Remaining ticks fire at the start of the controller's next turns.
+  const remainingTicks = totalTicks - 1;
+  if (remainingTicks > 0 && snapshot.length > 0) {
+    state.players[context.player].delayedEffects.push({
+      type: "lingeringDamage",
+      amount,
+      turnsRemaining: remainingTicks,
+      targetPlayer: opponentId,
+      targetInstanceIds: snapshot,
+    });
+  }
+  return { resolved: true };
+};
+
 /** Pool both players' Spirit; the activator takes the rounded-up half. */
 const slushFundHandler: EffectHandler = (state, _params, context) => {
   const me = state.players[context.player];
@@ -1170,6 +1212,11 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   // attackWarrior, actions.ts).
   registry.register("ATTACK_TARGET_SPLASH", attackTargetSplashHandler);
   registry.register("WEAPON_ATTACK_BONUS_SPLASH", weaponAttackBonusSplashHandler);
+
+  // Group 4G: Silurian Period's recurring snapshot damage. Resolves through
+  // this pipeline (an Attack card); the per-turn ticks ride the
+  // delayedEffects system (resolveDelayedEffects in turn.ts).
+  registry.register("LINGERING_EXISTING_DAMAGE", lingeringExistingDamageHandler);
   return registry;
 }
 
