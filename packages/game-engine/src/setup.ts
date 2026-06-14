@@ -84,5 +84,6 @@ function createPlayer(id: PlayerId, config: RulesConfig): PlayerState {
     outDeck: [],
     directAttackUsedThisTurn: false,
     delayedEffects: [],
+    outOfPlay: [],
   };
 }

@@ -140,6 +140,7 @@ export function runStartPhase(state: GameState): void {
   expireTemporaryBuffs(state, player);
   triggerExpiredStatuses(state, expireStatuses(state, player.id, "startOfTurn"));
   resolveDelayedEffects(state, player);
+  resolveOutOfPlayReturns(state, player);
 
   gainSpirit(state, player, state.config.spiritGainPerTurn);
   drawCards(state, player, 1);
@@ -211,6 +212,35 @@ function resolveDelayedEffects(state: GameState, player: PlayerState): void {
     }
   }
   player.delayedEffects = remaining;
+}
+
+/**
+ * GILs Unit (TEMPORARY_OUT_OF_PLAY_RESTORE): each controller Start Phase
+ * counts a held Warrior down by one boundary. When its countdown reaches 0
+ * the Warrior returns to the field at full HEALTH, keeping its identity and
+ * attached Weapon, with a fresh attack available this turn.
+ */
+function resolveOutOfPlayReturns(state: GameState, player: PlayerState): void {
+  const remaining: PlayerState["outOfPlay"] = [];
+  for (const held of player.outOfPlay) {
+    const turnsRemaining = held.turnsRemaining - 1;
+    if (turnsRemaining > 0) {
+      remaining.push({ ...held, turnsRemaining });
+      continue;
+    }
+    const warrior = held.warrior;
+    warrior.currentHealth = warrior.maxHealth;
+    warrior.attacksRemaining = 1;
+    player.field.push(warrior);
+    state.events.push({
+      type: "warriorReturnedFromOutOfPlay",
+      player: player.id,
+      instanceId: warrior.instanceId,
+      cardId: warrior.card.id,
+      newHealth: warrior.currentHealth,
+    });
+  }
+  player.outOfPlay = remaining;
 }
 
 /**

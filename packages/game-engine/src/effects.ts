@@ -1181,6 +1181,35 @@ const damageAllOpponentWarriorsDelayedHandler: EffectHandler = (
   return { resolved: true };
 };
 
+/**
+ * GILs Unit: pull one friendly Warrior off the field and hold it out of play
+ * for `secondaryAmount` of the controller's turns. The Warrior keeps its
+ * identity and attached Weapon while away (it does not hit the Out Deck); the
+ * timed return at full HEALTH is driven by resolveOutOfPlayReturns (turn.ts).
+ */
+const temporaryOutOfPlayRestoreHandler: EffectHandler = (state, params, context) => {
+  const target = requireWarriorTarget(state, params, context, "friendly");
+  if (!target.ok) return target.outcome;
+
+  const turns = numberParam(params, ["secondaryAmount"], durationTurns(params, 3));
+  if (turns <= 0) return targetFailure("out-of-play duration must be at least 1 turn.");
+
+  const owner = state.players[target.owner];
+  const index = owner.field.findIndex((w) => w.instanceId === target.warrior.instanceId);
+  if (index === -1) return targetFailure("target Warrior is no longer on the field.");
+  const [warrior] = owner.field.splice(index, 1);
+
+  owner.outOfPlay.push({ warrior: warrior!, turnsRemaining: turns });
+  state.events.push({
+    type: "warriorSentOutOfPlay",
+    player: target.owner,
+    instanceId: warrior!.instanceId,
+    cardId: warrior!.card.id,
+    turnsRemaining: turns,
+  });
+  return { resolved: true };
+};
+
 /** Pool both players' Spirit; the activator takes the rounded-up half. */
 const slushFundHandler: EffectHandler = (state, _params, context) => {
   const me = state.players[context.player];
@@ -1341,6 +1370,14 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   registry.register(
     "DAMAGE_ALL_OPPONENT_WARRIORS_DELAYED",
     damageAllOpponentWarriorsDelayedHandler,
+  );
+
+  // GILs Unit: remove a friendly Warrior from play for a few of the
+  // controller's turns; it returns at full HEALTH (resolveOutOfPlayReturns,
+  // turn.ts).
+  registry.register(
+    "TEMPORARY_OUT_OF_PLAY_RESTORE",
+    temporaryOutOfPlayRestoreHandler,
   );
   return registry;
 }

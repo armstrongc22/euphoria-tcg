@@ -188,6 +188,17 @@ export interface StatusEffect {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * GILs Unit (TEMPORARY_OUT_OF_PLAY_RESTORE): a Warrior held off the field
+ * for a few of the controller's turns, then returned at full HEALTH. The
+ * Warrior keeps its identity (instanceId, card, attached Weapon) while away.
+ */
+export interface OutOfPlayWarrior {
+  warrior: WarriorInPlay;
+  /** Controller start-of-turn boundaries left before it returns to the field. */
+  turnsRemaining: number;
+}
+
 export interface PlayerState {
   id: PlayerId;
   lives: number;
@@ -199,6 +210,8 @@ export interface PlayerState {
   outDeck: Card[];
   directAttackUsedThisTurn: boolean;
   delayedEffects: DelayedEffect[];
+  /** Warriors temporarily removed from play, awaiting their timed return. */
+  outOfPlay: OutOfPlayWarrior[];
 }
 
 export interface GameState {

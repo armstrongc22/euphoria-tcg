@@ -15,6 +15,8 @@ export type GameEvent =
   | { type: "turnEnded"; player: PlayerId }
   | { type: "warriorSummoned"; player: PlayerId; cardId: string; instanceId: string; cost: number }
   | { type: "warriorRevived"; player: PlayerId; cardId: string; instanceId: string }
+  | { type: "warriorSentOutOfPlay"; player: PlayerId; instanceId: string; cardId: string; turnsRemaining: number }
+  | { type: "warriorReturnedFromOutOfPlay"; player: PlayerId; instanceId: string; cardId: string; newHealth: number }
   | { type: "extraAttackGranted"; player: PlayerId; instanceId: string; amount: number; attacksRemaining: number }
   | { type: "deckSearched"; player: PlayerId; cardId: string }
   | { type: "cardStolenFromHand"; player: PlayerId; fromPlayer: PlayerId; cardId: string }
