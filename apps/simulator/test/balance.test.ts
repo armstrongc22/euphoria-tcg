@@ -58,6 +58,41 @@ describe("generateBalanceReport", () => {
     expect(factionWins).toBe(report.seat.player1Wins + report.seat.player2Wins);
   });
 
+  it("splits each faction's record cleanly across the two seats", () => {
+    for (const faction of DECK_FACTIONS) {
+      const r = report.byFaction[faction];
+      // 1 game/matchup: a faction is P1 in 4 matchups and P2 in 4 matchups.
+      expect(r.player1Games).toBe(4);
+      expect(r.player2Games).toBe(4);
+      // Seat totals reconstitute the overall totals exactly.
+      expect(r.player1Games + r.player2Games).toBe(r.games);
+      expect(r.player1Wins + r.player2Wins).toBe(r.wins);
+      // Wins never exceed games in either seat.
+      expect(r.player1Wins).toBeLessThanOrEqual(r.player1Games);
+      expect(r.player2Wins).toBeLessThanOrEqual(r.player2Games);
+    }
+  });
+
+  it("reconciles per-faction seat wins with the overall seat tallies", () => {
+    const p1 = DECK_FACTIONS.reduce(
+      (sum, f) => sum + report.byFaction[f].player1Wins,
+      0,
+    );
+    const p2 = DECK_FACTIONS.reduce(
+      (sum, f) => sum + report.byFaction[f].player2Wins,
+      0,
+    );
+    expect(p1).toBe(report.seat.player1Wins);
+    expect(p2).toBe(report.seat.player2Wins);
+    // Every faction's P1 seat-games sum to the total game count (each game has
+    // exactly one P1 faction), and likewise for P2.
+    const p1Games = DECK_FACTIONS.reduce(
+      (sum, f) => sum + report.byFaction[f].player1Games,
+      0,
+    );
+    expect(p1Games).toBe(report.totalGames);
+  });
+
   it("reports a positive average turn count and direct-attack win method", () => {
     expect(report.avgTurns).toBeGreaterThan(0);
     // Lives only fall to direct attacks today, so combat wins are 0.
@@ -91,6 +126,9 @@ describe("formatBalanceReport", () => {
   it("renders the required sections as readable text", () => {
     const text = formatBalanceReport(report);
     expect(text).toContain("win rate by faction");
+    expect(text).toContain("as Player 1");
+    expect(text).toContain("as Player 2");
+    expect(text).toContain("overall seat win rate");
     expect(text).toContain("win rate by matchup");
     expect(text).toContain("win method");
     expect(text).toContain("hit max-turn limit");

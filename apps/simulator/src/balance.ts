@@ -15,9 +15,15 @@ import { buildFactionDeck, DECK_FACTIONS, type DeckFaction } from "./deck";
 import { runGame } from "./runner";
 
 export interface FactionRecord {
-  /** Seat-appearances: a mirror match counts the faction twice. */
+  /** Seat-appearances across both seats: a mirror match counts the faction twice. */
   games: number;
   wins: number;
+  /** Games and wins recorded while this faction sat in the Player 1 seat. */
+  player1Games: number;
+  player1Wins: number;
+  /** Games and wins recorded while this faction sat in the Player 2 seat. */
+  player2Games: number;
+  player2Wins: number;
 }
 
 export interface MatchupRecord {
@@ -60,7 +66,17 @@ export function generateBalanceReport(options: BalanceOptions): BalanceReport {
   const { pool, gamesPerMatchup, seed, maxTurns } = options;
 
   const byFaction = Object.fromEntries(
-    DECK_FACTIONS.map((f) => [f, { games: 0, wins: 0 }]),
+    DECK_FACTIONS.map((f) => [
+      f,
+      {
+        games: 0,
+        wins: 0,
+        player1Games: 0,
+        player1Wins: 0,
+        player2Games: 0,
+        player2Wins: 0,
+      },
+    ]),
   ) as Record<DeckFaction, FactionRecord>;
   const matchups: MatchupRecord[] = [];
   const seat = { player1Wins: 0, player2Wins: 0, draws: 0 };
@@ -105,15 +121,19 @@ export function generateBalanceReport(options: BalanceOptions): BalanceReport {
           totalTurns += result.turns;
           record.games += 1;
           byFaction[p1].games += 1;
+          byFaction[p1].player1Games += 1;
           byFaction[p2].games += 1;
+          byFaction[p2].player2Games += 1;
 
           if (result.winner === "player1") {
             record.player1Wins += 1;
             byFaction[p1].wins += 1;
+            byFaction[p1].player1Wins += 1;
             seat.player1Wins += 1;
           } else if (result.winner === "player2") {
             record.player2Wins += 1;
             byFaction[p2].wins += 1;
+            byFaction[p2].player2Wins += 1;
             seat.player2Wins += 1;
           } else {
             record.draws += 1;
@@ -168,12 +188,21 @@ export function formatBalanceReport(report: BalanceReport): string {
     `seed ${report.seed} · ${report.gamesPerMatchup} game(s)/matchup · ${report.totalGames} games · avg ${report.avgTurns.toFixed(1)} turns`,
   );
 
+  const seatCell = (wins: number, games: number): string =>
+    `${String(wins).padStart(4)}/${String(games).toString().padEnd(4)} ${pct(wins, games).padStart(6)}`;
+
   lines.push("");
-  lines.push("win rate by faction (across both seats):");
+  lines.push("win rate by faction (overall, then split by seat):");
+  lines.push(
+    `  ${"faction".padEnd(7)}  ${"overall".padEnd(12)}  ${"as Player 1".padEnd(12)}  as Player 2`,
+  );
   for (const faction of DECK_FACTIONS) {
     const r = report.byFaction[faction];
     lines.push(
-      `  ${faction.padEnd(7)} ${String(r.wins).padStart(4)}/${String(r.games).padEnd(4)}  ${pct(r.wins, r.games)}`,
+      `  ${faction.padEnd(7)}  ${seatCell(r.wins, r.games)}  ${seatCell(
+        r.player1Wins,
+        r.player1Games,
+      )}  ${seatCell(r.player2Wins, r.player2Games)}`,
     );
   }
 
@@ -195,6 +224,9 @@ export function formatBalanceReport(report: BalanceReport): string {
   lines.push("outcomes:");
   lines.push(
     `  seat wins: player1 ${report.seat.player1Wins} | player2 ${report.seat.player2Wins} | draws ${report.seat.draws}`,
+  );
+  lines.push(
+    `  overall seat win rate: player1 ${pct(report.seat.player1Wins, report.totalGames)} | player2 ${pct(report.seat.player2Wins, report.totalGames)}`,
   );
   lines.push(
     `  win method: direct-attack ${report.winsByDirectAttack} | combat ${report.winsByCombat}` +
