@@ -1,0 +1,70 @@
+name: Deploy card viewer to GitHub Pages
+
+# Verify the full project, then publish apps/web/dist to GitHub Pages.
+# The site is served at https://armstrongc22.github.io/euphoria-tcg/, so the
+# web app is built with VITE_BASE=/euphoria-tcg/ (vite.config.ts reads it).
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+# Least-privilege token for the Pages deployment.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let in-progress runs finish; only queue one deploy at a time.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Validate cards
+        run: npm run validate:cards
+
+      - name: Build web app
+        run: npm run web:build
+        env:
+          VITE_BASE: /euphoria-tcg/
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

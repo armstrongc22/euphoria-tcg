@@ -18,18 +18,28 @@ npm run web:build    # outputs apps/web/dist (gitignored)
 npm run preview --workspace @euphoria/web   # serve the build locally
 ```
 
-## Deploy (static host)
+## Deploy (GitHub Pages)
 
-The build is fully static (HTML/CSS/JS + card images). For a host that serves
-at a sub-path (e.g. GitHub Pages project sites at `/<repo>/`), set the base:
+The build is fully static (HTML/CSS/JS + card images). It is published to
+GitHub Pages automatically by `.github/workflows/deploy-pages.yml` on every
+push to `main`/`master` (and via manual "Run workflow"). The workflow installs
+deps, runs the tests, typecheck, and card validation, then builds with the
+sub-path base and uploads `apps/web/dist`.
+
+Live site: **https://armstrongc22.github.io/euphoria-tcg/**
+
+One-time repository setup: in **Settings → Pages**, set **Source** to
+**GitHub Actions**.
+
+For a host that serves at a sub-path (e.g. GitHub Pages project sites at
+`/<repo>/`), the base must match. The workflow sets it; to reproduce locally:
 
 ```bash
 VITE_BASE=/euphoria-tcg/ npm run web:build
 ```
 
 `base` defaults to `/` for local dev/preview. Image URLs derive from
-`import.meta.env.BASE_URL`, so art resolves under any base. A CI deploy
-workflow (e.g. GitHub Pages Action) can be added when a target is chosen.
+`import.meta.env.BASE_URL`, so art resolves under any base.
 
 ## Layout
 
