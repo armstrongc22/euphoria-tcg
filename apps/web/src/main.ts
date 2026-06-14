@@ -9,6 +9,7 @@ import { renderControls } from "./controls";
 import { createCardDetail } from "./detail";
 import { DEFAULT_FILTERS, filterCards, type CardFilters } from "./filters";
 import { renderGrid } from "./grid";
+import { sortCards } from "./sort";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (app === null) throw new Error("#app mount point missing from index.html");
@@ -21,6 +22,7 @@ app.innerHTML = `
   <section id="controls" class="controls" aria-label="Filters"></section>
   <p id="count" class="result-count" role="status"></p>
   <main id="grid" class="card-grid" aria-label="Cards"></main>
+  <footer class="site-footer">Euphoria TCG · beta card viewer</footer>
 `;
 
 const controlsEl = document.querySelector<HTMLElement>("#controls")!;
@@ -30,10 +32,12 @@ const gridEl = document.querySelector<HTMLElement>("#grid")!;
 const detail = createCardDetail(import.meta.env.BASE_URL);
 document.body.append(detail.element);
 
+// Sort once; filtering preserves order.
+const ordered = sortCards(cards);
 let filters: CardFilters = { ...DEFAULT_FILTERS };
 
 function apply(): void {
-  const visible = filterCards(cards, filters);
+  const visible = filterCards(ordered, filters);
   countEl.textContent = `${visible.length} of ${cards.length} cards`;
   if (visible.length === 0) {
     const empty = document.createElement("p");

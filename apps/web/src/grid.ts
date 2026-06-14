@@ -41,6 +41,12 @@ function cardElement(card: Card, onSelect?: (card: Card) => void): HTMLElement {
   img.loading = "lazy";
   img.src = cardImageUrl(card, BASE);
   img.alt = card.name;
+  // Degrade gracefully if art is missing: drop the broken-image icon and show
+  // a styled placeholder (the caption still names the card).
+  img.addEventListener("error", () => {
+    img.removeAttribute("src");
+    img.classList.add("card__art--missing");
+  });
 
   const caption = document.createElement("figcaption");
   caption.className = "card__caption";
