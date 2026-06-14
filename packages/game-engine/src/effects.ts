@@ -1294,6 +1294,11 @@ export function createDefaultEffectRegistry(): EffectRegistry {
     weaponCombatPassiveHandler,
   );
 
+  // Apotheosis: the equipped Warrior's outgoing damage is half the
+  // defender's HEALTH, enforced in computeCombatDamage (actions.ts); equip
+  // just clears the marker.
+  registry.register("WEAPON_HALF_HEALTH_DAMAGE", weaponCombatPassiveHandler);
+
   // Group 4F: splash / adjacency combat targeting (shared splash.ts
   // geometry). Apex Forest splashes all other enemy Warriors when its
   // Attack card resolves; Scythe Cycle adds static ATTACK at equip and

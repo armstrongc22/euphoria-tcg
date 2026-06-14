@@ -239,10 +239,13 @@ function destroyedFriendlyWarriorCount(state: GameState, owner: PlayerId): numbe
  * Combat damage with Weapon combat passives applied. Passives are read
  * straight from the attached Weapon card: Weapons never detach and go to
  * the Out Deck with their Warrior, so attachment is exactly the passive's
- * lifetime. The attacker's outgoing modifiers apply first (Xīwànghǎo adds
- * the attack difference; Armageddon adds a per-destroyed-friendly-Warrior
- * bonus, recomputed each attack so it tracks the growing Out Deck), then
- * the defender's incoming one (Skeleton Key halves what arrives).
+ * lifetime. The attacker's outgoing modifiers apply first (Apotheosis
+ * overrides the damage to a fraction of the defender's HEALTH; Xīwànghǎo
+ * adds the attack difference; Armageddon adds a per-destroyed-friendly-
+ * Warrior bonus, recomputed each attack so it tracks the growing Out Deck),
+ * then the defender's incoming one (Skeleton Key halves what arrives). A
+ * Warrior holds at most one Weapon, so the attacker branches are mutually
+ * exclusive.
  */
 function computeCombatDamage(
   state: GameState,
@@ -251,6 +254,14 @@ function computeCombatDamage(
   defender: WarriorInPlay,
 ): number {
   let damage = attacker.currentAttack;
+  // Apotheosis: the damage inflicted is always a fraction (half) of the
+  // defender's current HEALTH, replacing the attack-based amount.
+  if (attachedWeaponCode(attacker) === "WEAPON_HALF_HEALTH_DAMAGE") {
+    const fraction = attacker.attachedWeapon?.effectParams?.["amount"];
+    const multiplier =
+      typeof fraction === "number" && fraction > 0 && fraction < 1 ? fraction : 0.5;
+    damage = Math.floor(defender.currentHealth * multiplier);
+  }
   if (attachedWeaponCode(attacker) === "WEAPON_ADD_ATTACK_DIFFERENCE_DAMAGE") {
     damage += Math.abs(attacker.currentAttack - defender.currentAttack);
   }
