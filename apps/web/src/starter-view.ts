@@ -39,25 +39,48 @@ function cardArt(card: Card, className: string): HTMLImageElement {
   return img;
 }
 
-/** One selectable faction tile in the top row. */
-function selectorTile(
+/**
+ * One floating faction "product" card on the selection screen: name, faction
+ * description, playstyle summary, a few featured card images, and a
+ * "Choose this deck" button. Exported so the selection UI can be tested.
+ */
+export function renderFactionChoice(
   recipe: StarterRecipe,
-  selected: boolean,
-  onSelect: (faction: StarterFaction) => void,
+  pool: readonly Card[],
+  onChoose: (faction: StarterFaction) => void,
 ): HTMLElement {
-  const tile = document.createElement("button");
-  tile.type = "button";
-  tile.className = "starter-tile";
-  tile.dataset.faction = recipe.faction;
-  tile.setAttribute("aria-pressed", String(selected));
-  if (selected) tile.classList.add("starter-tile--selected");
-  tile.innerHTML =
-    `<span class="starter-tile__name">${escapeHtml(recipe.faction)}</span>` +
-    `<span class="starter-tile__flavor">${escapeHtml(recipe.flavor)}</span>` +
-    `<span class="starter-tile__playstyle">${escapeHtml(recipe.playstyle)}</span>` +
-    `<span class="starter-tile__count">${deckCardCount(recipe)} cards · ${recipe.featured.length} featured</span>`;
-  tile.addEventListener("click", () => onSelect(recipe.faction));
-  return tile;
+  const featured = resolveFeatured(recipe, pool).slice(0, 3);
+
+  const card = document.createElement("article");
+  card.className = "faction-choice";
+  card.dataset.faction = recipe.faction;
+
+  const art = document.createElement("div");
+  art.className = "faction-choice__art";
+  for (const c of featured) {
+    art.append(cardArt(c, "faction-choice__thumb"));
+  }
+
+  const body = document.createElement("div");
+  body.className = "faction-choice__body";
+  body.innerHTML =
+    `<h3 class="faction-choice__name">${escapeHtml(recipe.faction)}</h3>` +
+    `<p class="faction-choice__flavor">${escapeHtml(recipe.flavor)}</p>` +
+    `<p class="faction-choice__playstyle"><span class="faction-choice__tag">Playstyle</span> ${escapeHtml(
+      recipe.playstyle,
+    )}</p>` +
+    `<p class="faction-choice__count">${deckCardCount(recipe)}-card fixed starter deck</p>`;
+
+  const choose = document.createElement("button");
+  choose.type = "button";
+  choose.className = "faction-choice__cta";
+  choose.dataset.faction = recipe.faction;
+  choose.textContent = "Choose this deck";
+  choose.addEventListener("click", () => onChoose(recipe.faction));
+
+  body.append(choose);
+  card.append(art, body);
+  return card;
 }
 
 /** One row in the deck list: quantity, art thumbnail, name, and type. */
@@ -166,48 +189,75 @@ export function renderDeckPanel(
   return panel;
 }
 
+/** Options for {@link mountStarterDecks}. */
+export interface StarterDecksOptions {
+  /** If set, open straight to this deck (e.g. a returning player's pick). */
+  readonly initialFaction?: StarterFaction | null;
+  /** Called when the visitor chooses a deck, so the choice can be persisted. */
+  readonly onChoose?: (faction: StarterFaction) => void;
+}
+
 /**
- * Mounts the Starter Decks page into `container`: the selector row plus a
- * detail panel that re-renders when a faction is chosen. Defaults to the first
- * faction.
+ * Mounts the Starter Decks page into `container`. Two states:
+ *   - "choosing": four floating faction product-cards, each with a
+ *     "Choose this deck" button.
+ *   - "chosen": that faction's fixed 30-card deck list, with a link back to the
+ *     choices.
+ * Recipes are frozen (./starter) — nothing is regenerated at runtime.
  */
 export function mountStarterDecks(
   container: HTMLElement,
   pool: readonly Card[],
+  options: StarterDecksOptions = {},
 ): void {
+  const { initialFaction = null, onChoose } = options;
+
   container.innerHTML = `
     <section class="starter-intro">
       <h2 class="starter-intro__title">Choose your starter deck</h2>
-      <p class="starter-intro__lead">Pick one faction to play. Each is a fixed 30-card deck — no deck building yet.</p>
+      <p class="starter-intro__lead">Choose your starter deck. Play games. Earn reward cards. Upgrade your faction over time.</p>
+      <p class="starter-intro__note">Beta signup is local preview for now. Real email capture will be connected before launch.</p>
     </section>
-    <div id="starter-selector" class="starter-selector" role="group" aria-label="Starter faction decks"></div>
-    <div id="starter-panel" class="starter-panel" aria-live="polite"></div>
+    <div id="starter-choices" class="starter-choices" role="group" aria-label="Starter faction decks"></div>
+    <div id="starter-panel" class="starter-panel" aria-live="polite" hidden></div>
   `;
 
-  const selectorEl = container.querySelector<HTMLElement>("#starter-selector")!;
+  const choicesEl = container.querySelector<HTMLElement>("#starter-choices")!;
   const panelEl = container.querySelector<HTMLElement>("#starter-panel")!;
 
-  let selected: StarterFaction = STARTER_FACTIONS[0];
-
-  function renderSelector(): void {
-    selectorEl.replaceChildren(
+  function showChoices(): void {
+    panelEl.hidden = true;
+    panelEl.replaceChildren();
+    choicesEl.hidden = false;
+    choicesEl.replaceChildren(
       ...STARTER_FACTIONS.map((faction) =>
-        selectorTile(getRecipe(faction), faction === selected, select),
+        renderFactionChoice(getRecipe(faction), pool, choose),
       ),
     );
   }
 
-  function renderPanel(): void {
-    panelEl.replaceChildren(renderDeckPanel(selected, pool));
+  function showDeck(faction: StarterFaction): void {
+    choicesEl.hidden = true;
+    choicesEl.replaceChildren();
+
+    const back = document.createElement("button");
+    back.type = "button";
+    back.className = "starter-back";
+    back.textContent = "← Choose a different deck";
+    back.addEventListener("click", showChoices);
+
+    panelEl.hidden = false;
+    panelEl.replaceChildren(back, renderDeckPanel(faction, pool));
   }
 
-  function select(faction: StarterFaction): void {
-    if (faction === selected) return;
-    selected = faction;
-    renderSelector();
-    renderPanel();
+  function choose(faction: StarterFaction): void {
+    onChoose?.(faction);
+    showDeck(faction);
   }
 
-  renderSelector();
-  renderPanel();
+  if (initialFaction !== null) {
+    showDeck(initialFaction);
+  } else {
+    showChoices();
+  }
 }
