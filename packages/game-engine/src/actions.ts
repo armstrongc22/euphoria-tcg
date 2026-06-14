@@ -9,6 +9,7 @@ import {
   findAttackPreventionStatus,
   findAttackTargetProtection,
   findAttackerRestriction,
+  findDuelPartner,
   findRetaliationStatuses,
   recordAttackDeclaration,
   retaliationHealthLoss,
@@ -39,7 +40,8 @@ export type EngineErrorCode =
   | "ATTACK_CARD_INCOMPATIBLE"
   | "ATTACKS_PREVENTED"
   | "ATTACK_TARGET_PROTECTED"
-  | "ATTACKER_RESTRICTED";
+  | "ATTACKER_RESTRICTED"
+  | "FORCED_DUEL_TARGET";
 
 export interface EngineError {
   code: EngineErrorCode;
@@ -372,6 +374,14 @@ function attackWarrior(
       `${opponentId} controls no Warrior "${action.defenderInstanceId}" to attack.`,
     );
   }
+  // Trial of Gia: a dueling Warrior may only attack its locked opponent.
+  const duelPartnerId = findDuelPartner(state, action.attackerInstanceId);
+  if (duelPartnerId !== undefined && duelPartnerId !== action.defenderInstanceId) {
+    return fail(
+      "FORCED_DUEL_TARGET",
+      `${gate.attacker.card.name} is locked in a duel and may only attack its dueling opponent.`,
+    );
+  }
   if (
     findAttackTargetProtection(
       state,
@@ -635,6 +645,15 @@ function directAttack(state: GameState, attackerInstanceId: string): ActionResul
   const gate = validateAttacker(state, attackerInstanceId);
   if ("error" in gate) return gate.error;
 
+  // Trial of Gia: a dueling Warrior must attack its locked opponent, never
+  // the player directly. (Its opponent is on the field, so the no-Warriors
+  // rule below already blocks this; the explicit guard keeps the reason clear.)
+  if (findDuelPartner(state, attackerInstanceId) !== undefined) {
+    return fail(
+      "FORCED_DUEL_TARGET",
+      "A Warrior locked in a duel cannot make a direct attack.",
+    );
+  }
   const opponentId = opponentOf(state.activePlayer);
   if (state.players[opponentId].field.length > 0) {
     return fail(
@@ -779,6 +798,7 @@ function playItem(
   const resolution = effects.resolve(next, card, {
     player: next.activePlayer,
     targetInstanceId: action.targetInstanceId,
+    secondaryTargetInstanceId: action.secondaryTargetInstanceId,
     targetOutDeckCardId: action.targetOutDeckCardId,
     targetDeckCardId: action.targetDeckCardId,
     targetOpponentHandCardId: action.targetOpponentHandCardId,
@@ -908,8 +928,13 @@ export function getLegalActions(state: GameState): GameAction[] {
         ) {
           continue;
         }
+        // Trial of Gia: a dueling attacker's only legal target is its partner.
+        const duelPartnerId = findDuelPartner(state, attacker.instanceId);
         const attackCards = getCompatibleAttackCards(state, attacker.instanceId);
         for (const defender of opponent.field) {
+          if (duelPartnerId !== undefined && defender.instanceId !== duelPartnerId) {
+            continue;
+          }
           if (
             findAttackTargetProtection(
               state,
@@ -943,7 +968,11 @@ export function getLegalActions(state: GameState): GameAction[] {
             });
           }
         }
-        if (opponent.field.length === 0 && !player.directAttackUsedThisTurn) {
+        if (
+          opponent.field.length === 0 &&
+          !player.directAttackUsedThisTurn &&
+          duelPartnerId === undefined
+        ) {
           actions.push({
             kind: "directAttack",
             attackerInstanceId: attacker.instanceId,

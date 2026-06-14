@@ -71,10 +71,10 @@ describe("ATTACK_DAMAGE_BONUS_DISABLE (Pīsubaipā)", () => {
     expect(disables).toHaveLength(2);
     for (const status of disables) {
       expect(status.affectedInstanceId).toBe(defender.instanceId);
-      expect(status.expiry.player).toBe("player2");
-      expect(status.expiry.timing).toBe("startOfTurn");
+      expect(status.expiry!.player).toBe("player2");
+      expect(status.expiry!.timing).toBe("startOfTurn");
     }
-    expect(disables.map((s) => s.expiry.turnsRemaining).sort()).toEqual([1, 2]);
+    expect(disables.map((s) => s.expiry!.turnsRemaining).sort()).toEqual([1, 2]);
     expect(game.players.player1.outDeck.map((c) => c.id)).toContain(card.id);
   });
 

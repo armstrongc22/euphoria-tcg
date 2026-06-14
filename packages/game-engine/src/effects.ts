@@ -7,7 +7,7 @@
 import type { Card } from "@euphoria/card-data";
 import { shuffleWithState } from "./rng";
 import { otherWarriors } from "./splash";
-import { addStatus, addWarriorAttackDisable } from "./status";
+import { addStatus, addWarriorAttackDisable, findDuelPartner } from "./status";
 import {
   createWarriorInPlay,
   destroyWarrior,
@@ -27,6 +27,8 @@ export interface EffectContext {
   defenderInstanceId?: string;
   /** Explicit target chosen by the player, if any. */
   targetInstanceId?: string;
+  /** A second Warrior target (e.g. Trial of Gia's enemy duelist). */
+  secondaryTargetInstanceId?: string;
   /** Chosen card in the controller's own Out Deck (e.g. revive target). */
   targetOutDeckCardId?: string;
   /** Chosen card in the controller's own deck (e.g. search target). */
@@ -1294,6 +1296,46 @@ const decimationHandler: EffectHandler = (state, params, _context) => {
   return { resolved: true };
 };
 
+/**
+ * Trial of Gia: locks one friendly Warrior (targetInstanceId) and one enemy
+ * Warrior (secondaryTargetInstanceId) into a duel. While the FORCED_DUEL
+ * status stands, each may only attack the other (enforced in attackWarrior /
+ * directAttack / getLegalActions); it persists with no expiry and is removed
+ * when either Warrior is destroyed (destroyWarrior, turn.ts).
+ */
+const forcedDuelHandler: EffectHandler = (state, _params, context) => {
+  const friendlyId = context.targetInstanceId;
+  const enemyId = context.secondaryTargetInstanceId;
+  if (friendlyId === undefined || enemyId === undefined) {
+    return targetFailure(
+      "Trial of Gia needs one friendly and one enemy Warrior target.",
+    );
+  }
+  const friendly = findWarrior(state, friendlyId);
+  if (friendly === undefined || friendly.owner !== context.player) {
+    return targetFailure("the first target must be a friendly Warrior.");
+  }
+  const enemy = findWarrior(state, enemyId);
+  if (enemy === undefined || enemy.owner === context.player) {
+    return targetFailure("the second target must be an enemy Warrior.");
+  }
+  if (
+    findDuelPartner(state, friendlyId) !== undefined ||
+    findDuelPartner(state, enemyId) !== undefined
+  ) {
+    return targetFailure("one of those Warriors is already locked in a duel.");
+  }
+
+  addStatus(state, {
+    code: "FORCED_DUEL",
+    controller: context.player,
+    affectedPlayer: enemy.owner,
+    affectedInstanceId: friendlyId,
+    metadata: { opponentInstanceId: enemyId },
+  });
+  return { resolved: true };
+};
+
 /** Pool both players' Spirit; the activator takes the rounded-up half. */
 const slushFundHandler: EffectHandler = (state, _params, context) => {
   const me = state.players[context.player];
@@ -1473,6 +1515,10 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   // field, 2 random Warriors (either side) are destroyed; replaces the
   // declared combat hit (REPLACE_COMBAT_EFFECTS, actions.ts).
   registry.register("DECIMATION", decimationHandler);
+
+  // Trial of Gia: lock a friendly and an enemy Warrior into a duel — each
+  // may only attack the other until one is destroyed.
+  registry.register("FORCED_DUEL", forcedDuelHandler);
   return registry;
 }
 

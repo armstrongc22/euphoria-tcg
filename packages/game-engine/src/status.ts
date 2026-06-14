@@ -44,7 +44,12 @@ export function expireStatuses(
   const remaining: StatusEffect[] = [];
   const expired: StatusEffect[] = [];
   for (const status of state.statuses) {
-    if (status.expiry.player !== playerId || status.expiry.timing !== timing) {
+    // Expiry-less statuses (FORCED_DUEL) persist until removed explicitly.
+    if (
+      status.expiry === undefined ||
+      status.expiry.player !== playerId ||
+      status.expiry.timing !== timing
+    ) {
       remaining.push(status);
       continue;
     }
@@ -279,6 +284,57 @@ export function findRetaliationStatuses(
 /** The health an attacker loses to one retaliation status. */
 export function retaliationHealthLoss(status: StatusEffect): number {
   return numberMetadata(status, "amount", 0);
+}
+
+/** The opponent instance id recorded on a FORCED_DUEL status, if present. */
+function duelOpponentId(status: StatusEffect): string | undefined {
+  const value = status.metadata?.["opponentInstanceId"];
+  return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * Trial of Gia: if `instanceId` is one of the two Warriors locked in a duel,
+ * returns its partner's instance id (the only Warrior it may attack). Either
+ * side of the duel resolves to the other.
+ */
+export function findDuelPartner(
+  state: GameState,
+  instanceId: string,
+): string | undefined {
+  for (const status of state.statuses) {
+    if (status.code !== "FORCED_DUEL") continue;
+    const opponentId = duelOpponentId(status);
+    if (status.affectedInstanceId === instanceId) return opponentId;
+    if (opponentId === instanceId) return status.affectedInstanceId;
+  }
+  return undefined;
+}
+
+/**
+ * Removes any duel that the just-destroyed Warrior was part of (Trial of
+ * Gia ends "until one is destroyed"). Called by destroyWarrior on a real
+ * destruction — not a tank return or prevented destruction, where the
+ * Warrior stays on the field and the duel continues.
+ */
+export function removeDuelsForWarrior(state: GameState, instanceId: string): void {
+  const remaining: StatusEffect[] = [];
+  for (const status of state.statuses) {
+    if (
+      status.code === "FORCED_DUEL" &&
+      (status.affectedInstanceId === instanceId ||
+        duelOpponentId(status) === instanceId)
+    ) {
+      state.events.push({
+        type: "statusExpired",
+        player: status.controller,
+        statusId: status.id,
+        code: status.code,
+      });
+      continue;
+    }
+    remaining.push(status);
+  }
+  state.statuses = remaining;
 }
 
 /**

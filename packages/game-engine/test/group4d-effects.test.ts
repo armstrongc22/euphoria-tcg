@@ -90,9 +90,9 @@ describe("WEAPON_DISABLE_ATTACKED_ONE_TURN (Phobos)", () => {
     const disable = disables[0]!;
     expect(disable.affectedInstanceId).toBe(defender.instanceId);
     expect(disable.affectedPlayer).toBe("player2");
-    expect(disable.expiry.player).toBe("player2");
-    expect(disable.expiry.timing).toBe("startOfTurn");
-    expect(disable.expiry.turnsRemaining).toBe(1);
+    expect(disable.expiry!.player).toBe("player2");
+    expect(disable.expiry!.timing).toBe("startOfTurn");
+    expect(disable.expiry!.turnsRemaining).toBe(1);
     expect(disable.affectedInstanceId).not.toBe(bystander.instanceId);
   });
 

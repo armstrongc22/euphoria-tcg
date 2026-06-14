@@ -167,7 +167,15 @@ export type StatusCode =
    * `faction` Warrior loses metadata.amount health after damage resolves
    * (side-agnostic, per the card text's "any Warrior").
    */
-  | "RETALIATE_AGAINST_FACTION_ATTACKERS";
+  | "RETALIATE_AGAINST_FACTION_ATTACKERS"
+  /**
+   * Trial of Gia: locks two Warriors into a duel. affectedInstanceId is the
+   * controller's Warrior and metadata.opponentInstanceId is the opponent's;
+   * each may only attack the other (no other target, no direct attack). It
+   * persists with no expiry and is removed by destroyWarrior when either
+   * Warrior is destroyed.
+   */
+  | "FORCED_DUEL";
 
 /**
  * Which turn boundary a status expires on. "startOfTurn" fires during
@@ -202,7 +210,12 @@ export interface StatusEffect {
   affectedInstanceId?: string;
   /** Only Warriors of this faction are covered, if set. */
   faction?: string;
-  expiry: StatusExpiry;
+  /**
+   * The turn boundary that counts this status down. Omitted for statuses
+   * that persist until game logic removes them explicitly (FORCED_DUEL,
+   * cleared on a duelist's destruction) rather than on a turn boundary.
+   */
+  expiry?: StatusExpiry;
   /** Free-form per-status data (e.g. the source card's effectParams). */
   metadata?: Record<string, unknown>;
 }
@@ -264,6 +277,8 @@ export type GameAction =
       cardId: string;
       targetPlayer?: PlayerId;
       targetInstanceId?: string;
+      /** A second Warrior target (e.g. Trial of Gia's enemy duelist). */
+      secondaryTargetInstanceId?: string;
       /** Card id in the player's own Out Deck (e.g. the Warrior to revive). */
       targetOutDeckCardId?: string;
       /** Card id in the player's own deck (e.g. the search target). */

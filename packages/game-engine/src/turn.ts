@@ -7,6 +7,7 @@ import {
   destructionPreventionPenalty,
   expireStatuses,
   findDestructionProtection,
+  removeDuelsForWarrior,
   triggerExpiredStatuses,
 } from "./status";
 import type {
@@ -139,6 +140,8 @@ export function destroyWarrior(
       warriorInstanceId: instanceId,
     });
   }
+  // Trial of Gia: a duel ends once one of its Warriors is destroyed.
+  removeDuelsForWarrior(state, instanceId);
 }
 
 /**
