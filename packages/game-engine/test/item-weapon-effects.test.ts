@@ -157,7 +157,7 @@ describe("Weapons and the effect registry", () => {
     const game = newGame();
     const warrior = putWarriorOnField(game, "player1");
     const weapon = makeWeaponCard({
-      effectCode: "WEAPON_GRANT_OTHER_EXTRA_ATTACK",
+      effectCode: "WEAPON_SOME_UNIMPLEMENTED_PASSIVE",
       timing: "on_equip",
       effectParams: { amount: 1 },
     });

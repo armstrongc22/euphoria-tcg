@@ -977,7 +977,7 @@ const damageUpToTwoDisableHandler: EffectHandler = (state, params, context) => {
 
 /**
  * Combat-time Weapon passives (Skeleton Key, Xīwànghǎo, Armageddon,
- * Phobos): nothing happens at equip time — actions.ts reads the passive
+ * Phobos, Moirai): nothing happens at equip time — actions.ts reads the passive
  * from the attached Weapon during attack resolution, and the attachment's
  * lifetime is the passive's. Resolving here (after validating the equip
  * target) keeps the
@@ -1089,17 +1089,21 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   // Group 4D: more Weapon combat passives enforced in attackWarrior /
   // computeCombatDamage (actions.ts). Armageddon's per-destroyed-friendly
   // bonus and Phobos's disable-on-hit both live on the attached Weapon, so
-  // equip just clears the marker. Moirai (WEAPON_GRANT_OTHER_EXTRA_ATTACK)
-  // is deliberately NOT registered: its recurring once-per-turn "select
-  // another Warrior to attack again" is an activated ability with no
-  // supporting plumbing (no activated-ability action, no per-turn-use
-  // tracking, no second target), so it stays EFFECT_NOT_IMPLEMENTED.
+  // equip just clears the marker.
   registry.register(
     "WEAPON_ATTACK_PER_DESTROYED_FRIENDLY",
     weaponCombatPassiveHandler,
   );
   registry.register(
     "WEAPON_DISABLE_ATTACKED_ONE_TURN",
+    weaponCombatPassiveHandler,
+  );
+
+  // Group 4E: Moirai. When the equipped Warrior attacks, it grants one
+  // other friendly Warrior an extra attack (attackWarrior, actions.ts);
+  // equip just clears the marker like the other combat passives.
+  registry.register(
+    "WEAPON_GRANT_OTHER_EXTRA_ATTACK",
     weaponCombatPassiveHandler,
   );
   return registry;

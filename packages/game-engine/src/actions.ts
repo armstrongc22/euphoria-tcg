@@ -257,6 +257,38 @@ function computeCombatDamage(
   return damage;
 }
 
+/**
+ * Moirai's on-attack grant: when the equipped Warrior attacks, you may
+ * give one *other* friendly Warrior an extra Warrior-vs-Warrior attack
+ * this turn, via the shared attacksRemaining plumbing (cf.
+ * EXTRA_ATTACK_THIS_TURN). The card text — "a Warrior not equipped with
+ * this card" — forbids targeting the equipped Warrior itself; enemy,
+ * missing, invalid, and self targets grant nothing. Every reject path
+ * returns silently so the attack that triggered it stays intact. The
+ * granted attack rides attacksRemaining, so it lapses at the next refresh.
+ */
+function grantOtherWarriorExtraAttack(
+  state: GameState,
+  attackingPlayer: PlayerId,
+  attackerInstanceId: string,
+  targetInstanceId: string | undefined,
+): void {
+  if (targetInstanceId === undefined) return; // optional grant, none chosen
+  if (targetInstanceId === attackerInstanceId) return; // cannot target itself
+  const target = state.players[attackingPlayer].field.find(
+    (w) => w.instanceId === targetInstanceId,
+  );
+  if (target === undefined) return; // invalid id, or an enemy Warrior
+  target.attacksRemaining += 1;
+  state.events.push({
+    type: "extraAttackGranted",
+    player: attackingPlayer,
+    instanceId: target.instanceId,
+    amount: 1,
+    attacksRemaining: target.attacksRemaining,
+  });
+}
+
 function attackWarrior(
   state: GameState,
   action: Extract<GameAction, { kind: "attack" }>,
@@ -424,6 +456,20 @@ function attackWarrior(
           1,
         );
       }
+    }
+
+    // Moirai (WEAPON_GRANT_OTHER_EXTRA_ATTACK): the equipped Warrior's
+    // attack lets you grant one other friendly Warrior an extra attack
+    // this turn (the choice rides the attack's effectTargetInstanceId).
+    // Only Warrior-vs-Warrior attacks reach here, so direct attacks never
+    // trigger it.
+    if (attachedWeaponCode(attacker) === "WEAPON_GRANT_OTHER_EXTRA_ATTACK") {
+      grantOtherWarriorExtraAttack(
+        next,
+        next.activePlayer,
+        attacker.instanceId,
+        action.effectTargetInstanceId,
+      );
     }
 
     // After-damage-resolution hook (A Dragon's Judgement): each active

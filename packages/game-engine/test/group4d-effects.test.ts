@@ -7,8 +7,7 @@
  *   Warrior's outgoing damage gains a per-destroyed-friendly-Warrior bonus,
  *   recomputed each attack from the controller's Out Deck.
  *
- * WEAPON_GRANT_OTHER_EXTRA_ATTACK (Moirai) is intentionally left
- * unimplemented and is verified to stay EFFECT_NOT_IMPLEMENTED.
+ * (Moirai / WEAPON_GRANT_OTHER_EXTRA_ATTACK is covered in Group 4E.)
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -339,32 +338,5 @@ describe("WEAPON_ATTACK_PER_DESTROYED_FRIENDLY (Armageddon)", () => {
       (w) => w.instanceId === defender.instanceId,
     )!;
     expect(hit.currentHealth).toBe(4000); // 5000 - 1000, no bonus
-  });
-});
-
-describe("WEAPON_GRANT_OTHER_EXTRA_ATTACK (Moirai) stays unimplemented", () => {
-  it("equips with the pending marker, no stat change, no statuses", () => {
-    let game = toPlayer1Turn3(newGame());
-    const warrior = putWarriorOnField(game, "player1");
-    const moirai = realCard("moirai");
-    game.players.player1.hand.push(moirai);
-    game = mustApply(game, {
-      kind: "equipWeapon",
-      cardId: moirai.id,
-      warriorInstanceId: warrior.instanceId,
-    });
-
-    expect(
-      game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === moirai.id,
-      ),
-    ).toBe(true);
-    const equipped = game.players.player1.field.find(
-      (w) => w.instanceId === warrior.instanceId,
-    )!;
-    expect(equipped.currentAttack).toBe(1000);
-    expect(equipped.attachedWeapon?.id).toBe(moirai.id);
-    expect(game.players.player1.outDeck).toHaveLength(0);
-    expect(game.statuses).toHaveLength(0);
   });
 });
