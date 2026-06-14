@@ -1,8 +1,9 @@
 /**
- * App entry point. Renders a top header + tab navigation, then mounts two views:
- * the existing Card Viewer and the new Starter Decks page. Only one view is
- * shown at a time; the Card Viewer code path is unchanged — it's just wrapped in
- * a mount function so the tabs can host it.
+ * App entry point. Renders a top header + tab navigation, then mounts three
+ * views: the beta Signup / Start screen (the default landing), the Starter Decks
+ * page, and the existing Card Viewer. Only one view is shown at a time; the Card
+ * Viewer code path is unchanged — it's just wrapped in a mount function so the
+ * tabs can host it.
  */
 import "./styles.css";
 import { cards } from "./cards";
@@ -10,13 +11,15 @@ import { renderControls } from "./controls";
 import { createCardDetail } from "./detail";
 import { DEFAULT_FILTERS, filterCards, type CardFilters } from "./filters";
 import { renderGrid } from "./grid";
+import { getLocalStore, loadSignup, recordFaction } from "./signup";
+import { mountSignup } from "./signup-view";
 import { sortCards } from "./sort";
 import { mountStarterDecks } from "./starter-view";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (app === null) throw new Error("#app mount point missing from index.html");
 
-type ViewId = "viewer" | "starter";
+type ViewId = "signup" | "starter" | "viewer";
 
 app.innerHTML = `
   <header class="site-header">
@@ -24,23 +27,27 @@ app.innerHTML = `
     <p class="site-header__meta">${cards.length} cards · beta</p>
   </header>
   <nav class="site-nav" aria-label="Sections">
-    <button type="button" class="site-nav__tab" data-view="viewer">Card Viewer</button>
+    <button type="button" class="site-nav__tab" data-view="signup">Signup / Start</button>
     <button type="button" class="site-nav__tab" data-view="starter">Starter Decks</button>
+    <button type="button" class="site-nav__tab" data-view="viewer">Card Viewer</button>
   </nav>
-  <div id="view-viewer" class="view"></div>
+  <div id="view-signup" class="view"></div>
   <div id="view-starter" class="view" hidden></div>
+  <div id="view-viewer" class="view" hidden></div>
   <footer class="site-footer">Euphoria TCG · beta</footer>
 `;
 
-const viewerEl = document.querySelector<HTMLElement>("#view-viewer")!;
+const signupEl = document.querySelector<HTMLElement>("#view-signup")!;
 const starterEl = document.querySelector<HTMLElement>("#view-starter")!;
+const viewerEl = document.querySelector<HTMLElement>("#view-viewer")!;
 const tabs = Array.from(
   document.querySelectorAll<HTMLButtonElement>(".site-nav__tab"),
 );
 
 function showView(view: ViewId): void {
-  viewerEl.hidden = view !== "viewer";
+  signupEl.hidden = view !== "signup";
   starterEl.hidden = view !== "starter";
+  viewerEl.hidden = view !== "viewer";
   for (const tab of tabs) {
     const active = tab.dataset.view === view;
     tab.classList.toggle("site-nav__tab--active", active);
@@ -52,9 +59,25 @@ for (const tab of tabs) {
   tab.addEventListener("click", () => showView(tab.dataset.view as ViewId));
 }
 
+// Local/demo persistence only — no backend. See signup.ts for the real-capture TODO.
+const store = getLocalStore();
+
+mountSignup(signupEl, {
+  store,
+  onContinue: () => showView("starter"),
+});
+
+mountStarterDecks(starterEl, cards, {
+  initialFaction: store ? (loadSignup(store)?.faction ?? null) : null,
+  onChoose: (faction) => {
+    if (store) recordFaction(store, faction);
+  },
+});
+
 mountCardViewer(viewerEl);
-mountStarterDecks(starterEl, cards);
-showView("viewer");
+
+// Signup / Start is the default landing view.
+showView("signup");
 
 /** Mounts the card viewer (filters + grid + detail modal) into a container. */
 function mountCardViewer(root: HTMLElement): void {
