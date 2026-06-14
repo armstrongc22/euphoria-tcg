@@ -46,6 +46,12 @@ export interface GameResult {
   effectFallbacks: number;
   /** `drawFailedDeckEmpty` events: a player tried to draw from an empty deck. */
   deckOuts: number;
+  /** Warriors each player summoned over the game. */
+  summons: Record<PlayerId, number>;
+  /** Warriors each player lost (owner of a destroyed Warrior). */
+  warriorsLost: Record<PlayerId, number>;
+  /** Direct attacks each player landed. */
+  directAttacks: Record<PlayerId, number>;
 }
 
 /** Runs one game to completion (or to a safety cap) and reports the outcome. */
@@ -89,9 +95,17 @@ export function runGame(setup: GameSetup): GameResult {
   let winByDirectAttack = false;
   let effectFallbacks = 0;
   let deckOuts = 0;
+  const summons: Record<PlayerId, number> = { player1: 0, player2: 0 };
+  const warriorsLost: Record<PlayerId, number> = { player1: 0, player2: 0 };
+  const directAttacks: Record<PlayerId, number> = { player1: 0, player2: 0 };
   for (const event of state.events) {
-    if (event.type === "directAttacked" && event.livesRemaining <= 0) {
-      winByDirectAttack = true;
+    if (event.type === "directAttacked") {
+      directAttacks[event.player] += 1;
+      if (event.livesRemaining <= 0) winByDirectAttack = true;
+    } else if (event.type === "warriorSummoned") {
+      summons[event.player] += 1;
+    } else if (event.type === "warriorDestroyed") {
+      warriorsLost[event.player] += 1;
     } else if (event.type === "effectNotImplemented") {
       effectFallbacks += 1;
     } else if (event.type === "drawFailedDeckEmpty") {
@@ -112,5 +126,8 @@ export function runGame(setup: GameSetup): GameResult {
     winByDirectAttack: state.winner !== null && winByDirectAttack,
     effectFallbacks,
     deckOuts,
+    summons,
+    warriorsLost,
+    directAttacks,
   };
 }

@@ -7,6 +7,7 @@
     "start": "tsx src/main.ts",
     "balance": "tsx src/balance-main.ts",
     "trace": "tsx src/trace-main.ts",
+    "monk-compare": "tsx src/monk-compare-main.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
