@@ -116,3 +116,65 @@ body {
   color: var(--text-dim);
   font-size: 0.8rem;
 }
+
+/* Filter bar */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  padding: 1rem clamp(1rem, 4vw, 3rem) 0;
+}
+
+.controls__search {
+  flex: 1 1 240px;
+  min-width: 200px;
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+}
+
+.controls__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.controls__label {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.controls__select {
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+}
+
+.controls__search:focus,
+.controls__select:focus {
+  outline: 2px solid var(--sonic);
+  outline-offset: 1px;
+}
+
+.result-count {
+  margin: 0;
+  padding: 0.75rem clamp(1rem, 4vw, 3rem) 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.card-grid__empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-dim);
+  padding: 3rem 1rem;
+}

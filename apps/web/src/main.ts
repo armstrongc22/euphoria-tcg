@@ -1,9 +1,12 @@
 /**
- * Card viewer entry point. Mounts the header and the full card grid. Filters,
- * search, and a card detail view layer on in later increments.
+ * Card viewer entry point. Mounts the header, the filter bar, and the card
+ * grid, re-rendering the grid (and a result count) whenever the filters change.
+ * A card detail view layers on in a later increment.
  */
 import "./styles.css";
 import { cards } from "./cards";
+import { renderControls } from "./controls";
+import { DEFAULT_FILTERS, filterCards, type CardFilters } from "./filters";
 import { renderGrid } from "./grid";
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -14,7 +17,32 @@ app.innerHTML = `
     <h1>Euphoria <span class="site-header__sub">Card Viewer</span></h1>
     <p class="site-header__meta">${cards.length} cards · beta</p>
   </header>
-  <main id="grid" class="card-grid" aria-label="All cards"></main>
+  <section id="controls" class="controls" aria-label="Filters"></section>
+  <p id="count" class="result-count" role="status"></p>
+  <main id="grid" class="card-grid" aria-label="Cards"></main>
 `;
 
-renderGrid(document.querySelector<HTMLElement>("#grid")!, cards);
+const controlsEl = document.querySelector<HTMLElement>("#controls")!;
+const countEl = document.querySelector<HTMLElement>("#count")!;
+const gridEl = document.querySelector<HTMLElement>("#grid")!;
+
+let filters: CardFilters = { ...DEFAULT_FILTERS };
+
+function apply(): void {
+  const visible = filterCards(cards, filters);
+  countEl.textContent = `${visible.length} of ${cards.length} cards`;
+  if (visible.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "card-grid__empty";
+    empty.textContent = "No cards match these filters.";
+    gridEl.replaceChildren(empty);
+  } else {
+    renderGrid(gridEl, visible);
+  }
+}
+
+renderControls(controlsEl, cards, filters, (next) => {
+  filters = next;
+  apply();
+});
+apply();
