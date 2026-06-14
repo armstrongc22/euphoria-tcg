@@ -1299,6 +1299,10 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   // just clears the marker.
   registry.register("WEAPON_HALF_HEALTH_DAMAGE", weaponCombatPassiveHandler);
 
+  // Gilgamesh: vs a higher-ATTACK defender, the equipped Warrior hits at the
+  // higher ATTACK (computeCombatDamage, actions.ts); equip clears the marker.
+  registry.register("WEAPON_EQUALIZE_VS_HIGHER_ATTACK", weaponCombatPassiveHandler);
+
   // Group 4F: splash / adjacency combat targeting (shared splash.ts
   // geometry). Apex Forest splashes all other enemy Warriors when its
   // Attack card resolves; Scythe Cycle adds static ATTACK at equip and

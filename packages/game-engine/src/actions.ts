@@ -265,6 +265,13 @@ function computeCombatDamage(
   if (attachedWeaponCode(attacker) === "WEAPON_ADD_ATTACK_DIFFERENCE_DAMAGE") {
     damage += Math.abs(attacker.currentAttack - defender.currentAttack);
   }
+  // Gilgamesh: vs a defender with higher ATTACK, the equipped Warrior gains
+  // the difference for the battle — so the hit lands at the higher ATTACK.
+  if (attachedWeaponCode(attacker) === "WEAPON_EQUALIZE_VS_HIGHER_ATTACK") {
+    if (defender.currentAttack > attacker.currentAttack) {
+      damage += defender.currentAttack - attacker.currentAttack;
+    }
+  }
   if (attachedWeaponCode(attacker) === "WEAPON_ATTACK_PER_DESTROYED_FRIENDLY") {
     const perWarrior = attacker.attachedWeapon?.effectParams?.["amount"];
     const amount = typeof perWarrior === "number" ? perWarrior : 250;
