@@ -94,6 +94,8 @@ export function applyAction(
       return attackWarrior(state, action, effects);
     case "directAttack":
       return directAttack(state, action.attackerInstanceId);
+    case "reclaimWarrior":
+      return reclaimWarrior(state, action.warriorInstanceId);
 
     case "enterBattle": {
       if (state.phase !== "main") {
@@ -693,6 +695,73 @@ function directAttack(state: GameState, attackerInstanceId: string): ActionResul
 }
 
 /**
+ * Coerced Loyalty buyback: the original owner takes a stolen Warrior back on
+ * their own Main Phase, paying the buyback HEALTH cost. The Warrior returns to
+ * the owner's field, then takes the damage — which may destroy it (sending its
+ * card to the owner's Out Deck via destroyWarrior).
+ */
+function reclaimWarrior(
+  state: GameState,
+  warriorInstanceId: string,
+): ActionResult {
+  if (state.phase !== "main") {
+    return fail(
+      "WRONG_PHASE",
+      `A Warrior can only be reclaimed in Main Phase (current: ${state.phase}).`,
+    );
+  }
+  const ownerId = state.activePlayer;
+  const thiefId = opponentOf(ownerId);
+  const held = state.players[thiefId].field.find(
+    (w) => w.instanceId === warriorInstanceId && w.stolenFrom === ownerId,
+  );
+  if (held === undefined) {
+    return fail(
+      "WARRIOR_NOT_FOUND",
+      `${ownerId} has no Warrior "${warriorInstanceId}" stolen by ${thiefId} to reclaim.`,
+    );
+  }
+  if (state.players[ownerId].field.length >= state.config.warriorSlots) {
+    return fail(
+      "FIELD_FULL",
+      `${ownerId}'s Warrior field is full (${state.config.warriorSlots} slots); there is no room to reclaim.`,
+    );
+  }
+
+  const next = structuredClone(state);
+  const index = next.players[thiefId].field.findIndex(
+    (w) => w.instanceId === warriorInstanceId,
+  );
+  const [warrior] = next.players[thiefId].field.splice(index, 1);
+  const buyback = warrior!.stealBuybackDamage ?? 0;
+  warrior!.stolenFrom = undefined;
+  warrior!.stealBuybackDamage = undefined;
+  next.players[ownerId].field.push(warrior!);
+  next.events.push({
+    type: "warriorControlReclaimed",
+    player: ownerId,
+    fromPlayer: thiefId,
+    instanceId: warrior!.instanceId,
+    cardId: warrior!.card.id,
+    newHealth: warrior!.currentHealth,
+  });
+
+  // Pay the cost: the reclaimed Warrior takes the buyback damage.
+  warrior!.currentHealth -= buyback;
+  next.events.push({
+    type: "warriorHealthModified",
+    player: ownerId,
+    instanceId: warrior!.instanceId,
+    amount: -buyback,
+    newHealth: warrior!.currentHealth,
+  });
+  if (warrior!.currentHealth <= 0) {
+    destroyWarrior(next, ownerId, warrior!.instanceId);
+  }
+  return { ok: true, state: next };
+}
+
+/**
  * Shared validation for playing a card from the active player's hand during
  * Main Phase. Returns the hand index on success.
  */
@@ -907,6 +976,18 @@ export function getLegalActions(state: GameState): GameAction[] {
             kind: "equipWeapon",
             cardId: card.id,
             warriorInstanceId: warrior.instanceId,
+          });
+        }
+      }
+    }
+    // Coerced Loyalty: reclaim any of the active player's Warriors the
+    // opponent currently controls, as long as there is room on the field.
+    if (player.field.length < state.config.warriorSlots) {
+      for (const stolen of state.players[opponentOf(state.activePlayer)].field) {
+        if (stolen.stolenFrom === state.activePlayer) {
+          actions.push({
+            kind: "reclaimWarrior",
+            warriorInstanceId: stolen.instanceId,
           });
         }
       }

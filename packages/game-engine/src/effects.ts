@@ -1336,6 +1336,44 @@ const forcedDuelHandler: EffectHandler = (state, _params, context) => {
   return { resolved: true };
 };
 
+/**
+ * Coerced Loyalty: take control of one enemy Warrior — it moves to the
+ * controller's field and fights for them this turn (attack refreshed). It
+ * remembers its original owner (stolenFrom) and the buyback HEALTH cost; the
+ * owner may reclaim it later (reclaimWarrior, actions.ts).
+ */
+const controlStealHandler: EffectHandler = (state, params, context) => {
+  const target = requireWarriorTarget(state, params, context, "enemy");
+  if (!target.ok) return target.outcome;
+  if (target.warrior.stolenFrom !== undefined) {
+    return targetFailure("that Warrior's control is already contested.");
+  }
+  if (state.players[context.player].field.length >= state.config.warriorSlots) {
+    return targetFailure(
+      "your Warrior field is full; there is no room to take control of another Warrior.",
+    );
+  }
+
+  const originalOwner = target.owner;
+  const index = state.players[originalOwner].field.findIndex(
+    (w) => w.instanceId === target.warrior.instanceId,
+  );
+  const [warrior] = state.players[originalOwner].field.splice(index, 1);
+  warrior!.stolenFrom = originalOwner;
+  warrior!.stealBuybackDamage = numberParam(params, ["secondaryAmount"], 5000);
+  warrior!.attacksRemaining = 1;
+  state.players[context.player].field.push(warrior!);
+
+  state.events.push({
+    type: "warriorControlStolen",
+    player: context.player,
+    fromPlayer: originalOwner,
+    instanceId: warrior!.instanceId,
+    cardId: warrior!.card.id,
+  });
+  return { resolved: true };
+};
+
 /** Pool both players' Spirit; the activator takes the rounded-up half. */
 const slushFundHandler: EffectHandler = (state, _params, context) => {
   const me = state.players[context.player];
@@ -1519,6 +1557,10 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   // Trial of Gia: lock a friendly and an enemy Warrior into a duel — each
   // may only attack the other until one is destroyed.
   registry.register("FORCED_DUEL", forcedDuelHandler);
+
+  // Coerced Loyalty: take control of an enemy Warrior; the owner may pay a
+  // HEALTH buyback to reclaim it (reclaimWarrior, actions.ts).
+  registry.register("CONTROL_STEAL", controlStealHandler);
   return registry;
 }
 

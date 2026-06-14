@@ -20,6 +20,8 @@ export type GameEvent =
   | { type: "warriorDrewStone"; player: PlayerId; instanceId: string; stone: "white" | "black" }
   | { type: "warriorEnteredTank"; player: PlayerId; instanceId: string; cardId: string; attack: number; health: number }
   | { type: "warriorReturnedFromTank"; player: PlayerId; instanceId: string; cardId: string; newHealth: number }
+  | { type: "warriorControlStolen"; player: PlayerId; fromPlayer: PlayerId; instanceId: string; cardId: string }
+  | { type: "warriorControlReclaimed"; player: PlayerId; fromPlayer: PlayerId; instanceId: string; cardId: string; newHealth: number }
   | { type: "extraAttackGranted"; player: PlayerId; instanceId: string; amount: number; attacksRemaining: number }
   | { type: "deckSearched"; player: PlayerId; cardId: string }
   | { type: "cardStolenFromHand"; player: PlayerId; fromPlayer: PlayerId; cardId: string }

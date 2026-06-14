@@ -84,6 +84,15 @@ export interface WarriorInPlay {
    * not in a tank.
    */
   tankForm?: TankForm;
+  /**
+   * Coerced Loyalty (CONTROL_STEAL): while this Warrior is under foreign
+   * control it sits in the thief's field, and stolenFrom records its original
+   * owner — who may reclaim it (reclaimWarrior) and to whose Out Deck its card
+   * returns if it is destroyed. Unset = the field owner is the true owner.
+   */
+  stolenFrom?: PlayerId;
+  /** Coerced Loyalty: HEALTH the original owner pays to reclaim this Warrior. */
+  stealBuybackDamage?: number;
 }
 
 /**
@@ -306,5 +315,7 @@ export type GameAction =
       effectTargetInstanceId?: string;
     }
   | { kind: "directAttack"; attackerInstanceId: string }
+  /** Coerced Loyalty: the original owner pays the buyback to take a stolen Warrior back. */
+  | { kind: "reclaimWarrior"; warriorInstanceId: string }
   | { kind: "enterBattle" }
   | { kind: "endTurn" };

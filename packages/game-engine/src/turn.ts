@@ -124,7 +124,10 @@ export function destroyWarrior(
 
   owner.field.splice(index, 1);
 
-  owner.outDeck.push(warrior.card);
+  // Coerced Loyalty: a stolen Warrior's card belongs to its original owner,
+  // so it (and any Weapon) return to that player's Out Deck, not the thief's.
+  const cardOwner = state.players[warrior.stolenFrom ?? ownerId];
+  cardOwner.outDeck.push(warrior.card);
   state.events.push({
     type: "warriorDestroyed",
     player: ownerId,
@@ -132,7 +135,7 @@ export function destroyWarrior(
     cardId: warrior.card.id,
   });
   if (warrior.attachedWeapon !== undefined) {
-    owner.outDeck.push(warrior.attachedWeapon);
+    cardOwner.outDeck.push(warrior.attachedWeapon);
     state.events.push({
       type: "weaponDestroyed",
       player: ownerId,
