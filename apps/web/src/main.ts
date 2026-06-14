@@ -6,6 +6,7 @@
 import "./styles.css";
 import { cards } from "./cards";
 import { renderControls } from "./controls";
+import { createCardDetail } from "./detail";
 import { DEFAULT_FILTERS, filterCards, type CardFilters } from "./filters";
 import { renderGrid } from "./grid";
 
@@ -26,6 +27,9 @@ const controlsEl = document.querySelector<HTMLElement>("#controls")!;
 const countEl = document.querySelector<HTMLElement>("#count")!;
 const gridEl = document.querySelector<HTMLElement>("#grid")!;
 
+const detail = createCardDetail(import.meta.env.BASE_URL);
+document.body.append(detail.element);
+
 let filters: CardFilters = { ...DEFAULT_FILTERS };
 
 function apply(): void {
@@ -37,7 +41,7 @@ function apply(): void {
     empty.textContent = "No cards match these filters.";
     gridEl.replaceChildren(empty);
   } else {
-    renderGrid(gridEl, visible);
+    renderGrid(gridEl, visible, detail.open);
   }
 }
 
