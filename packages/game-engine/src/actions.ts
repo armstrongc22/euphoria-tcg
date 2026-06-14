@@ -6,6 +6,8 @@ import {
 } from "./effects";
 import {
   addWarriorAttackDisable,
+  attackDamageMultiplier,
+  findAttackDamageHalving,
   findAttackPreventionStatus,
   findAttackTargetProtection,
   findAttackerRestriction,
@@ -289,6 +291,12 @@ function computeCombatDamage(
     const multiplier =
       typeof amount === "number" && amount > 0 && amount < 1 ? amount : 0.5;
     damage = Math.floor(damage * multiplier);
+  }
+  // Bitter Guard: the attacking player's combat damage is cut to a fraction
+  // (half) for the duration of the status — applied last, to the final hit.
+  const halving = findAttackDamageHalving(state, attackerOwner);
+  if (halving !== undefined) {
+    damage = Math.floor(damage * attackDamageMultiplier(halving));
   }
   return damage;
 }

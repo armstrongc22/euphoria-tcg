@@ -184,7 +184,14 @@ export type StatusCode =
    * persists with no expiry and is removed by destroyWarrior when either
    * Warrior is destroyed.
    */
-  | "FORCED_DUEL";
+  | "FORCED_DUEL"
+  /**
+   * Bitter Guard: while active, affectedPlayer's Warriors deal
+   * metadata.amount (default 0.5) of their normal combat damage —
+   * applied in computeCombatDamage. Covers the opponent's next turn, then
+   * expires at its End Phase.
+   */
+  | "HALVE_ATTACK_DAMAGE";
 
 /**
  * Which turn boundary a status expires on. "startOfTurn" fires during

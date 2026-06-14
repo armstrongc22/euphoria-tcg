@@ -750,6 +750,28 @@ const preventAttacksAgainstFactionNextTurnHandler: EffectHandler = (
 };
 
 /**
+ * Bitter Guard: "On your opponent's next turn, all their ATTACK damage is
+ * cut in half." A status scoped to the opponent halves their combat damage
+ * (computeCombatDamage, actions.ts); it covers the opponent's next turn and
+ * expires at that turn's End Phase.
+ */
+const halveOpponentAttackDamageNextTurnHandler: EffectHandler = (
+  state,
+  params,
+  context,
+) => {
+  const opponent = opponentOf(context.player);
+  addStatus(state, {
+    code: "HALVE_ATTACK_DAMAGE",
+    controller: context.player,
+    affectedPlayer: opponent,
+    expiry: { player: opponent, timing: "endOfTurn", turnsRemaining: 1 },
+    metadata: { amount: numberParam(params, ["amount"], 0.5) },
+  });
+  return { resolved: true };
+};
+
+/**
  * High Tea: "If you have 2 or more Warriors on your side of the field:
  * select 1. That Warrior cannot be destroyed this turn. If it would be
  * destroyed, it loses 1000 HEALTH instead." destroyWarrior enforces the
@@ -1561,6 +1583,13 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   // Coerced Loyalty: take control of an enemy Warrior; the owner may pay a
   // HEALTH buyback to reclaim it (reclaimWarrior, actions.ts).
   registry.register("CONTROL_STEAL", controlStealHandler);
+
+  // Bitter Guard: halve the opponent's combat damage on their next turn
+  // (computeCombatDamage, actions.ts).
+  registry.register(
+    "HALVE_OPPONENT_ATTACK_DAMAGE_NEXT_TURN",
+    halveOpponentAttackDamageNextTurnHandler,
+  );
   return registry;
 }
 

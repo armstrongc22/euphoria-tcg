@@ -338,6 +338,28 @@ export function removeDuelsForWarrior(state: GameState, instanceId: string): voi
 }
 
 /**
+ * Bitter Guard: the status halving `attackingPlayer`'s combat damage right
+ * now, if any. Applied in computeCombatDamage (actions.ts). The multiplier
+ * lives in metadata.amount (default 0.5).
+ */
+export function findAttackDamageHalving(
+  state: GameState,
+  attackingPlayer: PlayerId,
+): StatusEffect | undefined {
+  return state.statuses.find(
+    (s) =>
+      s.code === "HALVE_ATTACK_DAMAGE" &&
+      (s.affectedPlayer === undefined || s.affectedPlayer === attackingPlayer),
+  );
+}
+
+/** The surviving fraction of combat damage under a HALVE_ATTACK_DAMAGE status. */
+export function attackDamageMultiplier(status: StatusEffect): number {
+  const amount = numberMetadata(status, "amount", 0.5);
+  return amount > 0 && amount < 1 ? amount : 0.5;
+}
+
+/**
  * The status blocking all attack declarations right now, if any
  * (Gorgon's Eye). Applies to both players, including the controller.
  */

@@ -1315,6 +1315,7 @@
         "duration": "opponent_next_turn"
       }
     ],
+    "effectCode": "HALVE_OPPONENT_ATTACK_DAMAGE_NEXT_TURN",
     "timing": "on_attack_replace",
     "deckTags": [
       "Surfer"
