@@ -1210,6 +1210,46 @@ const temporaryOutOfPlayRestoreHandler: EffectHandler = (state, params, context)
   return { resolved: true };
 };
 
+/**
+ * XL-QR517: a friendly Warrior climbs into the tank, taking on the tank's
+ * ATTACK/HEALTH (amount/secondaryAmount). Its previous stats are stashed in
+ * tankForm and restored when the tank is destroyed (destroyWarrior, turn.ts),
+ * which returns the original Warrior to the field in place. Temporary attack
+ * buffs are dropped on entry since the tank overrides ATTACK outright.
+ */
+const tankFormHandler: EffectHandler = (state, params, context) => {
+  const target = requireWarriorTarget(state, params, context, "friendly");
+  if (!target.ok) return target.outcome;
+  const warrior = target.warrior;
+  if (warrior.tankForm !== undefined) {
+    return targetFailure("that Warrior is already in the tank.");
+  }
+
+  const tankAttack = numberParam(params, ["amount"], 1500);
+  const tankHealth = numberParam(params, ["secondaryAmount"], 3100);
+  const buffTotal = warrior.temporaryAttackBuffs.reduce((sum, b) => sum + b.amount, 0);
+
+  warrior.tankForm = {
+    originalAttack: warrior.currentAttack - buffTotal,
+    originalHealth: warrior.currentHealth,
+    originalMaxHealth: warrior.maxHealth,
+  };
+  warrior.temporaryAttackBuffs = [];
+  warrior.currentAttack = tankAttack;
+  warrior.currentHealth = tankHealth;
+  warrior.maxHealth = tankHealth;
+
+  state.events.push({
+    type: "warriorEnteredTank",
+    player: target.owner,
+    instanceId: warrior.instanceId,
+    cardId: warrior.card.id,
+    attack: tankAttack,
+    health: tankHealth,
+  });
+  return { resolved: true };
+};
+
 /** Pool both players' Spirit; the activator takes the rounded-up half. */
 const slushFundHandler: EffectHandler = (state, _params, context) => {
   const me = state.players[context.player];
@@ -1379,6 +1419,11 @@ export function createDefaultEffectRegistry(): EffectRegistry {
     "TEMPORARY_OUT_OF_PLAY_RESTORE",
     temporaryOutOfPlayRestoreHandler,
   );
+
+  // XL-QR517: transform a friendly Warrior into the tank; on the tank's
+  // destruction the original Warrior returns in place (destroyWarrior,
+  // turn.ts).
+  registry.register("TANK_FORM", tankFormHandler);
   return registry;
 }
 

@@ -101,6 +101,26 @@ export function destroyWarrior(
     });
     return;
   }
+  // XL-QR517: a destroyed tank doesn't die — it spits the original Warrior
+  // back out at its stashed stats, keeping its place (and Weapon) on the
+  // field. Resolved after destruction protection: a protected tank is never
+  // destroyed in the first place, so it never reaches this point.
+  if (warrior.tankForm !== undefined) {
+    const { originalAttack, originalHealth, originalMaxHealth } = warrior.tankForm;
+    warrior.currentAttack = originalAttack;
+    warrior.currentHealth = originalHealth;
+    warrior.maxHealth = originalMaxHealth;
+    warrior.tankForm = undefined;
+    state.events.push({
+      type: "warriorReturnedFromTank",
+      player: ownerId,
+      instanceId,
+      cardId: warrior.card.id,
+      newHealth: warrior.currentHealth,
+    });
+    return;
+  }
+
   owner.field.splice(index, 1);
 
   owner.outDeck.push(warrior.card);

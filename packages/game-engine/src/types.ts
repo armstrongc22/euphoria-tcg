@@ -76,6 +76,25 @@ export interface WarriorInPlay {
    * no separate reset. Unset = never negated.
    */
   negatedAttackTurn?: number;
+  /**
+   * XL-QR517 (TANK_FORM): set while this Warrior is piloting the tank. The
+   * Warrior's live stats are the tank's (1500/3100); these snapshot what to
+   * restore when the tank is destroyed, at which point the original Warrior
+   * returns to the field in place rather than going to the Out Deck. Unset =
+   * not in a tank.
+   */
+  tankForm?: TankForm;
+}
+
+/**
+ * The original Warrior's stats, stashed while it pilots the tank so they can
+ * be restored on the tank's destruction. Temporary attack buffs are dropped
+ * on entry (the tank overrides ATTACK), so only the permanent base is kept.
+ */
+export interface TankForm {
+  originalAttack: number;
+  originalHealth: number;
+  originalMaxHealth: number;
 }
 
 /**
