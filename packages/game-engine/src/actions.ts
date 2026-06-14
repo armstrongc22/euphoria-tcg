@@ -5,6 +5,7 @@ import {
   type EffectRegistry,
 } from "./effects";
 import {
+  addWarriorAttackDisable,
   findAttackPreventionStatus,
   findAttackTargetProtection,
   findAttackerRestriction,
@@ -18,7 +19,7 @@ import {
   opponentOf,
   runEndPhase,
 } from "./turn";
-import type { GameAction, GameState, WarriorInPlay } from "./types";
+import type { GameAction, GameState, PlayerId, WarriorInPlay } from "./types";
 
 export type EngineErrorCode =
   | "WRONG_PHASE"
@@ -217,21 +218,35 @@ function attachedWeaponCode(warrior: WarriorInPlay): string | undefined {
   return code === undefined ? undefined : normalizeEffectCode(code);
 }
 
+/** Warriors only ever reach the Out Deck by being destroyed, so the
+ *  destroyed-friendly-Warrior count is exactly the Warrior cards there. */
+function destroyedFriendlyWarriorCount(state: GameState, owner: PlayerId): number {
+  return state.players[owner].outDeck.filter((c) => c.type === "Warrior").length;
+}
+
 /**
  * Combat damage with Weapon combat passives applied. Passives are read
  * straight from the attached Weapon card: Weapons never detach and go to
  * the Out Deck with their Warrior, so attachment is exactly the passive's
- * lifetime. The attacker's outgoing modifier applies first (Xīwànghǎo
- * adds the attack difference), then the defender's incoming one (Skeleton
- * Key halves what arrives).
+ * lifetime. The attacker's outgoing modifiers apply first (Xīwànghǎo adds
+ * the attack difference; Armageddon adds a per-destroyed-friendly-Warrior
+ * bonus, recomputed each attack so it tracks the growing Out Deck), then
+ * the defender's incoming one (Skeleton Key halves what arrives).
  */
 function computeCombatDamage(
+  state: GameState,
+  attackerOwner: PlayerId,
   attacker: WarriorInPlay,
   defender: WarriorInPlay,
 ): number {
   let damage = attacker.currentAttack;
   if (attachedWeaponCode(attacker) === "WEAPON_ADD_ATTACK_DIFFERENCE_DAMAGE") {
     damage += Math.abs(attacker.currentAttack - defender.currentAttack);
+  }
+  if (attachedWeaponCode(attacker) === "WEAPON_ATTACK_PER_DESTROYED_FRIENDLY") {
+    const perWarrior = attacker.attachedWeapon?.effectParams?.["amount"];
+    const amount = typeof perWarrior === "number" ? perWarrior : 250;
+    damage += amount * destroyedFriendlyWarriorCount(state, attackerOwner);
   }
   if (attachedWeaponCode(defender) === "WEAPON_HALVE_INCOMING_DAMAGE") {
     const amount = defender.attachedWeapon?.effectParams?.["amount"];
@@ -377,7 +392,7 @@ function attackWarrior(
     const defenderFaction = defender.card.faction;
     // The attacker takes no counter damage (CLAUDE.md overrides the spec's
     // "simultaneous" wording; see RulesConfig.combatDamageSimultaneous).
-    const damage = computeCombatDamage(attacker, defender);
+    const damage = computeCombatDamage(next, next.activePlayer, attacker, defender);
     defender.currentHealth -= damage;
     next.events.push({
       type: "warriorAttacked",
@@ -388,6 +403,27 @@ function attackWarrior(
     });
     if (defender.currentHealth <= 0) {
       destroyWarrior(next, opponentId, defender.instanceId);
+    }
+
+    // Phobos (WEAPON_DISABLE_ATTACKED_ONE_TURN): a Warrior attacked by the
+    // equipped Warrior can't attack for 1 turn. Read straight from the
+    // attacker's attached Weapon (attachment == passive lifetime). A
+    // destroyed defender gets no disable — it has left the field, so the
+    // status would only fizzle. Direct attacks never reach here, so they
+    // never trigger this defender-specific passive.
+    if (attachedWeaponCode(attacker) === "WEAPON_DISABLE_ATTACKED_ONE_TURN") {
+      const stillFielded = next.players[opponentId].field.some(
+        (w) => w.instanceId === defender.instanceId,
+      );
+      if (stillFielded) {
+        addWarriorAttackDisable(
+          next,
+          next.activePlayer,
+          opponentId,
+          defender.instanceId,
+          1,
+        );
+      }
     }
 
     // After-damage-resolution hook (A Dragon's Judgement): each active

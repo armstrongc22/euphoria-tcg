@@ -976,10 +976,11 @@ const damageUpToTwoDisableHandler: EffectHandler = (state, params, context) => {
 };
 
 /**
- * Combat-time Weapon passives (Skeleton Key, Xīwànghǎo): nothing happens
- * at equip time — actions.ts reads the passive from the attached Weapon
- * during damage calculation, and the attachment's lifetime is the
- * passive's. Resolving here (after validating the equip target) keeps the
+ * Combat-time Weapon passives (Skeleton Key, Xīwànghǎo, Armageddon,
+ * Phobos): nothing happens at equip time — actions.ts reads the passive
+ * from the attached Weapon during attack resolution, and the attachment's
+ * lifetime is the passive's. Resolving here (after validating the equip
+ * target) keeps the
  * card from being flagged effectNotImplemented, with no Spirit beyond the
  * equip cost. Scythe Cycle (WEAPON_ATTACK_BONUS_SPLASH) is deliberately
  * NOT registered: its per-attack "select one" splash needs target
@@ -1082,6 +1083,23 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   registry.register("WEAPON_HALVE_INCOMING_DAMAGE", weaponCombatPassiveHandler);
   registry.register(
     "WEAPON_ADD_ATTACK_DIFFERENCE_DAMAGE",
+    weaponCombatPassiveHandler,
+  );
+
+  // Group 4D: more Weapon combat passives enforced in attackWarrior /
+  // computeCombatDamage (actions.ts). Armageddon's per-destroyed-friendly
+  // bonus and Phobos's disable-on-hit both live on the attached Weapon, so
+  // equip just clears the marker. Moirai (WEAPON_GRANT_OTHER_EXTRA_ATTACK)
+  // is deliberately NOT registered: its recurring once-per-turn "select
+  // another Warrior to attack again" is an activated ability with no
+  // supporting plumbing (no activated-ability action, no per-turn-use
+  // tracking, no second target), so it stays EFFECT_NOT_IMPLEMENTED.
+  registry.register(
+    "WEAPON_ATTACK_PER_DESTROYED_FRIENDLY",
+    weaponCombatPassiveHandler,
+  );
+  registry.register(
+    "WEAPON_DISABLE_ATTACKED_ONE_TURN",
     weaponCombatPassiveHandler,
   );
   return registry;
