@@ -10,7 +10,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "validate:cards": "tsx packages/card-data/src/validate.ts"
+    "validate:cards": "tsx packages/card-data/src/validate.ts",
+    "sim:balance": "tsx apps/simulator/src/balance-main.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

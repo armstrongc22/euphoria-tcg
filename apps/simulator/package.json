@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/main.ts",
+    "balance": "tsx src/balance-main.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

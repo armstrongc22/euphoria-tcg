@@ -36,6 +36,16 @@ export interface GameResult {
   actions: number;
   events: number;
   finalLives: Record<PlayerId, number>;
+  /**
+   * Whether the win came from a direct attack draining the loser's lives to 0.
+   * In the current ruleset lives only fall via direct attacks, so every win is
+   * one — tracked explicitly so a future combat/alt win condition shows up.
+   */
+  winByDirectAttack: boolean;
+  /** `effectNotImplemented` events: a card whose effect failed to resolve. */
+  effectFallbacks: number;
+  /** `drawFailedDeckEmpty` events: a player tried to draw from an empty deck. */
+  deckOuts: number;
 }
 
 /** Runs one game to completion (or to a safety cap) and reports the outcome. */
@@ -76,6 +86,19 @@ export function runGame(setup: GameSetup): GameResult {
     actions += 1;
   }
 
+  let winByDirectAttack = false;
+  let effectFallbacks = 0;
+  let deckOuts = 0;
+  for (const event of state.events) {
+    if (event.type === "directAttacked" && event.livesRemaining <= 0) {
+      winByDirectAttack = true;
+    } else if (event.type === "effectNotImplemented") {
+      effectFallbacks += 1;
+    } else if (event.type === "drawFailedDeckEmpty") {
+      deckOuts += 1;
+    }
+  }
+
   return {
     winner: state.winner,
     reason: state.winner !== null ? "win" : reason,
@@ -86,5 +109,8 @@ export function runGame(setup: GameSetup): GameResult {
       player1: state.players.player1.lives,
       player2: state.players.player2.lives,
     },
+    winByDirectAttack: state.winner !== null && winByDirectAttack,
+    effectFallbacks,
+    deckOuts,
   };
 }
