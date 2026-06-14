@@ -5,6 +5,7 @@
  * the caller's state — the untouched input state is returned instead.
  */
 import type { Card } from "@euphoria/card-data";
+import { shuffleWithState } from "./rng";
 import { otherWarriors } from "./splash";
 import { addStatus, addWarriorAttackDisable } from "./status";
 import {
@@ -1250,6 +1251,49 @@ const tankFormHandler: EffectHandler = (state, params, context) => {
   return { resolved: true };
 };
 
+/**
+ * Decimation: only fires when at least `minimumWarriors` Warriors share the
+ * field (both sides count). Every Warrior draws a stone; `destroyCount` of
+ * them draw white and are destroyed. The draw is a deterministic shuffle off
+ * the game's rngState, so it stays reproducible. Indiscriminate — the
+ * caster's own Warriors can draw white too. Below the threshold the card
+ * still resolves (it was spent) but nothing happens.
+ */
+const decimationHandler: EffectHandler = (state, params, _context) => {
+  const minimum = numberParam(params, ["minimumWarriors", "secondaryAmount"], 5);
+  const destroyCount = numberParam(params, ["destroyCount", "amount"], 2);
+
+  const everyone: { owner: PlayerId; instanceId: string }[] = [];
+  for (const owner of ["player1", "player2"] as const) {
+    for (const warrior of state.players[owner].field) {
+      everyone.push({ owner, instanceId: warrior.instanceId });
+    }
+  }
+  if (everyone.length < minimum) return { resolved: true };
+
+  const shuffled = shuffleWithState(everyone, state.rngState);
+  state.rngState = shuffled.state;
+  const whiteIds = new Set(
+    shuffled.items
+      .slice(0, Math.min(destroyCount, shuffled.items.length))
+      .map((w) => w.instanceId),
+  );
+
+  // Log every draw in stable field order; then destroy the white draws.
+  for (const w of everyone) {
+    state.events.push({
+      type: "warriorDrewStone",
+      player: w.owner,
+      instanceId: w.instanceId,
+      stone: whiteIds.has(w.instanceId) ? "white" : "black",
+    });
+  }
+  for (const w of everyone) {
+    if (whiteIds.has(w.instanceId)) destroyWarrior(state, w.owner, w.instanceId);
+  }
+  return { resolved: true };
+};
+
 /** Pool both players' Spirit; the activator takes the rounded-up half. */
 const slushFundHandler: EffectHandler = (state, _params, context) => {
   const me = state.players[context.player];
@@ -1424,6 +1468,11 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   // destruction the original Warrior returns in place (destroyWarrior,
   // turn.ts).
   registry.register("TANK_FORM", tankFormHandler);
+
+  // Decimation: a Shaman Finisher Attack card. With 5+ Warriors on the
+  // field, 2 random Warriors (either side) are destroyed; replaces the
+  // declared combat hit (REPLACE_COMBAT_EFFECTS, actions.ts).
+  registry.register("DECIMATION", decimationHandler);
   return registry;
 }
 

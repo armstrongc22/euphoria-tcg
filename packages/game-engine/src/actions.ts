@@ -63,6 +63,9 @@ function fail(code: EngineErrorCode, message: string): ActionResult {
 const REPLACE_COMBAT_EFFECTS = new Set([
   "LINGERING_EXISTING_DAMAGE",
   "GYLIPPUS",
+  // Decimation is a board-wide Finisher: its stone draw stands in for the
+  // declared attack, so the normal combat hit is skipped.
+  "DECIMATION",
 ]);
 
 /**

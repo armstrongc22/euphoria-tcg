@@ -17,6 +17,7 @@ export type GameEvent =
   | { type: "warriorRevived"; player: PlayerId; cardId: string; instanceId: string }
   | { type: "warriorSentOutOfPlay"; player: PlayerId; instanceId: string; cardId: string; turnsRemaining: number }
   | { type: "warriorReturnedFromOutOfPlay"; player: PlayerId; instanceId: string; cardId: string; newHealth: number }
+  | { type: "warriorDrewStone"; player: PlayerId; instanceId: string; stone: "white" | "black" }
   | { type: "warriorEnteredTank"; player: PlayerId; instanceId: string; cardId: string; attack: number; health: number }
   | { type: "warriorReturnedFromTank"; player: PlayerId; instanceId: string; cardId: string; newHealth: number }
   | { type: "extraAttackGranted"; player: PlayerId; instanceId: string; amount: number; attacksRemaining: number }

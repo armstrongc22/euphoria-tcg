@@ -27,7 +27,8 @@ export interface CreateGameOptions {
  */
 export function createGame(options: CreateGameOptions): GameState {
   const config: RulesConfig = { ...DEFAULT_RULES, ...options.config };
-  const rng = createRng(options.seed ?? Date.now());
+  const seed = options.seed ?? Date.now();
+  const rng = createRng(seed);
   const shouldShuffle = options.shuffleDecks ?? true;
 
   for (const id of PLAYER_IDS) {
@@ -51,6 +52,9 @@ export function createGame(options: CreateGameOptions): GameState {
     winner: null,
     statuses: [],
     events: [],
+    // In-game randomness draws from an independent, deterministic stream
+    // (offset from the seed) so it never correlates with the opening shuffle.
+    rngState: ((seed >>> 0) ^ 0x9e3779b9) >>> 0,
     nextInstanceId: 1,
     nextStatusId: 1,
   };

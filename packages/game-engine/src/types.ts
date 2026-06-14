@@ -244,6 +244,13 @@ export interface GameState {
   statuses: StatusEffect[];
   /** Append-only structured log (the Python engine's print-based log). */
   events: GameEvent[];
+  /**
+   * Serialized mulberry32 state for in-game randomness (e.g. Decimation's
+   * stone draw). Advanced by random effects via nextRandom/shuffleWithState
+   * so outcomes stay reproducible from the game's seed. Kept independent of
+   * the opening shuffle's stream.
+   */
+  rngState: number;
   /** Counter for unique WarriorInPlay instance ids. */
   nextInstanceId: number;
   /** Counter for unique StatusEffect ids. */
