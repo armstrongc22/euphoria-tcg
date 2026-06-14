@@ -9,3 +9,6 @@ __pycache__/
 
 # Node (for the upcoming packages/ workspace)
 node_modules/
+
+# Build output
+dist/

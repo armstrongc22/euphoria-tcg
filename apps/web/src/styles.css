@@ -1,0 +1,118 @@
+:root {
+  --bg: #0f1115;
+  --bg-elev: #171a21;
+  --text: #e8eaed;
+  --text-dim: #9aa0aa;
+  --border: #262b36;
+  --radius: 10px;
+
+  /* Faction accents */
+  --monk: #e0524a;
+  --dwarf: #d9a441;
+  --sonic: #4aa3e0;
+  --surfer: #36c6a8;
+  --shaman: #a06ad9;
+  --neutral: #8a93a3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.site-header {
+  padding: 1.5rem clamp(1rem, 4vw, 3rem);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem 1.25rem;
+}
+
+.site-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+}
+
+.site-header__sub {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.site-header__meta {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: clamp(0.75rem, 2vw, 1.25rem);
+  padding: clamp(1rem, 4vw, 3rem);
+}
+
+.card {
+  margin: 0;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--neutral);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition:
+    transform 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+}
+
+.card[data-faction="Monk"] {
+  border-top-color: var(--monk);
+}
+.card[data-faction="Dwarf"] {
+  border-top-color: var(--dwarf);
+}
+.card[data-faction="Sonic"] {
+  border-top-color: var(--sonic);
+}
+.card[data-faction="Surfer"] {
+  border-top-color: var(--surfer);
+}
+.card[data-faction="Shaman"] {
+  border-top-color: var(--shaman);
+}
+
+.card__art {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  background: #0b0d11;
+}
+
+.card__caption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.6rem 0.7rem 0.75rem;
+}
+
+.card__name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.25;
+}
+
+.card__tags {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}

@@ -4,9 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@euphoria/card-data": "*"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
   }
 }
