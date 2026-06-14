@@ -1139,6 +1139,47 @@ const lingeringExistingDamageHandler: EffectHandler = (state, params, context) =
   return { resolved: true };
 };
 
+/**
+ * Cytotoxic Chapel (DAMAGE_ALL_OPPONENT_WARRIORS_DELAYED): "Deal 1500
+ * damage to all Warriors on your opponent's side of the field. All Warriors
+ * that took damage from this effect take 500 damage on your next turn."
+ * Used as an Attack card; like 7th Plague it is additive — the declared
+ * defender still takes its combat hit, so this is NOT a REPLACE_COMBAT
+ * effect. It deals `amount` (1500) to every enemy Warrior now, then
+ * schedules a single `secondaryAmount` (500) tick against that same
+ * snapshot on the controller's next turn, riding the lingeringDamage
+ * delayedEffects path (survivors only; destroyed Warriors drop out). The
+ * controller's own Warriors are never touched.
+ */
+const damageAllOpponentWarriorsDelayedHandler: EffectHandler = (
+  state,
+  params,
+  context,
+) => {
+  const opponentId = opponentOf(context.player);
+  const amount = numberParam(params, ["amount"], 0);
+  const delayed = numberParam(params, ["secondaryAmount"], 0);
+  // Snapshot the Warriors that take damage (for the delayed follow-up).
+  const snapshot = state.players[opponentId].field.map((w) => w.instanceId);
+
+  // Immediate AoE; iterate a copy since lethal hits splice the field.
+  for (const warrior of [...state.players[opponentId].field]) {
+    modifyWarriorHealth(state, opponentId, warrior, -amount);
+  }
+
+  // One follow-up tick next turn against the surviving snapshot.
+  if (delayed > 0 && snapshot.length > 0) {
+    state.players[context.player].delayedEffects.push({
+      type: "lingeringDamage",
+      amount: delayed,
+      turnsRemaining: 1,
+      targetPlayer: opponentId,
+      targetInstanceIds: snapshot,
+    });
+  }
+  return { resolved: true };
+};
+
 /** Pool both players' Spirit; the activator takes the rounded-up half. */
 const slushFundHandler: EffectHandler = (state, _params, context) => {
   const me = state.players[context.player];
@@ -1269,6 +1310,13 @@ export function createDefaultEffectRegistry(): EffectRegistry {
   // Group 6A: Gylippus — flat primaryBonus to the attacked Warrior (replaces
   // the combat hit, see actions.ts) plus secondaryDamage to one other enemy.
   registry.register("GYLIPPUS", gylippusHandler);
+
+  // Group 6B: Cytotoxic Chapel — AoE now (additive with combat, like 7th
+  // Plague) plus a one-tick delayed follow-up next turn via lingeringDamage.
+  registry.register(
+    "DAMAGE_ALL_OPPONENT_WARRIORS_DELAYED",
+    damageAllOpponentWarriorsDelayedHandler,
+  );
   return registry;
 }
 
