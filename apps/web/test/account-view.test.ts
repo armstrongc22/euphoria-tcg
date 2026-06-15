@@ -107,3 +107,52 @@ describe("mountAccount", () => {
     expect(await auth.getSession()).toBeNull();
   });
 });
+
+describe("mountAccount match stats", () => {
+  /** Flushes the async showAccount/getMatchHistory microtask chain. */
+  async function flush(): Promise<void> {
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+  }
+
+  async function signedInAccount(): Promise<{ container: HTMLElement }> {
+    const store = memoryStore();
+    const auth = createLocalAuth(store);
+    await auth.signUp("player@example.com", "pw");
+    await auth.saveFaction(
+      { userId: "local-demo", email: "player@example.com" },
+      "Dwarf",
+    );
+    const container = document.createElement("div");
+    await mountAccount(container, { auth, pool: cards, onSignOut: () => {} });
+    return { container };
+  }
+
+  it("shows a stats panel starting at zero matches", async () => {
+    const { container } = await signedInAccount();
+    const stats = container.querySelector(".account__stats");
+    expect(stats).not.toBeNull();
+    expect(stats?.textContent).toContain("Total matches");
+    expect(stats?.textContent).toContain("Win rate");
+    expect(stats?.textContent?.toLowerCase()).toContain("no matches yet");
+  });
+
+  it("records a played match and reflects it in the stats after returning", async () => {
+    const { container } = await signedInAccount();
+
+    container.querySelector<HTMLButtonElement>(".account__play")!.click();
+    await flush();
+    container.querySelector<HTMLButtonElement>(".match-result__back")!.click();
+    await flush();
+
+    const stats = container.querySelector(".account__stats");
+    expect(stats?.textContent).not.toContain("no matches yet");
+    // One match recorded; a recent-match row is now listed.
+    expect(container.querySelectorAll(".account__recent-row")).toHaveLength(1);
+  });
+
+  it("keeps the reward placeholder as coming soon", async () => {
+    const { container } = await signedInAccount();
+    expect(container.querySelector(".account__rewards")?.textContent?.toLowerCase())
+      .toContain("reward cards coming soon");
+  });
+});

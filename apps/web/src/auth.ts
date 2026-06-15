@@ -14,6 +14,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "./supabase-client";
 import {
+  appendLocalMatch,
+  loadLocalMatches,
+  type MatchHistoryInsert,
+  type MatchRecord,
+} from "./match-history";
+import {
   clearSignup,
   getLocalStore,
   loadSignup,
@@ -78,6 +84,38 @@ export interface Auth {
   saveFaction(session: AuthSession, faction: StarterFaction): Promise<void>;
   /** The user's profile row, or null if it doesn't exist yet. */
   getProfile(session: AuthSession): Promise<Profile | null>;
+  /** Persist one completed test match for the signed-in user. */
+  saveMatch(session: AuthSession, match: MatchHistoryInsert): Promise<void>;
+  /** The user's match rows, newest first (default cap, never the whole table). */
+  getMatchHistory(session: AuthSession, limit?: number): Promise<MatchRecord[]>;
+}
+
+/** Columns selected from match_history; mirrors {@link MatchRecord}. */
+const MATCH_COLUMNS =
+  "user_id, player_faction, opponent_faction, winner, result, turns, " +
+  "lives_left_player, lives_left_opponent, warriors_summoned_player, " +
+  "warriors_summoned_opponent, direct_attacks_player, " +
+  "direct_attacks_opponent, created_at";
+
+/** Coerces a raw Supabase row into a typed MatchRecord. */
+function rowToMatchRecord(row: Record<string, unknown>): MatchRecord {
+  const num = (v: unknown): number => (typeof v === "number" ? v : Number(v) || 0);
+  const str = (v: unknown): string => (typeof v === "string" ? v : String(v ?? ""));
+  return {
+    user_id: str(row["user_id"]),
+    player_faction: str(row["player_faction"]) as StarterFaction,
+    opponent_faction: str(row["opponent_faction"]) as StarterFaction,
+    winner: str(row["winner"]),
+    result: str(row["result"]) as MatchRecord["result"],
+    turns: num(row["turns"]),
+    lives_left_player: num(row["lives_left_player"]),
+    lives_left_opponent: num(row["lives_left_opponent"]),
+    warriors_summoned_player: num(row["warriors_summoned_player"]),
+    warriors_summoned_opponent: num(row["warriors_summoned_opponent"]),
+    direct_attacks_player: num(row["direct_attacks_player"]),
+    direct_attacks_opponent: num(row["direct_attacks_opponent"]),
+    created_at: str(row["created_at"]),
+  };
 }
 
 function isStarterFaction(value: unknown): value is StarterFaction {
@@ -180,6 +218,24 @@ export function createSupabaseAuth(client: SupabaseClient): Auth {
           : null,
       };
     },
+
+    async saveMatch(_session, match) {
+      // created_at is omitted: the match_history default sets it on insert.
+      const { error } = await client.from("match_history").insert(match);
+      if (error) throw error;
+    },
+
+    async getMatchHistory(session, limit = 50) {
+      const { data, error } = await client
+        .from("match_history")
+        .select(MATCH_COLUMNS)
+        .eq("user_id", session.userId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      const rows = (data ?? []) as unknown as Record<string, unknown>[];
+      return rows.map(rowToMatchRecord);
+    },
   };
 }
 
@@ -233,6 +289,18 @@ export function createLocalAuth(store: KeyValueStore | null): Auth {
         email: session.email,
         selected_faction: faction,
       };
+    },
+
+    async saveMatch(_session, match) {
+      if (store !== null) appendLocalMatch(store, match);
+    },
+
+    async getMatchHistory(_session, limit) {
+      if (store === null) return [];
+      const all = loadLocalMatches(store).sort((a, b) =>
+        b.created_at.localeCompare(a.created_at),
+      );
+      return limit === undefined ? all : all.slice(0, limit);
     },
   };
 }

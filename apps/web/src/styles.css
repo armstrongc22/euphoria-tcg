@@ -969,3 +969,43 @@ body {
 .match-result__actions .account__play {
   margin-top: 0;
 }
+
+.account__stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.account__subheading {
+  margin: 0.75rem 0 0.4rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+.account__recent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.account__recent-row {
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius);
+  background: var(--surface, var(--bg));
+  border-left: 3px solid var(--border);
+  font-size: 0.92rem;
+}
+
+.account__recent-row--win {
+  border-left-color: var(--surfer);
+}
+
+.account__recent-row--loss {
+  border-left-color: var(--monk);
+}
