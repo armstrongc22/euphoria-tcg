@@ -74,6 +74,8 @@ describe("account page test-match flow (local fallback)", () => {
     expect(container.textContent?.toLowerCase()).toContain("reward cards coming soon");
 
     container.querySelector<HTMLButtonElement>(".match-result__back")!.click();
+    // Back to account reloads match history, so let that async render settle.
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(container.querySelector(".match-result")).toBeNull();
     expect(container.querySelector(".account__play")).not.toBeNull();
   });

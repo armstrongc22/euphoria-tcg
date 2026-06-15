@@ -57,6 +57,63 @@ the static site still works with no backend.
 - **RLS**: policies allowing each user to `select` / `insert` / `update` only
   their own row (`auth.uid() = id`).
 
+- **`public.match_history`** table — one row per completed test match:
+
+  | Column                       | Type          | Notes                          |
+  | ---------------------------- | ------------- | ------------------------------ |
+  | `id`                         | `uuid` PK     | `default gen_random_uuid()`    |
+  | `user_id`                    | `uuid`        | references `auth.users(id)`    |
+  | `player_faction`             | `text`        |                                |
+  | `opponent_faction`           | `text`        |                                |
+  | `winner`                     | `text`        | winning faction, or `draw`     |
+  | `result`                     | `text`        | `win` / `loss` / `draw`        |
+  | `turns`                      | `integer`     |                                |
+  | `lives_left_player`          | `integer`     |                                |
+  | `lives_left_opponent`        | `integer`     |                                |
+  | `warriors_summoned_player`   | `integer`     |                                |
+  | `warriors_summoned_opponent` | `integer`     |                                |
+  | `direct_attacks_player`      | `integer`     |                                |
+  | `direct_attacks_opponent`    | `integer`     |                                |
+  | `created_at`                 | `timestamptz` | DB default on insert           |
+
+  **RLS**: each user may `select` / `insert` only their own rows
+  (`auth.uid() = user_id`). Run once in the SQL editor:
+
+  ```sql
+  create table if not exists public.match_history (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references auth.users (id) on delete cascade,
+    player_faction text not null,
+    opponent_faction text not null,
+    winner text not null,
+    result text not null check (result in ('win', 'loss', 'draw')),
+    turns integer not null,
+    lives_left_player integer not null,
+    lives_left_opponent integer not null,
+    warriors_summoned_player integer not null,
+    warriors_summoned_opponent integer not null,
+    direct_attacks_player integer not null,
+    direct_attacks_opponent integer not null,
+    created_at timestamptz not null default now()
+  );
+
+  alter table public.match_history enable row level security;
+
+  create policy "match_history_select_own"
+    on public.match_history for select
+    using (auth.uid() = user_id);
+
+  create policy "match_history_insert_own"
+    on public.match_history for insert
+    with check (auth.uid() = user_id);
+
+  create index if not exists match_history_user_created_idx
+    on public.match_history (user_id, created_at desc);
+  ```
+
+  If Supabase is unavailable or unconfigured, match history persists to
+  localStorage instead, so the demo flow still shows stats and never crashes.
+
 ### How the app uses it
 
 - `src/supabase-config.ts` — detects the env vars (pure, tested).

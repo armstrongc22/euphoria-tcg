@@ -91,6 +91,54 @@ describe("createLocalAuth (fallback)", () => {
     await expect(auth.saveFaction(session, "Monk")).resolves.toBeUndefined();
     await expect(auth.signOut()).resolves.toBeUndefined();
   });
+
+  it("persists and returns match history (newest first)", async () => {
+    const store = memoryStore();
+    const auth = createLocalAuth(store);
+    const base = {
+      user_id: LOCAL_USER_ID,
+      player_faction: "Sonic",
+      opponent_faction: "Dwarf",
+      winner: "Sonic",
+      result: "win",
+      turns: 12,
+      lives_left_player: 3,
+      lives_left_opponent: 0,
+      warriors_summoned_player: 5,
+      warriors_summoned_opponent: 4,
+      direct_attacks_player: 3,
+      direct_attacks_opponent: 0,
+    } as const;
+
+    await auth.saveMatch(SESSION, base);
+    await auth.saveMatch(SESSION, { ...base, result: "loss", winner: "Dwarf" });
+
+    const history = await auth.getMatchHistory(SESSION);
+    expect(history).toHaveLength(2);
+    expect(history.every((m) => typeof m.created_at === "string")).toBe(true);
+    expect(await auth.getMatchHistory(SESSION, 1)).toHaveLength(1);
+  });
+
+  it("match history degrades to [] with no store and never throws", async () => {
+    const auth = createLocalAuth(null);
+    await expect(
+      auth.saveMatch(SESSION, {
+        user_id: LOCAL_USER_ID,
+        player_faction: "Monk",
+        opponent_faction: "Sonic",
+        winner: "Monk",
+        result: "win",
+        turns: 9,
+        lives_left_player: 3,
+        lives_left_opponent: 0,
+        warriors_summoned_player: 2,
+        warriors_summoned_opponent: 2,
+        direct_attacks_player: 3,
+        direct_attacks_opponent: 0,
+      }),
+    ).resolves.toBeUndefined();
+    expect(await auth.getMatchHistory(SESSION)).toEqual([]);
+  });
 });
 
 describe("signUpOrSignIn", () => {
@@ -103,6 +151,8 @@ describe("signUpOrSignIn", () => {
       getSession: vi.fn(),
       saveFaction: vi.fn(),
       getProfile: vi.fn(),
+      saveMatch: vi.fn(),
+      getMatchHistory: vi.fn(),
     };
     expect(await signUpOrSignIn(auth, SESSION.email, "pw")).toEqual(SESSION);
     expect(auth.signIn).not.toHaveBeenCalled();
@@ -119,6 +169,8 @@ describe("signUpOrSignIn", () => {
       getSession: vi.fn(),
       saveFaction: vi.fn(),
       getProfile: vi.fn(),
+      saveMatch: vi.fn(),
+      getMatchHistory: vi.fn(),
     };
     expect(await signUpOrSignIn(auth, SESSION.email, "pw")).toEqual(SESSION);
     expect(auth.signIn).toHaveBeenCalledTimes(1);
@@ -135,6 +187,8 @@ describe("signUpOrSignIn", () => {
       getSession: vi.fn(),
       saveFaction: vi.fn(),
       getProfile: vi.fn(),
+      saveMatch: vi.fn(),
+      getMatchHistory: vi.fn(),
     };
     await expect(signUpOrSignIn(auth, SESSION.email, "pw")).rejects.toThrow(
       /at least 6 characters/,

@@ -14,6 +14,15 @@ import type { Auth } from "./auth";
 import { renderMatchResult } from "./match-view";
 import { runTestMatch } from "./match";
 import {
+  buildMatchHistoryInsert,
+  computeAccountStats,
+  EMPTY_STATS,
+  formatWinRate,
+  recentMatches,
+  type AccountStats,
+  type MatchRecord,
+} from "./match-history";
+import {
   deckCardCount,
   getRecipe,
   type StarterFaction,
@@ -25,6 +34,10 @@ export interface AccountInfo {
   readonly faction: StarterFaction | null;
   /** True for a real Supabase account, false for the localStorage demo. */
   readonly isRemote: boolean;
+  /** Aggregate match stats; defaults to all-zero when omitted. */
+  readonly stats?: AccountStats;
+  /** The most recent matches (newest first); empty when omitted. */
+  readonly recent?: readonly MatchRecord[];
 }
 
 function escapeHtml(text: string): string {
@@ -40,6 +53,55 @@ function field(label: string, value: string, valueClass = ""): HTMLElement {
     `<dt class="account__label">${escapeHtml(label)}</dt>` +
     `<dd class="account__value ${valueClass}">${escapeHtml(value)}</dd>`;
   return row;
+}
+
+/** Builds the stats panel: totals, win rate, and the recent-matches list. */
+function renderStats(
+  stats: AccountStats,
+  recent: readonly MatchRecord[],
+): HTMLElement {
+  const panel = document.createElement("section");
+  panel.className = "account__panel account__stats";
+
+  const heading = document.createElement("h3");
+  heading.className = "account__panel-heading";
+  heading.textContent = "Account stats";
+  panel.append(heading);
+
+  const list = document.createElement("dl");
+  list.className = "account__fields account__stats-grid";
+  list.append(field("Total matches", String(stats.total)));
+  list.append(field("Wins", String(stats.wins)));
+  list.append(field("Losses", String(stats.losses)));
+  list.append(field("Win rate", formatWinRate(stats.winRate)));
+  panel.append(list);
+
+  const recentHeading = document.createElement("h4");
+  recentHeading.className = "account__subheading";
+  recentHeading.textContent = "Recent matches";
+  panel.append(recentHeading);
+
+  if (recent.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "account__panel-body";
+    empty.textContent = "No matches yet — play a test match to get started.";
+    panel.append(empty);
+  } else {
+    const ul = document.createElement("ul");
+    ul.className = "account__recent";
+    for (const m of recent) {
+      const li = document.createElement("li");
+      li.className = `account__recent-row account__recent-row--${m.result}`;
+      const verdict =
+        m.result === "win" ? "Win" : m.result === "loss" ? "Loss" : "Draw";
+      li.textContent =
+        `${m.player_faction} vs ${m.opponent_faction} — ${verdict} · ${m.turns} turns`;
+      ul.append(li);
+    }
+    panel.append(ul);
+  }
+
+  return panel;
 }
 
 /**
@@ -94,6 +156,8 @@ export function renderAccount(
     );
   }
   section.append(list);
+
+  section.append(renderStats(info.stats ?? EMPTY_STATS, info.recent ?? []));
 
   if (info.faction !== null && onPlayMatch !== undefined) {
     const faction = info.faction;
@@ -177,11 +241,11 @@ export async function mountAccount(
   }
 
   const profile = await auth.getProfile(session);
-  const info: AccountInfo = {
+  const base = {
     email: profile?.email ?? session.email,
     faction: profile?.selected_faction ?? null,
     isRemote: auth.isRemote,
-  };
+  } satisfies Omit<AccountInfo, "stats" | "recent">;
 
   const handleSignOut = async (): Promise<void> => {
     try {
@@ -191,23 +255,44 @@ export async function mountAccount(
     }
   };
 
-  // The match runs entirely client-side: show its result in place of the
-  // account card, with Play again (re-run) and Back to account (re-render).
+  // Match history powers the stats panel. If it can't load (Supabase down or
+  // not configured), fall back to empty stats rather than crashing the page.
+  const loadHistory = async (): Promise<MatchRecord[]> => {
+    try {
+      return await auth.getMatchHistory(session, 50);
+    } catch {
+      return [];
+    }
+  };
+
+  // The match runs entirely client-side; we then persist it (best-effort) and
+  // show the result in place of the account card.
   const showResult = (faction: StarterFaction): void => {
     const summary = runTestMatch({ faction, pool });
+    void auth
+      .saveMatch(session, buildMatchHistoryInsert(session.userId, summary))
+      .catch(() => {
+        /* persistence is best-effort; never block the result screen */
+      });
     container.replaceChildren(
       renderMatchResult(summary, {
         onPlayAgain: () => showResult(faction),
-        onBack: showAccount,
+        onBack: () => void showAccount(),
       }),
     );
   };
 
-  function showAccount(): void {
+  const showAccount = async (): Promise<void> => {
+    const records = await loadHistory();
+    const info: AccountInfo = {
+      ...base,
+      stats: computeAccountStats(records),
+      recent: recentMatches(records, 5),
+    };
     container.replaceChildren(
       renderAccount(info, pool, handleSignOut, showResult),
     );
-  }
+  };
 
-  showAccount();
+  await showAccount();
 }
