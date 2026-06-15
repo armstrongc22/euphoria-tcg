@@ -7,13 +7,15 @@
  * that clicking it shows a result with the reward placeholder, and that Play
  * again / Back to account work.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cards } from "../src/cards";
 import { mountAccount } from "../src/account-view";
 import { createLocalAuth } from "../src/auth";
+import { appendLocalMatch } from "../src/match-history";
 import { renderMatchResult } from "../src/match-view";
 import { runTestMatch } from "../src/match";
 import type { KeyValueStore } from "../src/signup";
+import type { StarterFaction } from "../src/starter";
 
 function memoryStore(): KeyValueStore {
   const map = new Map<string, string>();
@@ -23,6 +25,48 @@ function memoryStore(): KeyValueStore {
     removeItem: (k) => void map.delete(k),
   };
 }
+
+/** Flushes the async showResult/showAccount microtask chain. */
+async function flush(): Promise<void> {
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+}
+
+/** Records `n` prior wins for the demo user, so the next win lands as #(n+1). */
+function seedWins(store: KeyValueStore, faction: StarterFaction, n: number): void {
+  for (let i = 0; i < n; i++) {
+    appendLocalMatch(store, {
+      user_id: "local-demo",
+      player_faction: faction,
+      opponent_faction: "Sonic",
+      winner: faction,
+      result: "win",
+      turns: 7,
+      lives_left_player: 1,
+      lives_left_opponent: 0,
+      warriors_summoned_player: 3,
+      warriors_summoned_opponent: 2,
+      direct_attacks_player: 3,
+      direct_attacks_opponent: 0,
+    });
+  }
+}
+
+/** Finds the first seed for which `faction` wins, so a played match is a win. */
+function winningSeed(faction: StarterFaction): number {
+  for (let seed = 1; seed < 500; seed++) {
+    if (runTestMatch({ faction, pool: cards, seed }).playerWon) return seed;
+  }
+  throw new Error(`No winning seed found for ${faction}`);
+}
+
+/** Forces runTestMatch's `Math.random()` seed to land on `seed`. */
+function forceSeed(seed: number): void {
+  vi.spyOn(Math, "random").mockReturnValue((seed + 0.5) / 0x7fffffff);
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("renderMatchResult", () => {
   const summary = runTestMatch({ faction: "Sonic", pool: cards, seed: 1 });
@@ -50,8 +94,10 @@ describe("renderMatchResult", () => {
 });
 
 describe("account page test-match flow (local fallback)", () => {
-  async function mountedDemoAccount(): Promise<HTMLElement> {
-    const auth = createLocalAuth(memoryStore());
+  async function mountedDemoAccount(
+    store: KeyValueStore = memoryStore(),
+  ): Promise<HTMLElement> {
+    const auth = createLocalAuth(store);
     await auth.signUp("player@example.com", "pw");
     await auth.saveFaction(
       { userId: "local-demo", email: "player@example.com" },
@@ -67,45 +113,71 @@ describe("account page test-match flow (local fallback)", () => {
     expect(container.querySelector(".account__play")).not.toBeNull();
   });
 
-  it("runs a match and shows the result plus reward options, then returns", async () => {
+  it("shows the result but NO reward chooser on a non-milestone match", async () => {
     const container = await mountedDemoAccount();
 
     container.querySelector<HTMLButtonElement>(".account__play")!.click();
+    await flush();
     expect(container.querySelector(".match-result")).not.toBeNull();
-    // The reward chooser is appended after the result with three options.
-    const options = container.querySelectorAll(".reward-choice__option");
-    expect(options).toHaveLength(3);
+    // The very first match can never be a 5th win, so no reward is offered.
+    expect(container.querySelector(".reward-choice")).toBeNull();
 
     container.querySelector<HTMLButtonElement>(".match-result__back")!.click();
-    // Back to account reloads match history, so let that async render settle.
-    for (let i = 0; i < 5; i++) await Promise.resolve();
+    await flush();
     expect(container.querySelector(".match-result")).toBeNull();
     expect(container.querySelector(".account__play")).not.toBeNull();
   });
 
-  it("claims a reward card and shows it in the account inventory", async () => {
-    const container = await mountedDemoAccount();
+  it("offers a reward chooser when a win lands on a milestone (5th win)", async () => {
+    const store = memoryStore();
+    seedWins(store, "Dwarf", 4); // four prior wins → next win is the 5th
+    forceSeed(winningSeed("Dwarf")); // make the played match a win
+    const container = await mountedDemoAccount(store);
 
     container.querySelector<HTMLButtonElement>(".account__play")!.click();
+    await flush();
+
+    expect(container.querySelector(".match-result")).not.toBeNull();
+    const options = container.querySelectorAll(".reward-choice__option");
+    expect(options).toHaveLength(3);
+  });
+
+  it("claims a milestone reward card and shows it in the account inventory", async () => {
+    const store = memoryStore();
+    seedWins(store, "Dwarf", 4);
+    forceSeed(winningSeed("Dwarf"));
+    const container = await mountedDemoAccount(store);
+
+    container.querySelector<HTMLButtonElement>(".account__play")!.click();
+    await flush();
+
     const firstOption =
       container.querySelector<HTMLButtonElement>(".reward-choice__option")!;
     const chosenName =
       firstOption.querySelector(".reward-choice__name")?.textContent ?? "";
     firstOption.click();
-
-    // saveReward + showAccount are async; let the microtask chain settle.
-    for (let i = 0; i < 8; i++) await Promise.resolve();
+    await flush();
 
     expect(container.querySelector(".match-result")).toBeNull();
     const rewards = container.querySelector(".account__rewards");
     expect(rewards?.textContent).toContain(chosenName);
     expect(rewards?.querySelectorAll(".account__owned-row")).toHaveLength(1);
+
+    // The reward_events row persisted the milestone (5) and tier (1).
+    const raw = store.getItem("euphoria.rewardEvents.v1");
+    expect(raw).not.toBeNull();
+    const events = JSON.parse(raw!);
+    expect(events).toHaveLength(1);
+    expect(events[0].milestone).toBe(5);
+    expect(events[0].tier).toBe(1);
   });
 
   it("Play again keeps showing a result", async () => {
     const container = await mountedDemoAccount();
     container.querySelector<HTMLButtonElement>(".account__play")!.click();
+    await flush();
     container.querySelector<HTMLButtonElement>(".match-result__again")!.click();
+    await flush();
     expect(container.querySelector(".match-result")).not.toBeNull();
   });
 });

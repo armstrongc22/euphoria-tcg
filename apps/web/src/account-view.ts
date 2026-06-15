@@ -36,9 +36,12 @@ import {
   EMPTY_INVENTORY_STATS,
   generateRewardOptions,
   groupOwnedBySlug,
+  nextRewardMilestone,
+  rewardForMatch,
   type InventoryStats,
   type OwnedCardRecord,
   type OwnedGroup,
+  type RewardMilestone,
 } from "./rewards";
 
 /** Everything the account card needs, already resolved from the backend. */
@@ -91,6 +94,10 @@ function renderStats(
   list.append(field("Wins", String(stats.wins)));
   list.append(field("Losses", String(stats.losses)));
   list.append(field("Win rate", formatWinRate(stats.winRate)));
+  const next = nextRewardMilestone(stats.wins);
+  list.append(
+    field("Next reward", `Win ${next} (${next - stats.wins} to go)`),
+  );
   panel.append(list);
 
   const recentHeading = document.createElement("h4");
@@ -331,18 +338,23 @@ export async function mountAccount(
     }
   };
 
-  // After a match the player picks one of three reward cards. The options are
-  // derived from the faction's eligible pool, seeded by the match seed so the
-  // offer is reproducible. Saving writes owned_cards + reward_events (best
-  // effort); either way we return to the account, which reloads the inventory.
-  const showReward = (faction: StarterFaction, seed: number): void => {
+  // After a qualifying match the player picks one of three reward cards. The
+  // options are derived from the faction's eligible pool, seeded by the match
+  // seed so the offer is reproducible. Saving writes owned_cards + reward_events
+  // (best effort, now stamped with the milestone/tier); either way we return to
+  // the account, which reloads the inventory.
+  const showReward = (
+    faction: StarterFaction,
+    seed: number,
+    milestone: RewardMilestone,
+  ): void => {
     const options = generateRewardOptions(faction, pool, createRng(seed));
     const panel = renderRewardChoice(options, assetBase, (card) => {
       void auth
         .saveReward(
           session,
           buildOwnedCardInsert(session.userId, card),
-          buildRewardEventInsert(session.userId, faction, options, card),
+          buildRewardEventInsert(session.userId, faction, options, card, milestone),
         )
         .catch(() => {
           /* persistence is best-effort; never block returning to account */
@@ -353,21 +365,32 @@ export async function mountAccount(
   };
 
   // The match runs entirely client-side; we then persist it (best-effort) and
-  // show the result, followed by the reward chooser, in place of the account.
-  const showResult = (faction: StarterFaction): void => {
+  // show the result. A reward chooser is appended ONLY when this win lands on a
+  // milestone (every 5th win): we await the save so the reloaded history
+  // includes this match, then derive the milestone from the win COUNT — never
+  // from reward_events — so losses show nothing and legacy null-milestone rows
+  // can't re-unlock a reward.
+  const showResult = async (faction: StarterFaction): Promise<void> => {
     const summary = runTestMatch({ faction, pool });
-    void auth
-      .saveMatch(session, buildMatchHistoryInsert(session.userId, summary))
-      .catch(() => {
-        /* persistence is best-effort; never block the result screen */
-      });
+    try {
+      await auth.saveMatch(
+        session,
+        buildMatchHistoryInsert(session.userId, summary),
+      );
+    } catch {
+      /* persistence is best-effort; never block the result screen */
+    }
     container.replaceChildren(
       renderMatchResult(summary, {
-        onPlayAgain: () => showResult(faction),
+        onPlayAgain: () => void showResult(faction),
         onBack: () => void showAccount(),
       }),
     );
-    showReward(faction, summary.seed);
+    const wins = computeAccountStats(await loadHistory()).wins;
+    const milestone = rewardForMatch(summary.playerWon, wins);
+    if (milestone !== null) {
+      showReward(faction, summary.seed, milestone);
+    }
   };
 
   const showAccount = async (): Promise<void> => {

@@ -24,6 +24,50 @@ import { FACTION_SPECIFIC_ITEMS, type StarterFaction } from "./starter";
 /** How many reward options a player chooses between after a match. */
 export const REWARD_OPTION_COUNT = 3;
 
+/**
+ * Wins between reward milestones. A reward is offered only on the 5th, 10th,
+ * 15th, … win — never on losses or draws, and never between milestones.
+ */
+export const WIN_MILESTONE_INTERVAL = 5;
+
+/** A reached reward milestone: the win count that triggered it and its tier. */
+export interface RewardMilestone {
+  /** The win count that earned the reward (a positive multiple of the interval). */
+  readonly milestone: number;
+  /** 1-based tier, i.e. milestone / interval (5→1, 10→2, 15→3, …). */
+  readonly tier: number;
+}
+
+/**
+ * Decides whether a just-finished match earns a reward.
+ *
+ * `won` is whether THIS match was a win; `totalWins` is the player's career win
+ * count INCLUDING this match. A reward is earned only when the match was a win
+ * AND that win lands exactly on a multiple of {@link WIN_MILESTONE_INTERVAL}.
+ * Losses and draws (won === false) never earn a reward. Returns null otherwise.
+ *
+ * Note this is derived purely from the win COUNT, not from any reward_events
+ * rows — so legacy events with a null milestone can never re-unlock a reward.
+ */
+export function rewardForMatch(
+  won: boolean,
+  totalWins: number,
+): RewardMilestone | null {
+  if (!won) return null;
+  if (totalWins <= 0 || totalWins % WIN_MILESTONE_INTERVAL !== 0) return null;
+  return { milestone: totalWins, tier: totalWins / WIN_MILESTONE_INTERVAL };
+}
+
+/**
+ * The next win count at which a reward will be offered, given the player's
+ * current win total. Always strictly greater than `wins` (landing on a
+ * milestone returns the following one): 0→5, 3→5, 5→10, 7→10.
+ */
+export function nextRewardMilestone(wins: number): number {
+  const safe = wins > 0 ? wins : 0;
+  return (Math.floor(safe / WIN_MILESTONE_INTERVAL) + 1) * WIN_MILESTONE_INTERVAL;
+}
+
 /** localStorage keys. Versioned so the shape can change later without clashes. */
 export const OWNED_STORAGE_KEY = "euphoria.owned.v1";
 export const REWARD_EVENTS_STORAGE_KEY = "euphoria.rewardEvents.v1";
@@ -113,6 +157,10 @@ export interface RewardEventInsert {
   readonly chosen_slug: string;
   /** All slugs that were offered (includes chosen_slug). */
   readonly option_slugs: readonly string[];
+  /** The win count that earned this reward (a positive multiple of the interval). */
+  readonly milestone: number;
+  /** The reward tier (milestone / interval). */
+  readonly tier: number;
 }
 
 /**
@@ -134,18 +182,25 @@ export function buildOwnedCardInsert(
   };
 }
 
-/** Builds the reward_events insert recording which option was chosen. */
+/**
+ * Builds the reward_events insert recording which option was chosen and the
+ * milestone (and tier) that earned the reward, so new rows always persist
+ * milestone/tier rather than leaving them null.
+ */
 export function buildRewardEventInsert(
   userId: string,
   faction: StarterFaction,
   options: readonly Card[],
   chosen: Card,
+  milestone: RewardMilestone,
 ): RewardEventInsert {
   return {
     user_id: userId,
     player_faction: faction,
     chosen_slug: chosen.slug,
     option_slugs: options.map((c) => c.slug),
+    milestone: milestone.milestone,
+    tier: milestone.tier,
   };
 }
 

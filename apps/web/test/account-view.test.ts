@@ -157,6 +157,9 @@ describe("mountAccount match stats", () => {
     expect(stats).not.toBeNull();
     expect(stats?.textContent).toContain("Total matches");
     expect(stats?.textContent).toContain("Win rate");
+    // The next reward milestone is shown; with zero wins the first is win 5.
+    expect(stats?.textContent).toContain("Next reward");
+    expect(stats?.textContent).toContain("Win 5");
     expect(stats?.textContent?.toLowerCase()).toContain("no matches yet");
   });
 

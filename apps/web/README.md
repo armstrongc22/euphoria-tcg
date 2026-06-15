@@ -137,7 +137,13 @@ the static site still works with no backend.
   | `player_faction` | `text`        | the faction the offer was built for  |
   | `chosen_slug`    | `text`        | the slug the player chose            |
   | `option_slugs`   | `text[]`      | all slugs offered (includes chosen)  |
+  | `milestone`      | `integer`     | win count that earned it (5,10,15,…) |
+  | `tier`           | `integer`     | reward tier (`milestone / 5`)        |
   | `created_at`     | `timestamptz` | DB default on insert                 |
+
+  Rewards are offered only on win milestones (every 5th win); `milestone`/`tier`
+  are derived from the win COUNT, never from existing rows, so legacy rows whose
+  `milestone` is null can't re-unlock a reward.
 
   **RLS** on both: each user may `select` / `insert` only their own rows
   (`auth.uid() = user_id`). Run once in the SQL editor:
@@ -175,8 +181,16 @@ the static site still works with no backend.
     player_faction text not null,
     chosen_slug text not null,
     option_slugs text[] not null,
+    milestone integer,
+    tier integer,
     created_at timestamptz not null default now()
   );
+
+  -- If the table predates the milestone work, add the columns in place. Leaving
+  -- existing rows' milestone/tier null is fine: eligibility is derived from the
+  -- win count, not from these rows.
+  alter table public.reward_events add column if not exists milestone integer;
+  alter table public.reward_events add column if not exists tier integer;
 
   alter table public.reward_events enable row level security;
 
