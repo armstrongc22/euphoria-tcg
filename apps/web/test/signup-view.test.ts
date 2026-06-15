@@ -1,13 +1,15 @@
 /**
  * @vitest-environment jsdom
  *
- * Signup screen behavior: renders the form + local-preview note, blocks invalid
- * emails without advancing or persisting, and on a valid email persists state
- * and calls onContinue.
+ * Signup screen behavior against the localStorage demo backend: renders the
+ * email + password form, blocks an invalid email or too-short password without
+ * authenticating, and on valid input authenticates and calls onContinue. A
+ * returning signed-in visitor gets the "Continue" shortcut.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { loadSignup, type KeyValueStore } from "../src/signup";
 import { mountSignup } from "../src/signup-view";
+import { createLocalAuth } from "../src/auth";
+import type { KeyValueStore } from "../src/signup";
 
 function memoryStore(): KeyValueStore {
   const map = new Map<string, string>();
@@ -18,66 +20,90 @@ function memoryStore(): KeyValueStore {
   };
 }
 
-function submit(container: HTMLElement, email: string): void {
-  const input = container.querySelector<HTMLInputElement>("#signup-email")!;
-  input.value = email;
-  const form = container.querySelector<HTMLFormElement>(".signup__form")!;
-  form.requestSubmit();
+function fill(container: HTMLElement, email: string, password: string): void {
+  container.querySelector<HTMLInputElement>("#signup-email")!.value = email;
+  container.querySelector<HTMLInputElement>("#signup-password")!.value = password;
+}
+
+function submit(container: HTMLElement): void {
+  container.querySelector<HTMLFormElement>(".signup__form")!.requestSubmit();
+}
+
+/** Lets queued microtasks (the async signUpOrSignIn chain) settle. */
+async function flush(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
 }
 
 describe("mountSignup", () => {
   let container: HTMLElement;
-  let store: KeyValueStore;
   beforeEach(() => {
     container = document.createElement("div");
-    store = memoryStore();
   });
 
-  it("renders an email field and the local-preview note", () => {
-    mountSignup(container, { store, onContinue: () => {} });
+  it("renders email + password fields and the helper note", async () => {
+    await mountSignup(container, {
+      auth: createLocalAuth(memoryStore()),
+      onContinue: () => {},
+    });
     expect(container.querySelector("#signup-email")).not.toBeNull();
-    const note = container.querySelector(".signup__note")?.textContent ?? "";
-    expect(note.toLowerCase()).toContain("local preview");
+    expect(container.querySelector("#signup-password")).not.toBeNull();
+    expect(container.querySelector(".signup__note")?.textContent).toBeTruthy();
   });
 
-  it("blocks an invalid email: no onContinue, nothing stored, shows an error", () => {
+  it("blocks an invalid email: no onContinue, shows an error", async () => {
     const onContinue = vi.fn();
-    mountSignup(container, { store, onContinue });
+    await mountSignup(container, { auth: createLocalAuth(memoryStore()), onContinue });
 
-    submit(container, "not-an-email");
+    fill(container, "not-an-email", "supersecret");
+    submit(container);
+    await flush();
 
     expect(onContinue).not.toHaveBeenCalled();
-    expect(loadSignup(store)).toBeNull();
     const error = container.querySelector<HTMLElement>(".signup__error")!;
     expect(error.hidden).toBe(false);
     expect(error.textContent).toBeTruthy();
   });
 
-  it("accepts a valid email: persists it and advances", () => {
+  it("blocks a too-short password", async () => {
     const onContinue = vi.fn();
-    mountSignup(container, { store, onContinue });
+    await mountSignup(container, { auth: createLocalAuth(memoryStore()), onContinue });
 
-    submit(container, "player@example.com");
+    fill(container, "player@example.com", "123");
+    submit(container);
+    await flush();
+
+    expect(onContinue).not.toHaveBeenCalled();
+    expect(container.querySelector<HTMLElement>(".signup__error")!.hidden).toBe(false);
+  });
+
+  it("accepts valid input: authenticates and advances with a session", async () => {
+    const store = memoryStore();
+    const onContinue = vi.fn();
+    await mountSignup(container, { auth: createLocalAuth(store), onContinue });
+
+    fill(container, "player@example.com", "supersecret");
+    submit(container);
+    await flush();
 
     expect(onContinue).toHaveBeenCalledTimes(1);
-    expect(loadSignup(store)?.email).toBe("player@example.com");
+    expect(onContinue.mock.calls[0]?.[0]?.email).toBe("player@example.com");
   });
 
-  it("greets a returning signed-up visitor", () => {
-    mountSignup(container, { store, onContinue: () => {} });
-    submit(container, "player@example.com");
+  it("greets a returning signed-in visitor with a Continue button", async () => {
+    const store = memoryStore();
+    const auth = createLocalAuth(store);
+    await auth.signUp("player@example.com", "supersecret");
 
-    const again = document.createElement("div");
-    mountSignup(again, { store, onContinue: () => {} });
-    expect(again.querySelector(".signup__welcome")?.textContent).toContain(
-      "player@example.com",
-    );
-  });
+    await mountSignup(container, { auth, onContinue: () => {} });
+    const welcome = container.querySelector(".signup__welcome");
+    expect(welcome?.textContent).toContain("player@example.com");
 
-  it("works without a store (degrades to a stateless flow)", () => {
     const onContinue = vi.fn();
-    mountSignup(container, { store: null, onContinue });
-    submit(container, "player@example.com");
+    container.replaceChildren();
+    await mountSignup(container, { auth, onContinue });
+    container.querySelector<HTMLButtonElement>('[data-action="continue"]')!.click();
     expect(onContinue).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,12 +1,12 @@
 /**
  * Beta signup state — pure logic, no DOM, no network.
  *
- * TODO (real email capture): this is a LOCAL/DEMO implementation only. It stores
- * the email in localStorage so the beta flow works on a static GitHub Pages site
- * with no backend. Before launch, the signup submit must POST to a real provider
- * (e.g. an email/ESP API or a serverless function) instead of — or in addition
- * to — writing localStorage. Do NOT hardcode a provider here; wire it in the view
- * layer when the backend exists. Nothing below talks to a server on purpose.
+ * This is the LOCAL/DEMO persistence layer: it stores the email + chosen faction
+ * in localStorage so the beta flow works on a static site with no backend. It now
+ * backs the localStorage fallback in auth.ts (`createLocalAuth`), which is used
+ * only when Supabase env vars are missing; when they are present, auth.ts talks
+ * to Supabase Auth + the profiles table instead. Nothing in this module talks to
+ * a server on purpose.
  *
  * Storage is injected via the `KeyValueStore` interface so this module is fully
  * unit-testable without a browser (tests pass an in-memory fake; the app passes

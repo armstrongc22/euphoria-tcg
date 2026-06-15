@@ -1,25 +1,32 @@
 /**
- * App entry point. Renders a top header + tab navigation, then mounts three
+ * App entry point. Renders a top header + tab navigation, then mounts four
  * views: the beta Signup / Start screen (the default landing), the Starter Decks
- * page, and the existing Card Viewer. Only one view is shown at a time; the Card
- * Viewer code path is unchanged — it's just wrapped in a mount function so the
- * tabs can host it.
+ * page, the Account page, and the existing Card Viewer. Only one view is shown at
+ * a time; the Card Viewer code path is unchanged — it's just wrapped in a mount
+ * function so the tabs can host it.
+ *
+ * Account state runs through the `Auth` backend (auth.ts): real Supabase accounts
+ * when VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are set, otherwise the
+ * localStorage demo fallback. Card data, the rules engine, and the simulator are
+ * untouched.
  */
 import "./styles.css";
+import { mountAccount } from "./account-view";
+import { createAuth, type AuthSession } from "./auth";
 import { cards } from "./cards";
 import { renderControls } from "./controls";
 import { createCardDetail } from "./detail";
 import { DEFAULT_FILTERS, filterCards, type CardFilters } from "./filters";
 import { renderGrid } from "./grid";
-import { getLocalStore, loadSignup, recordFaction } from "./signup";
 import { mountSignup } from "./signup-view";
 import { sortCards } from "./sort";
 import { mountStarterDecks } from "./starter-view";
+import type { StarterFaction } from "./starter";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (app === null) throw new Error("#app mount point missing from index.html");
 
-type ViewId = "signup" | "starter" | "viewer";
+type ViewId = "signup" | "starter" | "account" | "viewer";
 
 app.innerHTML = `
   <header class="site-header">
@@ -29,16 +36,19 @@ app.innerHTML = `
   <nav class="site-nav" aria-label="Sections">
     <button type="button" class="site-nav__tab" data-view="signup">Signup / Start</button>
     <button type="button" class="site-nav__tab" data-view="starter">Starter Decks</button>
+    <button type="button" class="site-nav__tab" data-view="account">Account</button>
     <button type="button" class="site-nav__tab" data-view="viewer">Card Viewer</button>
   </nav>
   <div id="view-signup" class="view"></div>
   <div id="view-starter" class="view" hidden></div>
+  <div id="view-account" class="view" hidden></div>
   <div id="view-viewer" class="view" hidden></div>
   <footer class="site-footer">Euphoria TCG · beta</footer>
 `;
 
 const signupEl = document.querySelector<HTMLElement>("#view-signup")!;
 const starterEl = document.querySelector<HTMLElement>("#view-starter")!;
+const accountEl = document.querySelector<HTMLElement>("#view-account")!;
 const viewerEl = document.querySelector<HTMLElement>("#view-viewer")!;
 const tabs = Array.from(
   document.querySelectorAll<HTMLButtonElement>(".site-nav__tab"),
@@ -47,37 +57,73 @@ const tabs = Array.from(
 function showView(view: ViewId): void {
   signupEl.hidden = view !== "signup";
   starterEl.hidden = view !== "starter";
+  accountEl.hidden = view !== "account";
   viewerEl.hidden = view !== "viewer";
   for (const tab of tabs) {
     const active = tab.dataset.view === view;
     tab.classList.toggle("site-nav__tab--active", active);
     tab.setAttribute("aria-current", active ? "page" : "false");
   }
+  // The account view reflects live session/profile state, so re-render on show.
+  if (view === "account") void refreshAccount();
 }
 
 for (const tab of tabs) {
   tab.addEventListener("click", () => showView(tab.dataset.view as ViewId));
 }
 
-// Local/demo persistence only — no backend. See signup.ts for the real-capture TODO.
-const store = getLocalStore();
+// Pick the backend once: Supabase if configured, else the localStorage demo.
+const auth = createAuth();
 
-mountSignup(signupEl, {
-  store,
-  onContinue: () => showView("starter"),
-});
+// The session the rest of the flow operates on; set on signup, cleared on sign out.
+let session: AuthSession | null = null;
 
-mountStarterDecks(starterEl, cards, {
-  initialFaction: store ? (loadSignup(store)?.faction ?? null) : null,
-  onChoose: (faction) => {
-    if (store) recordFaction(store, faction);
-  },
-});
+async function refreshAccount(): Promise<void> {
+  await mountAccount(accountEl, {
+    auth,
+    pool: cards,
+    onSignOut: () => {
+      session = null;
+      void renderSignup();
+      mountStarter(null);
+      showView("signup");
+    },
+  });
+}
+
+async function renderSignup(): Promise<void> {
+  await mountSignup(signupEl, {
+    auth,
+    onContinue: (next) => {
+      session = next;
+      showView("starter");
+    },
+  });
+}
+
+function mountStarter(initialFaction: StarterFaction | null): void {
+  mountStarterDecks(starterEl, cards, {
+    initialFaction,
+    onChoose: (faction) => {
+      // Persist the choice on the profile, then send the player to their account.
+      void Promise.resolve(session ?? auth.getSession())
+        .then((s) => (s !== null ? auth.saveFaction(s, faction) : undefined))
+        .finally(() => showView("account"));
+    },
+  });
+}
 
 mountCardViewer(viewerEl);
 
-// Signup / Start is the default landing view.
-showView("signup");
+// Boot: restore any existing session, then render signup + starter accordingly.
+void (async () => {
+  session = await auth.getSession().catch(() => null);
+  const profile = session ? await auth.getProfile(session).catch(() => null) : null;
+  await renderSignup();
+  mountStarter(profile?.selected_faction ?? null);
+  // Signup / Start is the default landing view.
+  showView("signup");
+})();
 
 /** Mounts the card viewer (filters + grid + detail modal) into a container. */
 function mountCardViewer(root: HTMLElement): void {

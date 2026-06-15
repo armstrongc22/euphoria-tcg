@@ -49,6 +49,13 @@ jobs:
         run: npm run web:build
         env:
           VITE_BASE: /euphoria-tcg/
+          # Supabase Auth (Phase 1). Set these as repository secrets under
+          # Settings → Secrets and variables → Actions. Use only the anon
+          # (publishable) key here — never the service_role key. If either is
+          # absent the build still succeeds and the site runs in localStorage
+          # demo mode (see apps/web/src/auth.ts).
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
