@@ -21,12 +21,13 @@ import { renderGrid } from "./grid";
 import { mountSignup } from "./signup-view";
 import { sortCards } from "./sort";
 import { mountStarterDecks } from "./starter-view";
+import { mountDeckBuilder } from "./deck-builder-view";
 import type { StarterFaction } from "./starter";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (app === null) throw new Error("#app mount point missing from index.html");
 
-type ViewId = "signup" | "starter" | "account" | "viewer";
+type ViewId = "signup" | "starter" | "deckbuilder" | "account" | "viewer";
 
 app.innerHTML = `
   <header class="site-header">
@@ -36,11 +37,13 @@ app.innerHTML = `
   <nav class="site-nav" aria-label="Sections">
     <button type="button" class="site-nav__tab" data-view="signup">Signup / Start</button>
     <button type="button" class="site-nav__tab" data-view="starter">Starter Decks</button>
+    <button type="button" class="site-nav__tab" data-view="deckbuilder">Deck Builder</button>
     <button type="button" class="site-nav__tab" data-view="account">Account</button>
     <button type="button" class="site-nav__tab" data-view="viewer">Card Viewer</button>
   </nav>
   <div id="view-signup" class="view"></div>
   <div id="view-starter" class="view" hidden></div>
+  <div id="view-deckbuilder" class="view" hidden></div>
   <div id="view-account" class="view" hidden></div>
   <div id="view-viewer" class="view" hidden></div>
   <footer class="site-footer">Euphoria TCG · beta</footer>
@@ -48,6 +51,7 @@ app.innerHTML = `
 
 const signupEl = document.querySelector<HTMLElement>("#view-signup")!;
 const starterEl = document.querySelector<HTMLElement>("#view-starter")!;
+const deckBuilderEl = document.querySelector<HTMLElement>("#view-deckbuilder")!;
 const accountEl = document.querySelector<HTMLElement>("#view-account")!;
 const viewerEl = document.querySelector<HTMLElement>("#view-viewer")!;
 const tabs = Array.from(
@@ -57,6 +61,7 @@ const tabs = Array.from(
 function showView(view: ViewId): void {
   signupEl.hidden = view !== "signup";
   starterEl.hidden = view !== "starter";
+  deckBuilderEl.hidden = view !== "deckbuilder";
   accountEl.hidden = view !== "account";
   viewerEl.hidden = view !== "viewer";
   for (const tab of tabs) {
@@ -64,8 +69,10 @@ function showView(view: ViewId): void {
     tab.classList.toggle("site-nav__tab--active", active);
     tab.setAttribute("aria-current", active ? "page" : "false");
   }
-  // The account view reflects live session/profile state, so re-render on show.
+  // The account and deck-builder views reflect live session/profile state, so
+  // re-render on show.
   if (view === "account") void refreshAccount();
+  if (view === "deckbuilder") void refreshDeckBuilder();
 }
 
 for (const tab of tabs) {
@@ -89,6 +96,16 @@ async function refreshAccount(): Promise<void> {
       mountStarter(null);
       showView("signup");
     },
+  });
+}
+
+async function refreshDeckBuilder(): Promise<void> {
+  await mountDeckBuilder(deckBuilderEl, {
+    auth,
+    pool: cards,
+    base: import.meta.env.BASE_URL,
+    // A saved deck changes the account's "Active deck" line, so refresh it.
+    onSaved: () => void refreshAccount(),
   });
 }
 

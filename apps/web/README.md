@@ -209,6 +209,63 @@ the static site still works with no backend.
   If Supabase is unavailable or unconfigured, owned reward cards persist to
   localStorage instead, so the demo flow still earns and shows rewards.
 
+- **`public.active_decks`** table — a player's saved custom 30-card deck. One
+  row **per user per faction** (enforced by a unique index), upserted on save:
+
+  | Column        | Type          | Notes                                       |
+  | ------------- | ------------- | ------------------------------------------- |
+  | `id`          | `uuid` PK     | `default gen_random_uuid()`                 |
+  | `user_id`     | `uuid`        | references `auth.users(id)`                 |
+  | `faction`     | `text`        | Dwarf / Monk / Sonic / Surfer               |
+  | `cards`       | `jsonb`       | `[{ "slug": "...", "quantity": N }, ...]`   |
+  | `created_at`  | `timestamptz` | DB default on insert                        |
+  | `updated_at`  | `timestamptz` | written by the app on each upsert           |
+
+  The active deck is built from the player's starter cards plus owned reward
+  cards; quantities never exceed owned copies. A test match uses the saved deck
+  when valid, else falls back to the starter deck.
+
+  **RLS**: each user may `select` / `insert` / `update` / `delete` only their
+  own rows (`auth.uid() = user_id`). Run once in the SQL editor:
+
+  ```sql
+  -- active_decks: a player's saved custom 30-card deck, one per faction -----
+  create table if not exists public.active_decks (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references auth.users (id) on delete cascade,
+    faction text not null,
+    cards jsonb not null,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+  );
+
+  -- One active saved deck per user per faction.
+  create unique index if not exists active_decks_user_faction_uniq
+    on public.active_decks (user_id, faction);
+
+  alter table public.active_decks enable row level security;
+
+  create policy "active_decks_select_own"
+    on public.active_decks for select
+    using (auth.uid() = user_id);
+
+  create policy "active_decks_insert_own"
+    on public.active_decks for insert
+    with check (auth.uid() = user_id);
+
+  create policy "active_decks_update_own"
+    on public.active_decks for update
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+
+  create policy "active_decks_delete_own"
+    on public.active_decks for delete
+    using (auth.uid() = user_id);
+  ```
+
+  If Supabase is unavailable or unconfigured, the active deck persists to
+  localStorage (per faction) instead, so the deck builder still works offline.
+
 ### How the app uses it
 
 - `src/supabase-config.ts` — detects the env vars (pure, tested).

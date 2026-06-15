@@ -28,6 +28,13 @@ import {
   type RewardEventInsert,
 } from "./rewards";
 import {
+  coerceActiveDeckRow,
+  loadLocalActiveDeck,
+  saveLocalActiveDeck,
+  type ActiveDeckPayload,
+  type ActiveDeckRecord,
+} from "./deck-builder";
+import {
   clearSignup,
   getLocalStore,
   loadSignup,
@@ -107,6 +114,13 @@ export interface Auth {
   ): Promise<void>;
   /** The user's owned reward cards, newest first (default cap). */
   getOwnedCards(session: AuthSession, limit?: number): Promise<OwnedCardRecord[]>;
+  /** Save (upsert) the user's active deck for a faction. */
+  saveActiveDeck(session: AuthSession, payload: ActiveDeckPayload): Promise<void>;
+  /** The user's saved active deck for a faction, or null if none exists. */
+  getActiveDeck(
+    session: AuthSession,
+    faction: StarterFaction,
+  ): Promise<ActiveDeckRecord | null>;
 }
 
 /** Columns selected from match_history; mirrors {@link MatchRecord}. */
@@ -293,6 +307,26 @@ export function createSupabaseAuth(client: SupabaseClient): Auth {
       const rows = (data ?? []) as unknown as Record<string, unknown>[];
       return rows.map(rowToOwnedCard);
     },
+
+    async saveActiveDeck(_session, payload) {
+      // created_at is omitted: the table default sets it on insert and it must
+      // not be overwritten on update. One row per (user_id, faction).
+      const { error } = await client
+        .from("active_decks")
+        .upsert(payload, { onConflict: "user_id,faction" });
+      if (error) throw error;
+    },
+
+    async getActiveDeck(session, faction) {
+      const { data, error } = await client
+        .from("active_decks")
+        .select("faction, cards, updated_at")
+        .eq("user_id", session.userId)
+        .eq("faction", faction)
+        .maybeSingle();
+      if (error) throw error;
+      return coerceActiveDeckRow(data as Record<string, unknown> | null);
+    },
   };
 }
 
@@ -373,6 +407,17 @@ export function createLocalAuth(store: KeyValueStore | null): Auth {
         b.created_at.localeCompare(a.created_at),
       );
       return limit === undefined ? all : all.slice(0, limit);
+    },
+
+    async saveActiveDeck(_session, payload) {
+      if (store !== null) {
+        saveLocalActiveDeck(store, payload.faction, payload.cards);
+      }
+    },
+
+    async getActiveDeck(_session, faction) {
+      if (store === null) return null;
+      return loadLocalActiveDeck(store, faction);
     },
   };
 }
