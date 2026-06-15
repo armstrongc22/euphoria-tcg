@@ -11,6 +11,8 @@
  */
 import type { Card } from "@euphoria/card-data/schema";
 import type { Auth } from "./auth";
+import { renderMatchResult } from "./match-view";
+import { runTestMatch } from "./match";
 import {
   deckCardCount,
   getRecipe,
@@ -49,6 +51,12 @@ export function renderAccount(
   info: AccountInfo,
   _pool: readonly Card[],
   onSignOut: () => void,
+  /**
+   * Optional: when provided AND a faction is chosen, render a "Play test match"
+   * panel that calls back with the faction. Omitted in pure-render tests, so the
+   * panel only appears where the caller can actually run a match.
+   */
+  onPlayMatch?: (faction: StarterFaction) => void,
 ): HTMLElement {
   const section = document.createElement("section");
   section.className = "account";
@@ -86,6 +94,24 @@ export function renderAccount(
     );
   }
   section.append(list);
+
+  if (info.faction !== null && onPlayMatch !== undefined) {
+    const faction = info.faction;
+    const match = document.createElement("section");
+    match.className = "account__panel account__match";
+    match.innerHTML =
+      `<h3 class="account__panel-heading">Test match</h3>` +
+      `<p class="account__panel-body">Run a quick local simulation with your ` +
+      `${escapeHtml(faction)} starter deck against a random AI opponent. ` +
+      `Beta demo — nothing is saved yet.</p>`;
+    const play = document.createElement("button");
+    play.type = "button";
+    play.className = "account__play";
+    play.textContent = "Play test match";
+    play.addEventListener("click", () => onPlayMatch(faction));
+    match.append(play);
+    section.append(match);
+  }
 
   const progression = document.createElement("section");
   progression.className = "account__panel account__progression";
@@ -157,13 +183,31 @@ export async function mountAccount(
     isRemote: auth.isRemote,
   };
 
-  container.replaceChildren(
-    renderAccount(info, pool, async () => {
-      try {
-        await auth.signOut();
-      } finally {
-        onSignOut();
-      }
-    }),
-  );
+  const handleSignOut = async (): Promise<void> => {
+    try {
+      await auth.signOut();
+    } finally {
+      onSignOut();
+    }
+  };
+
+  // The match runs entirely client-side: show its result in place of the
+  // account card, with Play again (re-run) and Back to account (re-render).
+  const showResult = (faction: StarterFaction): void => {
+    const summary = runTestMatch({ faction, pool });
+    container.replaceChildren(
+      renderMatchResult(summary, {
+        onPlayAgain: () => showResult(faction),
+        onBack: showAccount,
+      }),
+    );
+  };
+
+  function showAccount(): void {
+    container.replaceChildren(
+      renderAccount(info, pool, handleSignOut, showResult),
+    );
+  }
+
+  showAccount();
 }
