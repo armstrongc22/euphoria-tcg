@@ -19,10 +19,14 @@ import {
   groupOwnedBySlug,
   isRewardEligible,
   loadLocalOwned,
+  nextRewardMilestone,
   OWNED_STORAGE_KEY,
   REWARD_EVENTS_STORAGE_KEY,
   REWARD_OPTION_COUNT,
+  rewardForMatch,
+  WIN_MILESTONE_INTERVAL,
   type OwnedCardRecord,
+  type RewardMilestone,
 } from "../src/rewards";
 import type { KeyValueStore } from "../src/signup";
 
@@ -162,17 +166,79 @@ describe("reward payloads", () => {
     expect(insert).not.toHaveProperty("created_at");
   });
 
-  it("builds the reward_events insert recording all offered options", () => {
+  it("builds the reward_events insert recording all offered options + milestone", () => {
     const options = generateRewardOptions("Dwarf", cards, createRng(3));
     const chosen = options[1]!;
-    const event = buildRewardEventInsert("user-1", "Dwarf", options, chosen);
+    const milestone: RewardMilestone = { milestone: 10, tier: 2 };
+    const event = buildRewardEventInsert("user-1", "Dwarf", options, chosen, milestone);
     expect(event).toEqual({
       user_id: "user-1",
       player_faction: "Dwarf",
       chosen_slug: chosen.slug,
       option_slugs: options.map((c) => c.slug),
+      milestone: 10,
+      tier: 2,
     });
     expect(event.option_slugs).toContain(event.chosen_slug);
+  });
+});
+
+describe("rewardForMatch (milestone gating)", () => {
+  it("offers a reward only on win milestones (every 5th win)", () => {
+    expect(rewardForMatch(true, 5)).toEqual({ milestone: 5, tier: 1 });
+    expect(rewardForMatch(true, 10)).toEqual({ milestone: 10, tier: 2 });
+    expect(rewardForMatch(true, 30)).toEqual({ milestone: 30, tier: 6 });
+  });
+
+  it("offers nothing between milestones, even on a win", () => {
+    for (const wins of [1, 2, 3, 4, 6, 7, 9, 11, 14]) {
+      expect(rewardForMatch(true, wins)).toBeNull();
+    }
+  });
+
+  it("never offers a reward on a loss or draw, even on a milestone win count", () => {
+    // won === false covers both losses and draws.
+    expect(rewardForMatch(false, 5)).toBeNull();
+    expect(rewardForMatch(false, 10)).toBeNull();
+    expect(rewardForMatch(false, 0)).toBeNull();
+  });
+
+  it("offers nothing at zero wins", () => {
+    expect(rewardForMatch(true, 0)).toBeNull();
+  });
+
+  it("derives milestone from win count, so a null-milestone legacy row can't unlock a repeat", () => {
+    // Eligibility depends only on (won, totalWins) — there is no path that reads
+    // reward_events. A player with 6 career wins (one past a milestone) gets
+    // nothing on their next win until they reach 10.
+    expect(rewardForMatch(true, 6)).toBeNull();
+    expect(rewardForMatch(true, 7)).toBeNull();
+    expect(rewardForMatch(true, 10)).toEqual({ milestone: 10, tier: 2 });
+  });
+
+  it("tier is always milestone / interval", () => {
+    for (let tier = 1; tier <= 8; tier++) {
+      const wins = tier * WIN_MILESTONE_INTERVAL;
+      expect(rewardForMatch(true, wins)).toEqual({ milestone: wins, tier });
+    }
+  });
+});
+
+describe("nextRewardMilestone (account page)", () => {
+  it("always returns the next strictly-greater milestone", () => {
+    expect(nextRewardMilestone(0)).toBe(5);
+    expect(nextRewardMilestone(3)).toBe(5);
+    expect(nextRewardMilestone(4)).toBe(5);
+    // Landing on a milestone advances to the following one.
+    expect(nextRewardMilestone(5)).toBe(10);
+    expect(nextRewardMilestone(7)).toBe(10);
+    expect(nextRewardMilestone(10)).toBe(15);
+  });
+
+  it("never returns a value at or below the current win count", () => {
+    for (let wins = 0; wins <= 40; wins++) {
+      expect(nextRewardMilestone(wins)).toBeGreaterThan(wins);
+    }
   });
 });
 
@@ -226,7 +292,10 @@ describe("local persistence (Supabase fallback)", () => {
     const options = generateRewardOptions("Sonic", cards, createRng(9));
     appendLocalRewardEvent(
       store,
-      buildRewardEventInsert("u", "Sonic", options, options[0]!),
+      buildRewardEventInsert("u", "Sonic", options, options[0]!, {
+        milestone: 5,
+        tier: 1,
+      }),
     );
     const raw = store.getItem(REWARD_EVENTS_STORAGE_KEY);
     expect(raw).not.toBeNull();
