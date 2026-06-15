@@ -119,6 +119,42 @@ describe("createLocalAuth (fallback)", () => {
     expect(await auth.getMatchHistory(SESSION, 1)).toHaveLength(1);
   });
 
+  it("saves rewards and reads back owned cards + claimed milestones", async () => {
+    const store = memoryStore();
+    const auth = createLocalAuth(store);
+
+    await auth.saveReward(
+      SESSION,
+      {
+        user_id: LOCAL_USER_ID,
+        card_slug: "titan",
+        card_name: "Titan",
+        faction: "Dwarf",
+        card_type: "Warrior",
+        source: "reward",
+      },
+      {
+        user_id: LOCAL_USER_ID,
+        player_faction: "Dwarf",
+        chosen_slug: "titan",
+        option_slugs: ["titan", "fafnir", "gulag"],
+        milestone: 5,
+        tier: "basic",
+      },
+    );
+
+    const owned = await auth.getOwnedCards(SESSION);
+    expect(owned).toHaveLength(1);
+    expect(owned[0]!.card_slug).toBe("titan");
+    expect(await auth.getRewardMilestones(SESSION)).toEqual([5]);
+  });
+
+  it("reward methods degrade safely with no store", async () => {
+    const auth = createLocalAuth(null);
+    expect(await auth.getOwnedCards(SESSION)).toEqual([]);
+    expect(await auth.getRewardMilestones(SESSION)).toEqual([]);
+  });
+
   it("match history degrades to [] with no store and never throws", async () => {
     const auth = createLocalAuth(null);
     await expect(
@@ -155,6 +191,7 @@ describe("signUpOrSignIn", () => {
       getMatchHistory: vi.fn(),
       saveReward: vi.fn(),
       getOwnedCards: vi.fn(),
+      getRewardMilestones: vi.fn(),
     };
     expect(await signUpOrSignIn(auth, SESSION.email, "pw")).toEqual(SESSION);
     expect(auth.signIn).not.toHaveBeenCalled();
@@ -175,6 +212,7 @@ describe("signUpOrSignIn", () => {
       getMatchHistory: vi.fn(),
       saveReward: vi.fn(),
       getOwnedCards: vi.fn(),
+      getRewardMilestones: vi.fn(),
     };
     expect(await signUpOrSignIn(auth, SESSION.email, "pw")).toEqual(SESSION);
     expect(auth.signIn).toHaveBeenCalledTimes(1);
@@ -195,6 +233,7 @@ describe("signUpOrSignIn", () => {
       getMatchHistory: vi.fn(),
       saveReward: vi.fn(),
       getOwnedCards: vi.fn(),
+      getRewardMilestones: vi.fn(),
     };
     await expect(signUpOrSignIn(auth, SESSION.email, "pw")).rejects.toThrow(
       /at least 6 characters/,

@@ -1027,6 +1027,18 @@ body {
   font-size: 0.92rem;
 }
 
+.account__reward-progress {
+  margin-bottom: 0.5rem;
+}
+
+.reward-choice--enhanced {
+  border-color: var(--surfer);
+}
+
+.match-result__reward-note .account__panel-body {
+  margin: 0;
+}
+
 .reward-choice__options {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));

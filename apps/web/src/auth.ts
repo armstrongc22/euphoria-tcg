@@ -23,6 +23,7 @@ import {
   appendLocalOwned,
   appendLocalRewardEvent,
   loadLocalOwned,
+  loadLocalRewardEvents,
   type OwnedCardInsert,
   type OwnedCardRecord,
   type RewardEventInsert,
@@ -107,6 +108,11 @@ export interface Auth {
   ): Promise<void>;
   /** The user's owned reward cards, newest first (default cap). */
   getOwnedCards(session: AuthSession, limit?: number): Promise<OwnedCardRecord[]>;
+  /**
+   * The win milestones the user has already claimed a reward for, used to avoid
+   * granting the same milestone twice. Order is not significant.
+   */
+  getRewardMilestones(session: AuthSession): Promise<number[]>;
 }
 
 /** Columns selected from match_history; mirrors {@link MatchRecord}. */
@@ -293,6 +299,18 @@ export function createSupabaseAuth(client: SupabaseClient): Auth {
       const rows = (data ?? []) as unknown as Record<string, unknown>[];
       return rows.map(rowToOwnedCard);
     },
+
+    async getRewardMilestones(session) {
+      const { data, error } = await client
+        .from("reward_events")
+        .select("milestone")
+        .eq("user_id", session.userId);
+      if (error) throw error;
+      const rows = (data ?? []) as unknown as Record<string, unknown>[];
+      return rows
+        .map((r) => Number(r["milestone"]))
+        .filter((n) => Number.isFinite(n));
+    },
   };
 }
 
@@ -373,6 +391,11 @@ export function createLocalAuth(store: KeyValueStore | null): Auth {
         b.created_at.localeCompare(a.created_at),
       );
       return limit === undefined ? all : all.slice(0, limit);
+    },
+
+    async getRewardMilestones(_session) {
+      if (store === null) return [];
+      return loadLocalRewardEvents(store).map((e) => e.milestone);
     },
   };
 }

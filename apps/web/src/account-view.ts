@@ -1,18 +1,19 @@
 /**
  * Account view. Shows the signed-in user's email, their selected faction and
- * chosen starter deck, placeholders for beta progression and reward cards, and a
- * sign-out button.
+ * chosen starter deck, match stats, win-based reward progress + owned reward
+ * cards, a beta-progression placeholder, and a sign-out button.
  *
  * Split in two:
  *   - renderAccount(info, pool, onSignOut): a PURE DOM builder (no auth, no
  *     network) so the rendering can be unit-tested with jsdom.
- *   - mountAccount(container, opts): loads the session + profile from the Auth
- *     backend and renders into the container; handles the signed-out case.
+ *   - mountAccount(container, opts): loads the session + profile + history from
+ *     the Auth backend, runs test matches, and gates reward cards by win
+ *     milestones (see ./reward-pacing); handles the signed-out case.
  */
 import type { Card } from "@euphoria/card-data/schema";
 import type { Auth } from "./auth";
 import { renderMatchResult } from "./match-view";
-import { runTestMatch } from "./match";
+import { runTestMatch, type MatchSummary } from "./match";
 import {
   buildMatchHistoryInsert,
   computeAccountStats,
@@ -34,12 +35,18 @@ import {
   buildRewardEventInsert,
   computeInventoryStats,
   EMPTY_INVENTORY_STATS,
-  generateRewardOptions,
   groupOwnedBySlug,
   type InventoryStats,
   type OwnedCardRecord,
   type OwnedGroup,
+  type RewardTier,
 } from "./rewards";
+import { generateTieredRewardOptions } from "./reward-pools";
+import {
+  nextEnhancedMilestone,
+  nextRewardMilestone,
+  rewardForMatch,
+} from "./reward-pacing";
 
 /** Everything the account card needs, already resolved from the backend. */
 export interface AccountInfo {
@@ -55,6 +62,15 @@ export interface AccountInfo {
   readonly inventory?: InventoryStats;
   /** Owned reward cards grouped by slug for display; empty when omitted. */
   readonly owned?: readonly OwnedGroup[];
+  /** Win-based reward progress; omitted in pure-render tests that don't need it. */
+  readonly rewardProgress?: RewardProgress;
+}
+
+/** Current wins and the upcoming reward milestones, for the inventory panel. */
+export interface RewardProgress {
+  readonly wins: number;
+  readonly nextReward: number;
+  readonly nextEnhanced: number;
 }
 
 function escapeHtml(text: string): string {
@@ -121,10 +137,11 @@ function renderStats(
   return panel;
 }
 
-/** Builds the reward-cards inventory panel: totals plus the owned-card list. */
+/** Builds the reward-cards inventory panel: progress, totals, owned-card list. */
 function renderInventory(
   stats: InventoryStats,
   owned: readonly OwnedGroup[],
+  progress?: RewardProgress,
 ): HTMLElement {
   const panel = document.createElement("section");
   panel.className = "account__panel account__rewards";
@@ -134,11 +151,22 @@ function renderInventory(
   heading.textContent = "Reward cards";
   panel.append(heading);
 
+  // Win-based pacing: current wins and the upcoming reward milestones. Shown
+  // whether or not any cards are owned yet, so the player knows the cadence.
+  if (progress !== undefined) {
+    const prog = document.createElement("dl");
+    prog.className = "account__fields account__stats-grid account__reward-progress";
+    prog.append(field("Wins", String(progress.wins)));
+    prog.append(field("Next reward", `${progress.nextReward} wins`));
+    prog.append(field("Next enhanced", `${progress.nextEnhanced} wins`));
+    panel.append(prog);
+  }
+
   if (owned.length === 0) {
     const empty = document.createElement("p");
     empty.className = "account__panel-body";
     empty.textContent =
-      "No reward cards yet — play a test match to earn your first reward.";
+      "No reward cards yet — earn your first at 5 wins.";
     panel.append(empty);
     return panel;
   }
@@ -247,7 +275,11 @@ export function renderAccount(
   section.append(progression);
 
   section.append(
-    renderInventory(info.inventory ?? EMPTY_INVENTORY_STATS, info.owned ?? []),
+    renderInventory(
+      info.inventory ?? EMPTY_INVENTORY_STATS,
+      info.owned ?? [],
+      info.rewardProgress,
+    ),
   );
 
   const signOut = document.createElement("button");
@@ -279,6 +311,11 @@ export interface AccountOptions {
   readonly onSignOut: () => void;
   /** Asset base path for reward-card art; defaults to "/". */
   readonly base?: string;
+  /**
+   * Runs one test match. Defaults to {@link runTestMatch}; injectable so tests
+   * can force a win/loss outcome (match outcomes are otherwise random).
+   */
+  readonly runMatch?: (faction: StarterFaction) => MatchSummary;
 }
 
 /**
@@ -289,7 +326,13 @@ export async function mountAccount(
   container: HTMLElement,
   options: AccountOptions,
 ): Promise<void> {
-  const { auth, pool, onSignOut, base: assetBase = "/" } = options;
+  const {
+    auth,
+    pool,
+    onSignOut,
+    base: assetBase = "/",
+    runMatch = (faction) => runTestMatch({ faction, pool }),
+  } = options;
 
   const session = await auth.getSession();
   if (session === null) {
@@ -331,53 +374,120 @@ export async function mountAccount(
     }
   };
 
-  // After a match the player picks one of three reward cards. The options are
-  // derived from the faction's eligible pool, seeded by the match seed so the
-  // offer is reproducible. Saving writes owned_cards + reward_events (best
-  // effort); either way we return to the account, which reloads the inventory.
-  const showReward = (faction: StarterFaction, seed: number): void => {
-    const options = generateRewardOptions(faction, pool, createRng(seed));
-    const panel = renderRewardChoice(options, assetBase, (card) => {
-      void auth
-        .saveReward(
-          session,
-          buildOwnedCardInsert(session.userId, card),
-          buildRewardEventInsert(session.userId, faction, options, card),
-        )
-        .catch(() => {
-          /* persistence is best-effort; never block returning to account */
-        })
-        .finally(() => void showAccount());
-    });
+  // Claimed milestones drive reward dedup; best-effort like the rest.
+  const loadClaimed = async (): Promise<number[]> => {
+    try {
+      return await auth.getRewardMilestones(session);
+    } catch {
+      return [];
+    }
+  };
+
+  // Live pacing state, refreshed by showAccount and advanced as matches are
+  // played, so reward decisions don't depend on read-after-write consistency.
+  let knownWins = 0;
+  let claimedMilestones: number[] = [];
+
+  // A reward is due: draw 3 tier-appropriate options (seeded by the match seed)
+  // and let the player claim one. Claiming writes owned_cards + reward_events
+  // (best effort), marks the milestone claimed, and returns to the account.
+  const showReward = (
+    faction: StarterFaction,
+    seed: number,
+    milestone: number,
+    tier: RewardTier,
+  ): void => {
+    const options = generateTieredRewardOptions(faction, pool, tier, createRng(seed));
+    const panel = renderRewardChoice(
+      options,
+      { base: assetBase, tier, milestone },
+      (card) => {
+        claimedMilestones = [...claimedMilestones, milestone];
+        void auth
+          .saveReward(
+            session,
+            buildOwnedCardInsert(session.userId, card),
+            buildRewardEventInsert(
+              session.userId,
+              faction,
+              options,
+              card,
+              milestone,
+              tier,
+            ),
+          )
+          .catch(() => {
+            /* persistence is best-effort; never block returning to account */
+          })
+          .finally(() => void showAccount());
+      },
+    );
     container.append(panel);
   };
 
-  // The match runs entirely client-side; we then persist it (best-effort) and
-  // show the result, followed by the reward chooser, in place of the account.
+  // Appends the "Next reward at X wins" note shown when no reward is due.
+  const showNextRewardNote = (wins: number): void => {
+    const note = document.createElement("section");
+    note.className = "account__panel match-result__reward-note";
+    note.innerHTML =
+      `<h3 class="account__panel-heading">Reward cards</h3>` +
+      `<p class="account__panel-body">Next reward at ` +
+      `${nextRewardMilestone(wins)} wins.</p>`;
+    container.append(note);
+  };
+
+  // The match runs entirely client-side; we persist it (best-effort), show the
+  // result, then either offer a reward (at a win milestone) or the next-reward
+  // note. Win count is advanced in memory so chained "Play again" stays correct.
   const showResult = (faction: StarterFaction): void => {
-    const summary = runTestMatch({ faction, pool });
+    const summary = runMatch(faction);
     void auth
       .saveMatch(session, buildMatchHistoryInsert(session.userId, summary))
       .catch(() => {
         /* persistence is best-effort; never block the result screen */
       });
+
+    const winsAfter = knownWins + (summary.outcome === "win" ? 1 : 0);
+    const reward = rewardForMatch({
+      outcome: summary.outcome,
+      totalWins: winsAfter,
+      claimedMilestones,
+    });
+    knownWins = winsAfter;
+
     container.replaceChildren(
       renderMatchResult(summary, {
         onPlayAgain: () => showResult(faction),
         onBack: () => void showAccount(),
       }),
     );
-    showReward(faction, summary.seed);
+    if (reward === null) {
+      showNextRewardNote(winsAfter);
+    } else {
+      showReward(faction, summary.seed, reward.milestone, reward.tier);
+    }
   };
 
   const showAccount = async (): Promise<void> => {
-    const [records, owned] = await Promise.all([loadHistory(), loadOwned()]);
+    const [records, owned, claimed] = await Promise.all([
+      loadHistory(),
+      loadOwned(),
+      loadClaimed(),
+    ]);
+    const stats = computeAccountStats(records);
+    knownWins = stats.wins;
+    claimedMilestones = claimed;
     const info: AccountInfo = {
       ...info0,
-      stats: computeAccountStats(records),
+      stats,
       recent: recentMatches(records, 5),
       inventory: computeInventoryStats(owned),
       owned: groupOwnedBySlug(owned),
+      rewardProgress: {
+        wins: stats.wins,
+        nextReward: nextRewardMilestone(stats.wins),
+        nextEnhanced: nextEnhancedMilestone(stats.wins),
+      },
     };
     container.replaceChildren(
       renderAccount(info, pool, handleSignOut, showResult),

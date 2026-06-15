@@ -73,6 +73,22 @@ describe("renderAccount", () => {
     expect(rewards?.textContent).toContain("Cards owned");
   });
 
+  it("shows win-based reward progress when provided", () => {
+    const el = renderAccount(
+      {
+        ...info,
+        rewardProgress: { wins: 7, nextReward: 10, nextEnhanced: 15 },
+      },
+      cards,
+      () => {},
+    );
+    const progress = el.querySelector(".account__reward-progress");
+    expect(progress?.textContent).toContain("Wins");
+    expect(progress?.textContent).toContain("7");
+    expect(progress?.textContent).toContain("10 wins");
+    expect(progress?.textContent).toContain("15 wins");
+  });
+
   it("wires the sign-out button to the callback", () => {
     const onSignOut = vi.fn();
     const el = renderAccount(info, cards, onSignOut);

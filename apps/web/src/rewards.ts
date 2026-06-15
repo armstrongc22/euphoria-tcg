@@ -24,6 +24,13 @@ import { FACTION_SPECIFIC_ITEMS, type StarterFaction } from "./starter";
 /** How many reward options a player chooses between after a match. */
 export const REWARD_OPTION_COUNT = 3;
 
+/**
+ * Reward tier. Defined here (rather than in ./reward-pools) so the persistence
+ * payloads can reference it without ./reward-pools importing this module back —
+ * keeping the dependency one-way (reward-pools → rewards).
+ */
+export type RewardTier = "basic" | "enhanced";
+
 /** localStorage keys. Versioned so the shape can change later without clashes. */
 export const OWNED_STORAGE_KEY = "euphoria.owned.v1";
 export const REWARD_EVENTS_STORAGE_KEY = "euphoria.rewardEvents.v1";
@@ -113,6 +120,15 @@ export interface RewardEventInsert {
   readonly chosen_slug: string;
   /** All slugs that were offered (includes chosen_slug). */
   readonly option_slugs: readonly string[];
+  /** The win milestone this reward was granted for (e.g. 5, 10, 15). */
+  readonly milestone: number;
+  /** Which pool the options were drawn from. */
+  readonly tier: RewardTier;
+}
+
+/** A persisted reward_events row: the inserted columns plus the DB/local stamp. */
+export interface RewardEventRecord extends RewardEventInsert {
+  readonly created_at: string;
 }
 
 /**
@@ -140,12 +156,16 @@ export function buildRewardEventInsert(
   faction: StarterFaction,
   options: readonly Card[],
   chosen: Card,
+  milestone: number,
+  tier: RewardTier,
 ): RewardEventInsert {
   return {
     user_id: userId,
     player_faction: faction,
     chosen_slug: chosen.slug,
     option_slugs: options.map((c) => c.slug),
+    milestone,
+    tier,
   };
 }
 
@@ -278,27 +298,48 @@ export function appendLocalOwned(
   return record;
 }
 
+/** Narrows an unknown parsed value to a RewardEventRecord, dropping bad rows. */
+function isRewardEventRecord(value: unknown): value is RewardEventRecord {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v["user_id"] === "string" &&
+    typeof v["player_faction"] === "string" &&
+    typeof v["chosen_slug"] === "string" &&
+    Array.isArray(v["option_slugs"]) &&
+    typeof v["milestone"] === "number" &&
+    (v["tier"] === "basic" || v["tier"] === "enhanced") &&
+    typeof v["created_at"] === "string"
+  );
+}
+
+/** Reads persisted local reward events, or [] if absent/corrupt. Never throws. */
+export function loadLocalRewardEvents(store: KeyValueStore): RewardEventRecord[] {
+  const raw = store.getItem(REWARD_EVENTS_STORAGE_KEY);
+  if (raw === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isRewardEventRecord);
+  } catch {
+    return [];
+  }
+}
+
 /**
- * Appends one reward event to local storage. We don't read these back in the
- * UI (the inventory comes from owned_cards), but persisting them locally keeps
- * the demo flow faithful to the Supabase path, which writes both tables.
+ * Appends one reward event to local storage, stamping created_at. The inventory
+ * comes from owned_cards, but reward events are read back for milestone dedup
+ * (loadLocalRewardEvents) and keep the demo faithful to the Supabase path, which
+ * writes both tables.
  */
 export function appendLocalRewardEvent(
   store: KeyValueStore,
   insert: RewardEventInsert,
   now: Date = new Date(),
-): void {
-  const record = { ...insert, created_at: now.toISOString() };
-  let all: unknown[] = [];
-  const raw = store.getItem(REWARD_EVENTS_STORAGE_KEY);
-  if (raw !== null) {
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      if (Array.isArray(parsed)) all = parsed;
-    } catch {
-      all = [];
-    }
-  }
+): RewardEventRecord {
+  const record: RewardEventRecord = { ...insert, created_at: now.toISOString() };
+  const all = loadLocalRewardEvents(store);
   all.push(record);
   store.setItem(REWARD_EVENTS_STORAGE_KEY, JSON.stringify(all));
+  return record;
 }

@@ -195,6 +195,36 @@ the static site still works with no backend.
   If Supabase is unavailable or unconfigured, owned reward cards persist to
   localStorage instead, so the demo flow still earns and shows rewards.
 
+- **Reward pacing (win milestones)** adds two columns to `reward_events` so a
+  milestone can only be rewarded once. Rewards are granted every 5 wins (basic)
+  with every 15th win granting an enhanced reward. Run this additive migration
+  on an existing `reward_events` table (new installs already get the columns if
+  you re-run the create above with them included):
+
+  | Column      | Type      | Notes                                    |
+  | ----------- | --------- | ---------------------------------------- |
+  | `milestone` | `integer` | win count the reward was granted for     |
+  | `tier`      | `text`    | `basic` / `enhanced`                     |
+
+  ```sql
+  alter table public.reward_events
+    add column if not exists milestone integer;
+  alter table public.reward_events
+    add column if not exists tier text;
+
+  -- DB-level guard: at most one reward claim per user per milestone. The app
+  -- already dedupes in-memory, but the database enforces it too. Partial index
+  -- so pre-migration rows with a null milestone don't collide.
+  create unique index if not exists reward_events_user_milestone_unique_idx
+    on public.reward_events (user_id, milestone)
+    where milestone is not null;
+  ```
+
+  No other tables change. `owned_cards` is unchanged, and the existing
+  owned_cards / reward_events save flow is preserved — pacing only gates *when*
+  a reward is offered. The localStorage fallback stores the same milestone/tier
+  fields, so dedup works without Supabase too.
+
 ### How the app uses it
 
 - `src/supabase-config.ts` — detects the env vars (pure, tested).

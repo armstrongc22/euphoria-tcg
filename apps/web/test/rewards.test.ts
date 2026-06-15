@@ -19,6 +19,7 @@ import {
   groupOwnedBySlug,
   isRewardEligible,
   loadLocalOwned,
+  loadLocalRewardEvents,
   OWNED_STORAGE_KEY,
   REWARD_EVENTS_STORAGE_KEY,
   REWARD_OPTION_COUNT,
@@ -165,12 +166,14 @@ describe("reward payloads", () => {
   it("builds the reward_events insert recording all offered options", () => {
     const options = generateRewardOptions("Dwarf", cards, createRng(3));
     const chosen = options[1]!;
-    const event = buildRewardEventInsert("user-1", "Dwarf", options, chosen);
+    const event = buildRewardEventInsert("user-1", "Dwarf", options, chosen, 5, "basic");
     expect(event).toEqual({
       user_id: "user-1",
       player_faction: "Dwarf",
       chosen_slug: chosen.slug,
       option_slugs: options.map((c) => c.slug),
+      milestone: 5,
+      tier: "basic",
     });
     expect(event.option_slugs).toContain(event.chosen_slug);
   });
@@ -226,14 +229,37 @@ describe("local persistence (Supabase fallback)", () => {
     const options = generateRewardOptions("Sonic", cards, createRng(9));
     appendLocalRewardEvent(
       store,
-      buildRewardEventInsert("u", "Sonic", options, options[0]!),
+      buildRewardEventInsert("u", "Sonic", options, options[0]!, 15, "enhanced"),
     );
     const raw = store.getItem(REWARD_EVENTS_STORAGE_KEY);
     expect(raw).not.toBeNull();
     const parsed = JSON.parse(raw!);
     expect(parsed).toHaveLength(1);
     expect(parsed[0].chosen_slug).toBe(options[0]!.slug);
+    expect(parsed[0].milestone).toBe(15);
+    expect(parsed[0].tier).toBe("enhanced");
     expect(parsed[0]).toHaveProperty("created_at");
+  });
+
+  it("reads reward-event milestones back for dedup", () => {
+    const store = memoryStore();
+    expect(loadLocalRewardEvents(store)).toEqual([]);
+    const options = generateRewardOptions("Monk", cards, createRng(2));
+    appendLocalRewardEvent(
+      store,
+      buildRewardEventInsert("u", "Monk", options, options[0]!, 5, "basic"),
+    );
+    appendLocalRewardEvent(
+      store,
+      buildRewardEventInsert("u", "Monk", options, options[1]!, 10, "basic"),
+    );
+    expect(loadLocalRewardEvents(store).map((e) => e.milestone)).toEqual([5, 10]);
+  });
+
+  it("drops corrupt reward-event rows rather than throwing", () => {
+    const store = memoryStore();
+    store.setItem(REWARD_EVENTS_STORAGE_KEY, "{not json");
+    expect(loadLocalRewardEvents(store)).toEqual([]);
   });
 
   it("returns [] on corrupt owned-cards storage rather than throwing", () => {
