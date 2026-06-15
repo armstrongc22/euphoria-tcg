@@ -921,3 +921,51 @@ body {
   border-color: var(--monk);
   color: var(--monk);
 }
+
+.account__play {
+  margin-top: 0.85rem;
+  background: var(--surfer);
+  color: var(--bg);
+  border: 1px solid var(--surfer);
+  border-radius: var(--radius);
+  padding: 0.55rem 1.1rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.account__play:hover {
+  filter: brightness(1.08);
+}
+
+.match-result__verdict {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.match-result--win .match-result__verdict {
+  color: var(--surfer);
+}
+
+.match-result--loss .match-result__verdict {
+  color: var(--monk);
+}
+
+.match-result__events {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.match-result__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.match-result__actions .account__signout,
+.match-result__actions .account__play {
+  margin-top: 0;
+}

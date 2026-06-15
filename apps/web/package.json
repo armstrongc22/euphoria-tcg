@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@euphoria/card-data": "*",
+    "@euphoria/game-engine": "*",
+    "@euphoria/simulator": "*",
     "@supabase/supabase-js": "^2.108.2"
   },
   "devDependencies": {
