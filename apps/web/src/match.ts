@@ -16,8 +16,10 @@ import {
   getRecipe,
   resolveDeck,
   STARTER_FACTIONS,
+  type DeckEntry,
   type StarterFaction,
 } from "./starter";
+import { expandDeckEntries } from "./deck-builder";
 
 /** The player is always seat player1; the AI opponent is player2. */
 const PLAYER_SEAT: PlayerId = "player1";
@@ -54,6 +56,13 @@ export interface TestMatchOptions {
   readonly seed?: number;
   /** Force the opponent faction (mainly for tests); otherwise chosen randomly. */
   readonly opponentFaction?: StarterFaction;
+  /**
+   * The player's deck to use. When provided (the saved custom deck), player1 is
+   * built from it; otherwise player1 uses the faction's fixed starter deck. The
+   * caller is responsible for validating it first — only the input deck changes,
+   * the simulator outcome logic is untouched.
+   */
+  readonly playerDeck?: readonly DeckEntry[];
 }
 
 /**
@@ -162,11 +171,18 @@ export function runTestMatch(options: TestMatchOptions): MatchSummary {
   const opponentFaction =
     options.opponentFaction ?? pickOpponentFaction(options.faction, rng);
 
+  // The player's deck is their saved custom deck when provided, else the fixed
+  // starter deck. The opponent always uses its faction's starter deck.
+  const playerDeck =
+    options.playerDeck !== undefined
+      ? expandDeckEntries(options.playerDeck, options.pool)
+      : expandStarterDeck(options.faction, options.pool);
+
   // Explicit player1/player2 keys: the engine's Record<PlayerId, …> needs the
   // literal seats, which a computed-key object would widen to an index signature.
   const result = runGame({
     decks: {
-      player1: expandStarterDeck(options.faction, options.pool),
+      player1: playerDeck,
       player2: expandStarterDeck(opponentFaction, options.pool),
     },
     agents: { player1: smartAgent(), player2: smartAgent() },

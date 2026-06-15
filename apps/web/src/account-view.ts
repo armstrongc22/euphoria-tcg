@@ -27,6 +27,7 @@ import {
   getRecipe,
   type StarterFaction,
 } from "./starter";
+import { chooseActiveDeck, type ChosenActiveDeck } from "./deck-builder";
 import { renderRewardChoice } from "./reward-view";
 import { createRng } from "@euphoria/game-engine";
 import {
@@ -58,6 +59,10 @@ export interface AccountInfo {
   readonly inventory?: InventoryStats;
   /** Owned reward cards grouped by slug for display; empty when omitted. */
   readonly owned?: readonly OwnedGroup[];
+  /** Which deck is active: a saved custom deck or the fixed starter deck. */
+  readonly deckMode?: "Starter Deck" | "Custom Deck";
+  /** A note shown when a saved deck was invalid and we fell back to the starter. */
+  readonly deckNote?: string;
 }
 
 function escapeHtml(text: string): string {
@@ -216,12 +221,26 @@ export function renderAccount(
         `${recipe.faction} Starter Deck · ${deckCardCount(recipe)} cards`,
       ),
     );
+    list.append(
+      field(
+        "Active deck",
+        info.deckMode ?? "Starter Deck",
+        info.deckMode === "Custom Deck" ? "account__value--custom" : "",
+      ),
+    );
   } else {
     list.append(
       field("Starter deck", "Choose a deck on the Starter Decks tab"),
     );
   }
   section.append(list);
+
+  if (info.deckNote !== undefined) {
+    const note = document.createElement("p");
+    note.className = "account__deck-note";
+    note.textContent = info.deckNote;
+    section.append(note);
+  }
 
   section.append(renderStats(info.stats ?? EMPTY_STATS, info.recent ?? []));
 
@@ -338,6 +357,23 @@ export async function mountAccount(
     }
   };
 
+  // Resolves which deck the player is actually using for `faction`: their saved
+  // custom deck when it exists and is valid, else the starter deck (with a
+  // fallback message). Best-effort: a load failure degrades to the starter deck.
+  const resolveActiveDeck = async (
+    faction: StarterFaction,
+    owned?: readonly OwnedCardRecord[],
+  ): Promise<ChosenActiveDeck> => {
+    const ownedRows = owned ?? (await loadOwned());
+    let saved = null;
+    try {
+      saved = await auth.getActiveDeck(session, faction);
+    } catch {
+      saved = null;
+    }
+    return chooseActiveDeck(saved, faction, pool, ownedRows);
+  };
+
   // After a qualifying match the player picks one of three reward cards. The
   // options are derived from the faction's eligible pool, seeded by the match
   // seed so the offer is reproducible. Saving writes owned_cards + reward_events
@@ -371,7 +407,14 @@ export async function mountAccount(
   // from reward_events — so losses show nothing and legacy null-milestone rows
   // can't re-unlock a reward.
   const showResult = async (faction: StarterFaction): Promise<void> => {
-    const summary = runTestMatch({ faction, pool });
+    // Use the saved custom deck when valid; otherwise the starter deck. A
+    // fallback (invalid saved deck) is surfaced as a note above the result.
+    const chosen = await resolveActiveDeck(faction);
+    const summary = runTestMatch({
+      faction,
+      pool,
+      playerDeck: chosen.isCustom ? chosen.entries : undefined,
+    });
     try {
       await auth.saveMatch(
         session,
@@ -380,12 +423,20 @@ export async function mountAccount(
     } catch {
       /* persistence is best-effort; never block the result screen */
     }
-    container.replaceChildren(
-      renderMatchResult(summary, {
-        onPlayAgain: () => void showResult(faction),
-        onBack: () => void showAccount(),
-      }),
-    );
+    const result = renderMatchResult(summary, {
+      onPlayAgain: () => void showResult(faction),
+      onBack: () => void showAccount(),
+    });
+    if (chosen.usedFallback || chosen.isCustom) {
+      const note = document.createElement("p");
+      note.className =
+        "account__deck-note" +
+        (chosen.usedFallback ? "" : " account__deck-note--ok");
+      note.textContent = chosen.message ?? "Using your custom deck.";
+      container.replaceChildren(note, result);
+    } else {
+      container.replaceChildren(result);
+    }
     const wins = computeAccountStats(await loadHistory()).wins;
     const milestone = rewardForMatch(summary.playerWon, wins);
     if (milestone !== null) {
@@ -395,12 +446,19 @@ export async function mountAccount(
 
   const showAccount = async (): Promise<void> => {
     const [records, owned] = await Promise.all([loadHistory(), loadOwned()]);
+    // Reflect which deck is active (and any fallback) when a faction is chosen.
+    const chosen =
+      info0.faction !== null
+        ? await resolveActiveDeck(info0.faction, owned)
+        : null;
     const info: AccountInfo = {
       ...info0,
       stats: computeAccountStats(records),
       recent: recentMatches(records, 5),
       inventory: computeInventoryStats(owned),
       owned: groupOwnedBySlug(owned),
+      deckMode: chosen?.isCustom ? "Custom Deck" : "Starter Deck",
+      deckNote: chosen?.usedFallback ? chosen.message : undefined,
     };
     container.replaceChildren(
       renderAccount(info, pool, handleSignOut, showResult),

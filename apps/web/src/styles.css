@@ -1079,3 +1079,210 @@ body {
   font-size: 0.78rem;
   color: var(--text-dim);
 }
+
+/* --- Deck builder --------------------------------------------------------- */
+
+.deck-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.deck-builder__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.deck-builder__title {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.deck-builder__count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--surfer);
+}
+
+.deck-builder__count--invalid {
+  color: var(--monk);
+  border-color: var(--monk);
+}
+
+.deck-builder__banner {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.85rem;
+  font-size: 0.88rem;
+}
+
+.deck-builder__banner--ok {
+  color: var(--surfer);
+  border-color: var(--surfer);
+}
+
+.deck-builder__banner--error {
+  color: var(--monk);
+  border-color: var(--monk);
+}
+
+.deck-builder__errors {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.deck-builder__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.deck-builder__reset,
+.deck-builder__save {
+  font: inherit;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.deck-builder__save {
+  border-color: var(--surfer);
+}
+
+.deck-builder__save:disabled {
+  cursor: default;
+  opacity: 0.5;
+  border-color: var(--border);
+}
+
+.deck-builder__status {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.deck-builder__pools {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.deck-builder__group-heading {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: var(--text-dim);
+}
+
+.deck-builder__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 0.6rem;
+}
+
+.deck-builder__card {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.deck-builder__art {
+  width: 2.6rem;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: calc(var(--radius) - 4px);
+  flex: none;
+}
+
+.deck-builder__art--missing {
+  background: var(--bg-elev);
+}
+
+.deck-builder__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.deck-builder__name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deck-builder__meta {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+
+.deck-builder__reward-note {
+  font-size: 0.7rem;
+  color: var(--dwarf);
+}
+
+.deck-builder__counts {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  flex: none;
+}
+
+.deck-builder__controls {
+  display: flex;
+  gap: 0.3rem;
+  flex: none;
+}
+
+.deck-builder__btn {
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: calc(var(--radius) - 4px);
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.deck-builder__btn:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.deck-builder__notice-body {
+  color: var(--text-dim);
+}
+
+.account__value--custom {
+  color: var(--surfer);
+  font-weight: 700;
+}
+
+.account__deck-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: var(--dwarf);
+}
+
+.account__deck-note--ok {
+  color: var(--surfer);
+}

@@ -155,6 +155,8 @@ describe("signUpOrSignIn", () => {
       getMatchHistory: vi.fn(),
       saveReward: vi.fn(),
       getOwnedCards: vi.fn(),
+      saveActiveDeck: vi.fn(),
+      getActiveDeck: vi.fn(),
     };
     expect(await signUpOrSignIn(auth, SESSION.email, "pw")).toEqual(SESSION);
     expect(auth.signIn).not.toHaveBeenCalled();
@@ -175,6 +177,8 @@ describe("signUpOrSignIn", () => {
       getMatchHistory: vi.fn(),
       saveReward: vi.fn(),
       getOwnedCards: vi.fn(),
+      saveActiveDeck: vi.fn(),
+      getActiveDeck: vi.fn(),
     };
     expect(await signUpOrSignIn(auth, SESSION.email, "pw")).toEqual(SESSION);
     expect(auth.signIn).toHaveBeenCalledTimes(1);
@@ -195,6 +199,8 @@ describe("signUpOrSignIn", () => {
       getMatchHistory: vi.fn(),
       saveReward: vi.fn(),
       getOwnedCards: vi.fn(),
+      saveActiveDeck: vi.fn(),
+      getActiveDeck: vi.fn(),
     };
     await expect(signUpOrSignIn(auth, SESSION.email, "pw")).rejects.toThrow(
       /at least 6 characters/,

@@ -12,6 +12,7 @@ import {
   runTestMatch,
 } from "../src/match";
 import { STARTER_DECK_SIZE, STARTER_FACTIONS } from "../src/starter";
+import { expandDeckEntries, starterActiveDeck } from "../src/deck-builder";
 
 describe("expandStarterDeck", () => {
   it.each(STARTER_FACTIONS)("expands the %s recipe to a full deck", (faction) => {
@@ -71,5 +72,33 @@ describe("runTestMatch", () => {
       opponentFaction: "Dwarf",
     });
     expect(summary.opponentFaction).toBe("Dwarf");
+  });
+});
+
+describe("runTestMatch uses the saved custom deck (rule 10)", () => {
+  it("passing the starter deck as playerDeck matches omitting it", () => {
+    const base = { faction: "Dwarf" as const, pool: cards, seed: 11, opponentFaction: "Monk" as const };
+    const withStarter = runTestMatch({ ...base, playerDeck: starterActiveDeck("Dwarf") });
+    const omitted = runTestMatch(base);
+    // Same seed + opponent + equivalent player deck ⇒ identical outcome.
+    expect(withStarter.outcome).toBe(omitted.outcome);
+    expect(withStarter.turns).toBe(omitted.turns);
+    expect(withStarter.winnerLabel).toBe(omitted.winnerLabel);
+  });
+
+  it("feeds the provided deck into player1 (a different deck differs)", () => {
+    // A custom deck that drops a card and adds copies of another is a different
+    // 30-card list than the starter, proving playerDeck flows to the player seat.
+    const starter = starterActiveDeck("Dwarf");
+    const custom = starter
+      .map((e) => (e.slug === "titan" ? { slug: e.slug, quantity: 1 } : e))
+      .map((e) => (e.slug === "aaron-alacapati" ? { slug: e.slug, quantity: 3 } : e));
+    const starterFlat = expandDeckEntries(starter, cards);
+    const customFlat = expandDeckEntries(custom, cards);
+    expect(customFlat).toHaveLength(starterFlat.length);
+    expect(customFlat).not.toEqual(starterFlat);
+    // And it runs without throwing.
+    const summary = runTestMatch({ faction: "Dwarf", pool: cards, seed: 5, playerDeck: custom });
+    expect(summary.turns).toBeGreaterThan(0);
   });
 });
