@@ -27,14 +27,15 @@ function memoryStore(): KeyValueStore {
 describe("renderMatchResult", () => {
   const summary = runTestMatch({ faction: "Sonic", pool: cards, seed: 1 });
 
-  it("shows both factions, the winner, turns, and the reward placeholder", () => {
+  it("shows both factions, the winner, and turns (no reward panel here)", () => {
     const el = renderMatchResult(summary, { onPlayAgain: () => {}, onBack: () => {} });
     const text = el.textContent ?? "";
     expect(text).toContain("Sonic");
     expect(text).toContain(summary.opponentFaction);
     expect(text).toContain(summary.winnerLabel);
     expect(text).toContain(String(summary.turns));
-    expect(text.toLowerCase()).toContain("reward cards coming soon");
+    // The reward chooser is a separate panel appended by the account flow.
+    expect(el.querySelector(".reward-choice")).toBeNull();
   });
 
   it("wires Play again and Back to account", () => {
@@ -66,18 +67,39 @@ describe("account page test-match flow (local fallback)", () => {
     expect(container.querySelector(".account__play")).not.toBeNull();
   });
 
-  it("runs a match and shows the result, then returns to the account", async () => {
+  it("runs a match and shows the result plus reward options, then returns", async () => {
     const container = await mountedDemoAccount();
 
     container.querySelector<HTMLButtonElement>(".account__play")!.click();
     expect(container.querySelector(".match-result")).not.toBeNull();
-    expect(container.textContent?.toLowerCase()).toContain("reward cards coming soon");
+    // The reward chooser is appended after the result with three options.
+    const options = container.querySelectorAll(".reward-choice__option");
+    expect(options).toHaveLength(3);
 
     container.querySelector<HTMLButtonElement>(".match-result__back")!.click();
     // Back to account reloads match history, so let that async render settle.
     for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(container.querySelector(".match-result")).toBeNull();
     expect(container.querySelector(".account__play")).not.toBeNull();
+  });
+
+  it("claims a reward card and shows it in the account inventory", async () => {
+    const container = await mountedDemoAccount();
+
+    container.querySelector<HTMLButtonElement>(".account__play")!.click();
+    const firstOption =
+      container.querySelector<HTMLButtonElement>(".reward-choice__option")!;
+    const chosenName =
+      firstOption.querySelector(".reward-choice__name")?.textContent ?? "";
+    firstOption.click();
+
+    // saveReward + showAccount are async; let the microtask chain settle.
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+
+    expect(container.querySelector(".match-result")).toBeNull();
+    const rewards = container.querySelector(".account__rewards");
+    expect(rewards?.textContent).toContain(chosenName);
+    expect(rewards?.querySelectorAll(".account__owned-row")).toHaveLength(1);
   });
 
   it("Play again keeps showing a result", async () => {

@@ -82,6 +82,7 @@ async function refreshAccount(): Promise<void> {
   await mountAccount(accountEl, {
     auth,
     pool: cards,
+    base: import.meta.env.BASE_URL,
     onSignOut: () => {
       session = null;
       void renderSignup();

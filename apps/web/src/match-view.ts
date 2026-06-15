@@ -1,9 +1,10 @@
 /**
  * Match result view. A PURE DOM builder (no auth, no network) so it can be
  * unit-tested with jsdom: it renders the summary produced by ./match —
- * player faction, opponent faction, winner, turns, win/loss, an event recap,
- * the "Reward cards coming soon." placeholder — plus Play again / Back to
- * account buttons wired to the supplied callbacks.
+ * player faction, opponent faction, winner, turns, win/loss, an event recap —
+ * plus Play again / Back to account buttons wired to the supplied callbacks.
+ * The post-match reward chooser is a separate panel (./reward-view) appended by
+ * the account flow; it is not part of this result card.
  */
 import type { MatchSummary } from "./match";
 
@@ -69,13 +70,6 @@ export function renderMatchResult(
     `<h3 class="account__panel-heading">Match recap</h3>` +
     `<ul class="match-result__events">${recapItems}</ul>`;
   section.append(recap);
-
-  const rewards = document.createElement("section");
-  rewards.className = "account__panel account__rewards";
-  rewards.innerHTML =
-    `<h3 class="account__panel-heading">Reward cards</h3>` +
-    `<p class="account__panel-body">Reward cards coming soon.</p>`;
-  section.append(rewards);
 
   const buttons = document.createElement("div");
   buttons.className = "match-result__actions";

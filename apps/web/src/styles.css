@@ -1009,3 +1009,73 @@ body {
 .account__recent-row--loss {
   border-left-color: var(--monk);
 }
+
+.account__owned {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.account__owned-row {
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius);
+  background: var(--surface, var(--bg));
+  border-left: 3px solid var(--surfer);
+  font-size: 0.92rem;
+}
+
+.reward-choice__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+}
+
+.reward-choice__option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.65rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+}
+
+.reward-choice__option:hover:not(:disabled) {
+  border-color: var(--surfer);
+}
+
+.reward-choice__option:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.reward-choice__option--chosen {
+  border-color: var(--surfer);
+  opacity: 1;
+}
+
+.reward-choice__art {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: calc(var(--radius) - 2px);
+}
+
+.reward-choice__name {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.reward-choice__meta {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}

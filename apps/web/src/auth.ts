@@ -20,6 +20,14 @@ import {
   type MatchRecord,
 } from "./match-history";
 import {
+  appendLocalOwned,
+  appendLocalRewardEvent,
+  loadLocalOwned,
+  type OwnedCardInsert,
+  type OwnedCardRecord,
+  type RewardEventInsert,
+} from "./rewards";
+import {
   clearSignup,
   getLocalStore,
   loadSignup,
@@ -88,6 +96,17 @@ export interface Auth {
   saveMatch(session: AuthSession, match: MatchHistoryInsert): Promise<void>;
   /** The user's match rows, newest first (default cap, never the whole table). */
   getMatchHistory(session: AuthSession, limit?: number): Promise<MatchRecord[]>;
+  /**
+   * Save one chosen reward card: writes both the ownership row (owned_cards)
+   * and the choice record (reward_events) for the signed-in user.
+   */
+  saveReward(
+    session: AuthSession,
+    owned: OwnedCardInsert,
+    event: RewardEventInsert,
+  ): Promise<void>;
+  /** The user's owned reward cards, newest first (default cap). */
+  getOwnedCards(session: AuthSession, limit?: number): Promise<OwnedCardRecord[]>;
 }
 
 /** Columns selected from match_history; mirrors {@link MatchRecord}. */
@@ -114,6 +133,24 @@ function rowToMatchRecord(row: Record<string, unknown>): MatchRecord {
     warriors_summoned_opponent: num(row["warriors_summoned_opponent"]),
     direct_attacks_player: num(row["direct_attacks_player"]),
     direct_attacks_opponent: num(row["direct_attacks_opponent"]),
+    created_at: str(row["created_at"]),
+  };
+}
+
+/** Columns selected from owned_cards; mirrors {@link OwnedCardRecord}. */
+const OWNED_COLUMNS =
+  "user_id, card_slug, card_name, faction, card_type, source, created_at";
+
+/** Coerces a raw Supabase row into a typed OwnedCardRecord. */
+function rowToOwnedCard(row: Record<string, unknown>): OwnedCardRecord {
+  const str = (v: unknown): string => (typeof v === "string" ? v : String(v ?? ""));
+  return {
+    user_id: str(row["user_id"]),
+    card_slug: str(row["card_slug"]),
+    card_name: str(row["card_name"]),
+    faction: str(row["faction"]) as OwnedCardRecord["faction"],
+    card_type: str(row["card_type"]) as OwnedCardRecord["card_type"],
+    source: str(row["source"]) as OwnedCardRecord["source"],
     created_at: str(row["created_at"]),
   };
 }
@@ -236,6 +273,26 @@ export function createSupabaseAuth(client: SupabaseClient): Auth {
       const rows = (data ?? []) as unknown as Record<string, unknown>[];
       return rows.map(rowToMatchRecord);
     },
+
+    async saveReward(_session, owned, event) {
+      // created_at is omitted on both: the table defaults set it on insert.
+      const ownedResult = await client.from("owned_cards").insert(owned);
+      if (ownedResult.error) throw ownedResult.error;
+      const eventResult = await client.from("reward_events").insert(event);
+      if (eventResult.error) throw eventResult.error;
+    },
+
+    async getOwnedCards(session, limit = 200) {
+      const { data, error } = await client
+        .from("owned_cards")
+        .select(OWNED_COLUMNS)
+        .eq("user_id", session.userId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      const rows = (data ?? []) as unknown as Record<string, unknown>[];
+      return rows.map(rowToOwnedCard);
+    },
   };
 }
 
@@ -298,6 +355,21 @@ export function createLocalAuth(store: KeyValueStore | null): Auth {
     async getMatchHistory(_session, limit) {
       if (store === null) return [];
       const all = loadLocalMatches(store).sort((a, b) =>
+        b.created_at.localeCompare(a.created_at),
+      );
+      return limit === undefined ? all : all.slice(0, limit);
+    },
+
+    async saveReward(_session, owned, event) {
+      if (store !== null) {
+        appendLocalOwned(store, owned);
+        appendLocalRewardEvent(store, event);
+      }
+    },
+
+    async getOwnedCards(_session, limit) {
+      if (store === null) return [];
+      const all = loadLocalOwned(store).sort((a, b) =>
         b.created_at.localeCompare(a.created_at),
       );
       return limit === undefined ? all : all.slice(0, limit);
