@@ -90,7 +90,8 @@ One-time repository setup: in **Settings → Pages**, set **Source** to
 **GitHub Actions**.
 
 To enable real Supabase accounts on the deployed site, add the two env vars as
-repository secrets under **Settings → Secrets and variables → Actions**:
+repository **variables** (not secrets — these are public client-side values)
+under **Settings → Secrets and variables → Actions → Variables**:
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. The deploy workflow passes
 them to the build. Without them, the deployed site runs in localStorage demo
 mode.
