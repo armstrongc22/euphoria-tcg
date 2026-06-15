@@ -27,6 +27,19 @@ import {
   getRecipe,
   type StarterFaction,
 } from "./starter";
+import { renderRewardChoice } from "./reward-view";
+import { createRng } from "@euphoria/game-engine";
+import {
+  buildOwnedCardInsert,
+  buildRewardEventInsert,
+  computeInventoryStats,
+  EMPTY_INVENTORY_STATS,
+  generateRewardOptions,
+  groupOwnedBySlug,
+  type InventoryStats,
+  type OwnedCardRecord,
+  type OwnedGroup,
+} from "./rewards";
 
 /** Everything the account card needs, already resolved from the backend. */
 export interface AccountInfo {
@@ -38,6 +51,10 @@ export interface AccountInfo {
   readonly stats?: AccountStats;
   /** The most recent matches (newest first); empty when omitted. */
   readonly recent?: readonly MatchRecord[];
+  /** Aggregate reward-card inventory stats; defaults to all-zero when omitted. */
+  readonly inventory?: InventoryStats;
+  /** Owned reward cards grouped by slug for display; empty when omitted. */
+  readonly owned?: readonly OwnedGroup[];
 }
 
 function escapeHtml(text: string): string {
@@ -100,6 +117,48 @@ function renderStats(
     }
     panel.append(ul);
   }
+
+  return panel;
+}
+
+/** Builds the reward-cards inventory panel: totals plus the owned-card list. */
+function renderInventory(
+  stats: InventoryStats,
+  owned: readonly OwnedGroup[],
+): HTMLElement {
+  const panel = document.createElement("section");
+  panel.className = "account__panel account__rewards";
+
+  const heading = document.createElement("h3");
+  heading.className = "account__panel-heading";
+  heading.textContent = "Reward cards";
+  panel.append(heading);
+
+  if (owned.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "account__panel-body";
+    empty.textContent =
+      "No reward cards yet — play a test match to earn your first reward.";
+    panel.append(empty);
+    return panel;
+  }
+
+  const summary = document.createElement("dl");
+  summary.className = "account__fields account__stats-grid";
+  summary.append(field("Cards owned", String(stats.total)));
+  summary.append(field("Unique cards", String(stats.unique)));
+  panel.append(summary);
+
+  const ul = document.createElement("ul");
+  ul.className = "account__owned";
+  for (const group of owned) {
+    const li = document.createElement("li");
+    li.className = "account__owned-row";
+    const copies = group.count > 1 ? ` ×${group.count}` : "";
+    li.textContent = `${group.name}${copies}`;
+    ul.append(li);
+  }
+  panel.append(ul);
 
   return panel;
 }
@@ -187,13 +246,9 @@ export function renderAccount(
     `<div class="account__progress-bar" style="width: 0%"></div></div>`;
   section.append(progression);
 
-  const rewards = document.createElement("section");
-  rewards.className = "account__panel account__rewards";
-  rewards.innerHTML =
-    `<h3 class="account__panel-heading">Reward cards</h3>` +
-    `<p class="account__panel-body">Reward cards coming soon. ` +
-    `You'll earn cards to customize and upgrade your starter deck over time.</p>`;
-  section.append(rewards);
+  section.append(
+    renderInventory(info.inventory ?? EMPTY_INVENTORY_STATS, info.owned ?? []),
+  );
 
   const signOut = document.createElement("button");
   signOut.type = "button";
@@ -222,6 +277,8 @@ export interface AccountOptions {
   readonly pool: readonly Card[];
   /** Called after the user signs out, so the app can return to signup. */
   readonly onSignOut: () => void;
+  /** Asset base path for reward-card art; defaults to "/". */
+  readonly base?: string;
 }
 
 /**
@@ -232,7 +289,7 @@ export async function mountAccount(
   container: HTMLElement,
   options: AccountOptions,
 ): Promise<void> {
-  const { auth, pool, onSignOut } = options;
+  const { auth, pool, onSignOut, base: assetBase = "/" } = options;
 
   const session = await auth.getSession();
   if (session === null) {
@@ -241,11 +298,11 @@ export async function mountAccount(
   }
 
   const profile = await auth.getProfile(session);
-  const base = {
+  const info0 = {
     email: profile?.email ?? session.email,
     faction: profile?.selected_faction ?? null,
     isRemote: auth.isRemote,
-  } satisfies Omit<AccountInfo, "stats" | "recent">;
+  } satisfies Omit<AccountInfo, "stats" | "recent" | "inventory" | "owned">;
 
   const handleSignOut = async (): Promise<void> => {
     try {
@@ -265,8 +322,38 @@ export async function mountAccount(
     }
   };
 
+  // Owned reward cards power the inventory panel; same best-effort fallback.
+  const loadOwned = async (): Promise<OwnedCardRecord[]> => {
+    try {
+      return await auth.getOwnedCards(session, 200);
+    } catch {
+      return [];
+    }
+  };
+
+  // After a match the player picks one of three reward cards. The options are
+  // derived from the faction's eligible pool, seeded by the match seed so the
+  // offer is reproducible. Saving writes owned_cards + reward_events (best
+  // effort); either way we return to the account, which reloads the inventory.
+  const showReward = (faction: StarterFaction, seed: number): void => {
+    const options = generateRewardOptions(faction, pool, createRng(seed));
+    const panel = renderRewardChoice(options, assetBase, (card) => {
+      void auth
+        .saveReward(
+          session,
+          buildOwnedCardInsert(session.userId, card),
+          buildRewardEventInsert(session.userId, faction, options, card),
+        )
+        .catch(() => {
+          /* persistence is best-effort; never block returning to account */
+        })
+        .finally(() => void showAccount());
+    });
+    container.append(panel);
+  };
+
   // The match runs entirely client-side; we then persist it (best-effort) and
-  // show the result in place of the account card.
+  // show the result, followed by the reward chooser, in place of the account.
   const showResult = (faction: StarterFaction): void => {
     const summary = runTestMatch({ faction, pool });
     void auth
@@ -280,14 +367,17 @@ export async function mountAccount(
         onBack: () => void showAccount(),
       }),
     );
+    showReward(faction, summary.seed);
   };
 
   const showAccount = async (): Promise<void> => {
-    const records = await loadHistory();
+    const [records, owned] = await Promise.all([loadHistory(), loadOwned()]);
     const info: AccountInfo = {
-      ...base,
+      ...info0,
       stats: computeAccountStats(records),
       recent: recentMatches(records, 5),
+      inventory: computeInventoryStats(owned),
+      owned: groupOwnedBySlug(owned),
     };
     container.replaceChildren(
       renderAccount(info, pool, handleSignOut, showResult),

@@ -153,6 +153,8 @@ describe("signUpOrSignIn", () => {
       getProfile: vi.fn(),
       saveMatch: vi.fn(),
       getMatchHistory: vi.fn(),
+      saveReward: vi.fn(),
+      getOwnedCards: vi.fn(),
     };
     expect(await signUpOrSignIn(auth, SESSION.email, "pw")).toEqual(SESSION);
     expect(auth.signIn).not.toHaveBeenCalled();
@@ -171,6 +173,8 @@ describe("signUpOrSignIn", () => {
       getProfile: vi.fn(),
       saveMatch: vi.fn(),
       getMatchHistory: vi.fn(),
+      saveReward: vi.fn(),
+      getOwnedCards: vi.fn(),
     };
     expect(await signUpOrSignIn(auth, SESSION.email, "pw")).toEqual(SESSION);
     expect(auth.signIn).toHaveBeenCalledTimes(1);
@@ -189,6 +193,8 @@ describe("signUpOrSignIn", () => {
       getProfile: vi.fn(),
       saveMatch: vi.fn(),
       getMatchHistory: vi.fn(),
+      saveReward: vi.fn(),
+      getOwnedCards: vi.fn(),
     };
     await expect(signUpOrSignIn(auth, SESSION.email, "pw")).rejects.toThrow(
       /at least 6 characters/,

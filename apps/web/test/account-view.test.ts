@@ -41,12 +41,36 @@ describe("renderAccount", () => {
     expect(el.textContent).toContain(`Sonic Starter Deck · ${count} cards`);
   });
 
-  it("renders the beta progression and reward-cards placeholders", () => {
+  it("renders the beta progression placeholder", () => {
     const el = renderAccount(info, cards, () => {});
     expect(el.querySelector(".account__progression")?.textContent?.toLowerCase())
       .toContain("coming soon");
-    expect(el.querySelector(".account__rewards")?.textContent?.toLowerCase())
-      .toContain("reward cards coming soon");
+  });
+
+  it("shows the empty reward-cards inventory when nothing is owned", () => {
+    const el = renderAccount(info, cards, () => {});
+    const rewards = el.querySelector(".account__rewards");
+    expect(rewards?.textContent).toContain("Reward cards");
+    expect(rewards?.textContent?.toLowerCase()).toContain("no reward cards yet");
+  });
+
+  it("lists owned reward cards with copy counts", () => {
+    const el = renderAccount(
+      {
+        ...info,
+        inventory: { total: 3, unique: 2, byType: { Warrior: 2, Weapon: 1 } },
+        owned: [
+          { slug: "fafnir", name: "Fafnir", count: 1 },
+          { slug: "titan", name: "Titan", count: 2 },
+        ],
+      },
+      cards,
+      () => {},
+    );
+    const rewards = el.querySelector(".account__rewards");
+    expect(rewards?.textContent).toContain("Fafnir");
+    expect(rewards?.textContent).toContain("Titan ×2");
+    expect(rewards?.textContent).toContain("Cards owned");
   });
 
   it("wires the sign-out button to the callback", () => {
@@ -150,9 +174,9 @@ describe("mountAccount match stats", () => {
     expect(container.querySelectorAll(".account__recent-row")).toHaveLength(1);
   });
 
-  it("keeps the reward placeholder as coming soon", async () => {
+  it("shows an empty reward inventory before any rewards are earned", async () => {
     const { container } = await signedInAccount();
     expect(container.querySelector(".account__rewards")?.textContent?.toLowerCase())
-      .toContain("reward cards coming soon");
+      .toContain("no reward cards yet");
   });
 });

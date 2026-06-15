@@ -114,6 +114,87 @@ the static site still works with no backend.
   If Supabase is unavailable or unconfigured, match history persists to
   localStorage instead, so the demo flow still shows stats and never crashes.
 
+- **`public.owned_cards`** table — one row per reward card a player has earned:
+
+  | Column        | Type          | Notes                                   |
+  | ------------- | ------------- | --------------------------------------- |
+  | `id`          | `uuid` PK     | `default gen_random_uuid()`             |
+  | `user_id`     | `uuid`        | references `auth.users(id)`             |
+  | `card_slug`   | `text`        | the card's slug in `cards.json`         |
+  | `card_name`   | `text`        | denormalized for display                |
+  | `faction`     | `text`        | card faction (own faction or Neutral)   |
+  | `card_type`   | `text`        | Warrior / Attack / Item / Weapon        |
+  | `source`      | `text`        | `reward` (only source in the beta)      |
+  | `created_at`  | `timestamptz` | DB default on insert                    |
+
+- **`public.reward_events`** table — one row per reward choice (which options
+  were offered and which was picked), kept for progression analytics:
+
+  | Column           | Type          | Notes                                |
+  | ---------------- | ------------- | ------------------------------------ |
+  | `id`             | `uuid` PK     | `default gen_random_uuid()`          |
+  | `user_id`        | `uuid`        | references `auth.users(id)`          |
+  | `player_faction` | `text`        | the faction the offer was built for  |
+  | `chosen_slug`    | `text`        | the slug the player chose            |
+  | `option_slugs`   | `text[]`      | all slugs offered (includes chosen)  |
+  | `created_at`     | `timestamptz` | DB default on insert                 |
+
+  **RLS** on both: each user may `select` / `insert` only their own rows
+  (`auth.uid() = user_id`). Run once in the SQL editor:
+
+  ```sql
+  -- owned_cards: reward cards a player has earned -------------------------
+  create table if not exists public.owned_cards (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references auth.users (id) on delete cascade,
+    card_slug text not null,
+    card_name text not null,
+    faction text not null,
+    card_type text not null check (card_type in ('Warrior', 'Attack', 'Item', 'Weapon')),
+    source text not null default 'reward',
+    created_at timestamptz not null default now()
+  );
+
+  alter table public.owned_cards enable row level security;
+
+  create policy "owned_cards_select_own"
+    on public.owned_cards for select
+    using (auth.uid() = user_id);
+
+  create policy "owned_cards_insert_own"
+    on public.owned_cards for insert
+    with check (auth.uid() = user_id);
+
+  create index if not exists owned_cards_user_created_idx
+    on public.owned_cards (user_id, created_at desc);
+
+  -- reward_events: which options were offered and which was chosen --------
+  create table if not exists public.reward_events (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references auth.users (id) on delete cascade,
+    player_faction text not null,
+    chosen_slug text not null,
+    option_slugs text[] not null,
+    created_at timestamptz not null default now()
+  );
+
+  alter table public.reward_events enable row level security;
+
+  create policy "reward_events_select_own"
+    on public.reward_events for select
+    using (auth.uid() = user_id);
+
+  create policy "reward_events_insert_own"
+    on public.reward_events for insert
+    with check (auth.uid() = user_id);
+
+  create index if not exists reward_events_user_created_idx
+    on public.reward_events (user_id, created_at desc);
+  ```
+
+  If Supabase is unavailable or unconfigured, owned reward cards persist to
+  localStorage instead, so the demo flow still earns and shows rewards.
+
 ### How the app uses it
 
 - `src/supabase-config.ts` — detects the env vars (pure, tested).
