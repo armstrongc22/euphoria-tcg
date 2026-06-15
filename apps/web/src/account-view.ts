@@ -163,11 +163,16 @@ export function renderAccount(
     const faction = info.faction;
     const match = document.createElement("section");
     match.className = "account__panel account__match";
+    // Saving is real now: Supabase for signed-in accounts, localStorage for the
+    // demo fallback — so the copy reflects that instead of "nothing is saved".
+    const savedNote = info.isRemote
+      ? "Results are saved to your account history."
+      : "Results are saved to this device's match history.";
     match.innerHTML =
       `<h3 class="account__panel-heading">Test match</h3>` +
-      `<p class="account__panel-body">Run a quick local simulation with your ` +
+      `<p class="account__panel-body">Run a quick simulated match with your ` +
       `${escapeHtml(faction)} starter deck against a random AI opponent. ` +
-      `Beta demo — nothing is saved yet.</p>`;
+      `${savedNote}</p>`;
     const play = document.createElement("button");
     play.type = "button";
     play.className = "account__play";

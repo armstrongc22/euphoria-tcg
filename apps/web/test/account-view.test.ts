@@ -136,6 +136,13 @@ describe("mountAccount match stats", () => {
     expect(stats?.textContent?.toLowerCase()).toContain("no matches yet");
   });
 
+  it("test-match copy says results are saved, not that nothing is saved", async () => {
+    const { container } = await signedInAccount();
+    const matchCopy = container.querySelector(".account__match")?.textContent ?? "";
+    expect(matchCopy.toLowerCase()).toContain("results are saved");
+    expect(matchCopy.toLowerCase()).not.toContain("nothing is saved");
+  });
+
   it("records a played match and reflects it in the stats after returning", async () => {
     const { container } = await signedInAccount();
 
