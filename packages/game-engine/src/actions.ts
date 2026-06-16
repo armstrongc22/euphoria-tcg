@@ -326,6 +326,36 @@ export function getStealTargets(state: GameState, card: Card): Card[] {
   );
 }
 
+/** Item effect codes that need a chosen friendly Warrior on the field. */
+const FRIENDLY_WARRIOR_TARGET_ITEM_CODES = new Set(["TEMPORARY_OUT_OF_PLAY_RESTORE"]);
+
+/**
+ * True for an Item that targets one of the controller's own Warriors on the
+ * field (e.g. GILs Unit's TEMPORARY_OUT_OF_PLAY_RESTORE). Such Items need a
+ * chosen targetInstanceId on the playItem action; without one the handler fails
+ * safely and nothing happens. The auto-sim path is unchanged.
+ */
+export function isFriendlyWarriorTargetItem(card: Card): boolean {
+  return (
+    card.type === "Item" &&
+    card.effectCode !== undefined &&
+    FRIENDLY_WARRIOR_TARGET_ITEM_CODES.has(normalizeEffectCode(card.effectCode))
+  );
+}
+
+/**
+ * The valid targets for `card` right now: the active player's own Warriors on
+ * the field (mirrors requireWarriorTarget's "friendly" rule). Empty when `card`
+ * is not such an Item or the player controls no Warrior.
+ */
+export function getFriendlyWarriorTargets(
+  state: GameState,
+  card: Card,
+): WarriorInPlay[] {
+  if (!isFriendlyWarriorTargetItem(card)) return [];
+  return [...state.players[state.activePlayer].field];
+}
+
 function attachedWeaponCode(warrior: WarriorInPlay): string | undefined {
   const code = warrior.attachedWeapon?.effectCode;
   return code === undefined ? undefined : normalizeEffectCode(code);

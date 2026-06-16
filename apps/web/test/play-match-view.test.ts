@@ -952,3 +952,79 @@ describe("renderPlayableMatch — reduced motion", () => {
     }
   });
 });
+
+describe("renderPlayableMatch — GILs Unit friendly-Warrior target", () => {
+  const gils = (): Card => {
+    const c = cards.find((card) => card.slug === "gils-unit");
+    if (c === undefined) throw new Error("gils-unit missing from pool");
+    return c;
+  };
+  const aWarrior = (): Card => cards.find((c) => c.type === "Warrior")!;
+
+  function craftGils(field: WarriorInPlay[]): ReturnType<typeof createPlayableMatch> {
+    const match = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed: 1,
+      opponentFaction: "Dwarf",
+    });
+    const s = match.state();
+    s.players.player1.spirit = 5;
+    s.players.player1.hand = [gils()];
+    s.players.player1.field = field;
+    return match;
+  }
+
+  it("disables GILs Unit when the player controls no Warrior", () => {
+    const match = craftGils([]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const btn = buttonByText(root, ".play-match__card-btn", "No Warrior to target");
+    expect(btn).toBeDefined();
+    expect(btn!.disabled).toBe(true);
+  });
+
+  it("offers GILs Unit when a friendly Warrior exists", () => {
+    const match = craftGils([wip(aWarrior(), "w1")]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(buttonByText(root, ".play-match__card-btn", "Play")).toBeDefined();
+  });
+
+  it("shows a 'Use here' control on friendly Warriors after Play", () => {
+    const match = craftGils([wip(aWarrior(), "w1")]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    const useHere = root.querySelector(
+      '.play-match__field--mine [data-instance="w1"] .play-match__warrior-btn',
+    );
+    expect(useHere?.textContent).toBe("Use here");
+  });
+
+  it("resolves GILs Unit on the chosen Warrior, passing targetInstanceId", () => {
+    const match = craftGils([wip(aWarrior(), "w1")]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    buttonByText(root, ".play-match__warrior-btn", "Use here")!.click();
+
+    const p1 = match.state().players.player1;
+    // The Warrior left the field for the out-of-play zone; GILs Unit was spent.
+    expect(p1.field.some((w) => w.instanceId === "w1")).toBe(false);
+    expect(p1.outOfPlay.some((o) => o.warrior.instanceId === "w1")).toBe(true);
+    expect(p1.hand.some((c) => c.slug === "gils-unit")).toBe(false);
+    const events = match.state().events.map((e) => e.type);
+    expect(events).toContain("warriorSentOutOfPlay");
+    // It must NOT have silently failed.
+    expect(events).not.toContain("effectNotImplemented");
+  });
+
+  it("does not spend GILs Unit when the target picker is canceled", () => {
+    const match = craftGils([wip(aWarrior(), "w1")]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    // Toggle off (cancel) by clicking the active "Pick a Warrior…" button.
+    buttonByText(root, ".play-match__card-btn", "Pick a Warrior…")!.click();
+    expect(root.querySelector('[data-instance="w1"] .play-match__warrior-btn')).toBeNull();
+    const p1 = match.state().players.player1;
+    expect(p1.hand.some((c) => c.slug === "gils-unit")).toBe(true);
+    expect(p1.field.some((w) => w.instanceId === "w1")).toBe(true);
+  });
+});
