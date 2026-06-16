@@ -12,7 +12,9 @@
 import type { Card } from "@euphoria/card-data/schema";
 import type { Auth } from "./auth";
 import { renderMatchResult } from "./match-view";
-import { runTestMatch } from "./match";
+import { runTestMatch, type MatchSummary } from "./match";
+import { createPlayableMatch } from "./play-match";
+import { renderPlayableMatch } from "./play-match-view";
 import {
   buildMatchHistoryInsert,
   computeAccountStats,
@@ -190,6 +192,12 @@ export function renderAccount(
    * panel only appears where the caller can actually run a match.
    */
   onPlayMatch?: (faction: StarterFaction) => void,
+  /**
+   * Optional: when provided AND a faction is chosen, render a "Play match"
+   * button that launches the interactive, human-controlled match (./play-match).
+   * Like onPlayMatch it is omitted in pure-render tests.
+   */
+  onPlayLive?: (faction: StarterFaction) => void,
 ): HTMLElement {
   const section = document.createElement("section");
   section.className = "account";
@@ -244,21 +252,31 @@ export function renderAccount(
 
   section.append(renderStats(info.stats ?? EMPTY_STATS, info.recent ?? []));
 
-  if (info.faction !== null && onPlayMatch !== undefined) {
+  if (info.faction !== null && (onPlayMatch !== undefined || onPlayLive !== undefined)) {
     const faction = info.faction;
     const match = document.createElement("section");
     match.className = "account__panel account__match";
     match.innerHTML =
       `<h3 class="account__panel-heading">Test match</h3>` +
-      `<p class="account__panel-body">Run a quick local simulation with your ` +
-      `${escapeHtml(faction)} starter deck against a random AI opponent. ` +
-      `Beta demo — nothing is saved yet.</p>`;
-    const play = document.createElement("button");
-    play.type = "button";
-    play.className = "account__play";
-    play.textContent = "Play test match";
-    play.addEventListener("click", () => onPlayMatch(faction));
-    match.append(play);
+      `<p class="account__panel-body">Play a match with your ` +
+      `${escapeHtml(faction)} active deck against a random AI opponent. ` +
+      `Beta demo.</p>`;
+    if (onPlayLive !== undefined) {
+      const playLive = document.createElement("button");
+      playLive.type = "button";
+      playLive.className = "account__play account__play--live";
+      playLive.textContent = "Play match";
+      playLive.addEventListener("click", () => onPlayLive(faction));
+      match.append(playLive);
+    }
+    if (onPlayMatch !== undefined) {
+      const play = document.createElement("button");
+      play.type = "button";
+      play.className = "account__play account__play--sim";
+      play.textContent = "Quick sim";
+      play.addEventListener("click", () => onPlayMatch(faction));
+      match.append(play);
+    }
     section.append(match);
   }
 
@@ -305,6 +323,12 @@ export interface AccountOptions {
   readonly onSignOut: () => void;
   /** Asset base path for reward-card art; defaults to "/". */
   readonly base?: string;
+  /**
+   * When set to the signed-in user's faction, mount straight into the
+   * interactive match (e.g. arriving from the Deck Builder's "Play match")
+   * instead of the account card. Ignored if it doesn't match the profile.
+   */
+  readonly autoPlay?: StarterFaction;
 }
 
 /**
@@ -400,21 +424,30 @@ export async function mountAccount(
     container.append(panel);
   };
 
-  // The match runs entirely client-side; we then persist it (best-effort) and
-  // show the result. A reward chooser is appended ONLY when this win lands on a
-  // milestone (every 5th win): we await the save so the reloaded history
-  // includes this match, then derive the milestone from the win COUNT — never
-  // from reward_events — so losses show nothing and legacy null-milestone rows
-  // can't re-unlock a reward.
-  const showResult = async (faction: StarterFaction): Promise<void> => {
-    // Use the saved custom deck when valid; otherwise the starter deck. A
-    // fallback (invalid saved deck) is surfaced as a note above the result.
-    const chosen = await resolveActiveDeck(faction);
-    const summary = runTestMatch({
-      faction,
-      pool,
-      playerDeck: chosen.isCustom ? chosen.entries : undefined,
-    });
+  // A note about which deck is in play, shown above the result/board when a
+  // custom deck is used or we fell back to the starter. Null when irrelevant.
+  const deckNote = (chosen: ChosenActiveDeck): HTMLElement | null => {
+    if (!(chosen.usedFallback || chosen.isCustom)) return null;
+    const note = document.createElement("p");
+    note.className =
+      "account__deck-note" + (chosen.usedFallback ? "" : " account__deck-note--ok");
+    note.textContent = chosen.message ?? "Using your custom deck.";
+    return note;
+  };
+
+  // Shared match-completion flow used by BOTH the quick sim and the interactive
+  // match: persist the result (best-effort), render the existing result screen,
+  // and append the reward chooser ONLY when this win lands on a milestone (every
+  // 5th win). We await the save so the reloaded history includes this match, then
+  // derive the milestone from the win COUNT — never from reward_events — so
+  // losses show nothing and legacy null-milestone rows can't re-unlock a reward.
+  // `onPlayAgain` lets each entry point restart in its own mode.
+  const finishMatch = async (
+    faction: StarterFaction,
+    summary: MatchSummary,
+    chosen: ChosenActiveDeck,
+    onPlayAgain: () => void,
+  ): Promise<void> => {
     try {
       await auth.saveMatch(
         session,
@@ -424,24 +457,49 @@ export async function mountAccount(
       /* persistence is best-effort; never block the result screen */
     }
     const result = renderMatchResult(summary, {
-      onPlayAgain: () => void showResult(faction),
+      onPlayAgain,
       onBack: () => void showAccount(),
     });
-    if (chosen.usedFallback || chosen.isCustom) {
-      const note = document.createElement("p");
-      note.className =
-        "account__deck-note" +
-        (chosen.usedFallback ? "" : " account__deck-note--ok");
-      note.textContent = chosen.message ?? "Using your custom deck.";
-      container.replaceChildren(note, result);
-    } else {
-      container.replaceChildren(result);
-    }
+    const note = deckNote(chosen);
+    container.replaceChildren(...(note ? [note, result] : [result]));
     const wins = computeAccountStats(await loadHistory()).wins;
     const milestone = rewardForMatch(summary.playerWon, wins);
     if (milestone !== null) {
       showReward(faction, summary.seed, milestone);
     }
+  };
+
+  // Quick sim: runs the full match through the auto-sim and shows the result.
+  const showResult = async (faction: StarterFaction): Promise<void> => {
+    // Use the saved custom deck when valid; otherwise the starter deck.
+    const chosen = await resolveActiveDeck(faction);
+    const summary = runTestMatch({
+      faction,
+      pool,
+      playerDeck: chosen.isCustom ? chosen.entries : undefined,
+    });
+    await finishMatch(faction, summary, chosen, () => void showResult(faction));
+  };
+
+  // Interactive match: mounts the live board. The same active-deck resolution as
+  // the sim feeds the human's deck; on game over the board hands back the summary
+  // and we route into the shared finishMatch flow (history + reward intact).
+  const showPlayableMatch = async (faction: StarterFaction): Promise<void> => {
+    const chosen = await resolveActiveDeck(faction);
+    const match = createPlayableMatch({
+      faction,
+      pool,
+      playerDeck: chosen.isCustom ? chosen.entries : undefined,
+    });
+    const board = renderPlayableMatch(match, {
+      onComplete: (summary) =>
+        void finishMatch(faction, summary, chosen, () =>
+          void showPlayableMatch(faction),
+        ),
+      onQuit: () => void showAccount(),
+    });
+    const note = deckNote(chosen);
+    container.replaceChildren(...(note ? [note, board] : [board]));
   };
 
   const showAccount = async (): Promise<void> => {
@@ -461,9 +519,21 @@ export async function mountAccount(
       deckNote: chosen?.usedFallback ? chosen.message : undefined,
     };
     container.replaceChildren(
-      renderAccount(info, pool, handleSignOut, showResult),
+      renderAccount(
+        info,
+        pool,
+        handleSignOut,
+        showResult,
+        (faction) => void showPlayableMatch(faction),
+      ),
     );
   };
 
-  await showAccount();
+  // When asked (e.g. coming from the Deck Builder's "Play match"), jump straight
+  // into the interactive match for the chosen faction instead of the card.
+  if (options.autoPlay !== undefined && info0.faction === options.autoPlay) {
+    await showPlayableMatch(options.autoPlay);
+  } else {
+    await showAccount();
+  }
 }

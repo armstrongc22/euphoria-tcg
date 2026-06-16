@@ -166,7 +166,7 @@ describe("mountAccount match stats", () => {
   it("records a played match and reflects it in the stats after returning", async () => {
     const { container } = await signedInAccount();
 
-    container.querySelector<HTMLButtonElement>(".account__play")!.click();
+    container.querySelector<HTMLButtonElement>(".account__play--sim")!.click();
     await flush();
     container.querySelector<HTMLButtonElement>(".match-result__back")!.click();
     await flush();

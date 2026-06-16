@@ -22,8 +22,8 @@ import {
 import { expandDeckEntries } from "./deck-builder";
 
 /** The player is always seat player1; the AI opponent is player2. */
-const PLAYER_SEAT: PlayerId = "player1";
-const OPPONENT_SEAT: PlayerId = "player2";
+export const PLAYER_SEAT: PlayerId = "player1";
+export const OPPONENT_SEAT: PlayerId = "player2";
 
 /** A win/loss/draw for the human player. */
 export type MatchOutcome = "win" | "loss" | "draw";
@@ -110,8 +110,13 @@ function reasonText(reason: EndReason): string {
   }
 }
 
-/** Reduces a raw engine result to the display-ready {@link MatchSummary}. */
-function summarize(
+/**
+ * Reduces a raw engine result to the display-ready {@link MatchSummary}.
+ * Exported so an interactive, human-controlled match (./play-match) can produce
+ * the exact same summary shape the auto-sim does, keeping the result/history/
+ * reward flow identical regardless of how the game was played.
+ */
+export function summarizeMatch(
   playerFaction: StarterFaction,
   opponentFaction: StarterFaction,
   result: GameResult,
@@ -189,5 +194,5 @@ export function runTestMatch(options: TestMatchOptions): MatchSummary {
     seed,
   });
 
-  return summarize(options.faction, opponentFaction, result, seed);
+  return summarizeMatch(options.faction, opponentFaction, result, seed);
 }

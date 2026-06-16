@@ -4,7 +4,13 @@
  * other workspaces (e.g. the web app) can drive a match without pulling in the
  * CLI entry points, which read argv and load cards from disk via `fs`.
  */
-export { runGame, type GameSetup, type GameResult, type EndReason } from "./runner";
+export {
+  runGame,
+  buildGameResult,
+  type GameSetup,
+  type GameResult,
+  type EndReason,
+} from "./runner";
 export {
   greedyAgent,
   randomAgent,
