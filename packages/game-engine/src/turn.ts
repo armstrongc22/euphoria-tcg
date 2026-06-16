@@ -158,6 +158,7 @@ export function runStartPhase(state: GameState): void {
   state.events.push({ type: "turnStarted", player: player.id, turn: state.turn });
 
   player.directAttackUsedThisTurn = false;
+  player.warriorSummonsUsedThisTurn = 0;
   for (const warrior of player.field) {
     warrior.attacksRemaining = 1;
   }

@@ -10,12 +10,14 @@ let pool: Card[];
 let trace: TraceResult;
 beforeAll(() => {
   pool = loadCards();
+  // One-summon-per-turn slows board development, so this seed now needs more
+  // turns to reach a decisive result (it wins on turn 23). Cap raised from 20.
   trace = generateTrace({
     pool,
     player1Faction: "Monk",
     player2Faction: "Dwarf",
     seed: 123,
-    maxTurns: 20,
+    maxTurns: 40,
   });
 });
 
@@ -72,7 +74,7 @@ describe("generateTrace", () => {
       player1Faction: "Monk",
       player2Faction: "Dwarf",
       seed: 123,
-      maxTurns: 20,
+      maxTurns: 40,
     });
     expect(again).toEqual(trace);
   });

@@ -32,6 +32,8 @@ export interface RulesConfig {
   noAttacksOnFirstTurn: boolean;
   /** 1 */
   directAttackLimitPerTurn: number;
+  /** 1 — normal Warrior summons from hand allowed per player per turn */
+  warriorSummonsPerTurn: number;
   warriorsCanAttackTurnSummoned: boolean;
   /** false — attacker takes no counter damage (CLAUDE.md overrides the spec) */
   combatDamageSimultaneous: boolean;
@@ -257,6 +259,13 @@ export interface PlayerState {
   /** Used Items/Attacks and destroyed Warriors/Weapons. */
   outDeck: Card[];
   directAttackUsedThisTurn: boolean;
+  /**
+   * Normal Warrior summons (the `playWarrior` action) this player has made this
+   * turn. Gated against config.warriorSummonsPerTurn; reset each Start Phase.
+   * Effect/revive summons (e.g. warriorRevived) do not count — they don't go
+   * through the playWarrior action.
+   */
+  warriorSummonsUsedThisTurn: number;
   delayedEffects: DelayedEffect[];
   /** Warriors temporarily removed from play, awaiting their timed return. */
   outOfPlay: OutOfPlayWarrior[];
