@@ -85,11 +85,19 @@ const auth = createAuth();
 // The session the rest of the flow operates on; set on signup, cleared on sign out.
 let session: AuthSession | null = null;
 
+// Set when the user clicks "Play match" in the Deck Builder: the account view
+// reads it once on its next mount to launch straight into the interactive match,
+// then it is cleared so ordinary account visits show the card.
+let pendingPlay: StarterFaction | null = null;
+
 async function refreshAccount(): Promise<void> {
+  const autoPlay = pendingPlay;
+  pendingPlay = null;
   await mountAccount(accountEl, {
     auth,
     pool: cards,
     base: import.meta.env.BASE_URL,
+    autoPlay: autoPlay ?? undefined,
     onSignOut: () => {
       session = null;
       void renderSignup();
@@ -106,6 +114,12 @@ async function refreshDeckBuilder(): Promise<void> {
     base: import.meta.env.BASE_URL,
     // A saved deck changes the account's "Active deck" line, so refresh it.
     onSaved: () => void refreshAccount(),
+    // Launch the interactive match from the builder: stash the faction and
+    // switch to the account tab, which reads pendingPlay and starts the match.
+    onPlayMatch: (faction) => {
+      pendingPlay = faction;
+      showView("account");
+    },
   });
 }
 

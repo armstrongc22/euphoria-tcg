@@ -92,6 +92,21 @@ export function runGame(setup: GameSetup): GameResult {
     actions += 1;
   }
 
+  return buildGameResult(state, { reason, actions });
+}
+
+/**
+ * Reduces a finished (or capped) {@link GameState} to a {@link GameResult} by
+ * tallying its event log. Shared by the simulator's own loop and by any other
+ * driver — e.g. an interactive, human-controlled match in the web app — so the
+ * result/summary shape is computed in exactly one place. `reason` is the loop's
+ * stop reason; it is overridden to "win" whenever the game actually has a
+ * winner, mirroring the original inline behaviour.
+ */
+export function buildGameResult(
+  state: GameState,
+  opts: { reason: EndReason; actions: number },
+): GameResult {
   let winByDirectAttack = false;
   let effectFallbacks = 0;
   let deckOuts = 0;
@@ -115,9 +130,9 @@ export function runGame(setup: GameSetup): GameResult {
 
   return {
     winner: state.winner,
-    reason: state.winner !== null ? "win" : reason,
+    reason: state.winner !== null ? "win" : opts.reason,
     turns: state.turn,
-    actions,
+    actions: opts.actions,
     events: state.events.length,
     finalLives: {
       player1: state.players.player1.lives,

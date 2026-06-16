@@ -116,7 +116,7 @@ describe("account page test-match flow (local fallback)", () => {
   it("shows the result but NO reward chooser on a non-milestone match", async () => {
     const container = await mountedDemoAccount();
 
-    container.querySelector<HTMLButtonElement>(".account__play")!.click();
+    container.querySelector<HTMLButtonElement>(".account__play--sim")!.click();
     await flush();
     expect(container.querySelector(".match-result")).not.toBeNull();
     // The very first match can never be a 5th win, so no reward is offered.
@@ -134,7 +134,7 @@ describe("account page test-match flow (local fallback)", () => {
     forceSeed(winningSeed("Dwarf")); // make the played match a win
     const container = await mountedDemoAccount(store);
 
-    container.querySelector<HTMLButtonElement>(".account__play")!.click();
+    container.querySelector<HTMLButtonElement>(".account__play--sim")!.click();
     await flush();
 
     expect(container.querySelector(".match-result")).not.toBeNull();
@@ -148,7 +148,7 @@ describe("account page test-match flow (local fallback)", () => {
     forceSeed(winningSeed("Dwarf"));
     const container = await mountedDemoAccount(store);
 
-    container.querySelector<HTMLButtonElement>(".account__play")!.click();
+    container.querySelector<HTMLButtonElement>(".account__play--sim")!.click();
     await flush();
 
     const firstOption =
@@ -174,7 +174,7 @@ describe("account page test-match flow (local fallback)", () => {
 
   it("Play again keeps showing a result", async () => {
     const container = await mountedDemoAccount();
-    container.querySelector<HTMLButtonElement>(".account__play")!.click();
+    container.querySelector<HTMLButtonElement>(".account__play--sim")!.click();
     await flush();
     container.querySelector<HTMLButtonElement>(".match-result__again")!.click();
     await flush();

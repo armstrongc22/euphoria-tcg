@@ -1307,3 +1307,196 @@ body {
 .account__deck-note--ok {
   color: var(--surfer);
 }
+
+/* ----------------------------------------------------------------------------
+ * Interactive match board (play-match-view). Deliberately simple — a beta
+ * prototype board, not the final game UI.
+ * ------------------------------------------------------------------------- */
+.play-match {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.play-match__header {
+  position: relative;
+}
+
+.play-match__quit {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: auto;
+  padding: 0.35rem 0.8rem;
+}
+
+.play-match__error {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: rgba(220, 80, 80, 0.15);
+  color: var(--dwarf);
+  font-size: 0.9rem;
+}
+
+.play-match__stats {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  font-size: 0.95rem;
+}
+
+.play-match__seat {
+  font-weight: 700;
+  min-width: 5rem;
+}
+
+.play-match__stat--lives {
+  color: var(--dwarf);
+}
+
+.play-match__stat--spirit {
+  color: var(--surfer);
+}
+
+.play-match__field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-height: 4.5rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.play-match__field--theirs {
+  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.play-match__empty {
+  margin: 0;
+  align-self: center;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.play-match__warrior {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 7rem;
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.play-match__warrior:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.play-match__warrior--selected {
+  border-color: var(--surfer);
+  box-shadow: 0 0 0 2px var(--surfer);
+}
+
+.play-match__warrior--target {
+  border-color: var(--dwarf);
+  box-shadow: 0 0 0 2px var(--dwarf);
+}
+
+.play-match__warrior-name {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.play-match__warrior-stats {
+  font-size: 0.95rem;
+}
+
+.play-match__warrior-meta,
+.play-match__warrior-badge {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.play-match__hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.play-match__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 8rem;
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.play-match__card-name {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.play-match__card-meta {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.play-match__card-btn {
+  padding: 0.3rem 0.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.play-match__card-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.play-match__card-btn--active {
+  outline: 2px solid var(--surfer);
+}
+
+.play-match__actionbar {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.play-match__actionbar .account__play {
+  width: auto;
+  flex: 1;
+}
+
+.play-match__direct {
+  width: auto;
+  align-self: center;
+}
+
+.play-match__log-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  max-height: 9rem;
+  overflow-y: auto;
+}
+
+.account__play--live {
+  margin-right: 0.5rem;
+}
+
+.account__play--sim,
+.deck-builder__playbar {
+  margin-top: 0.5rem;
+}

@@ -290,6 +290,11 @@ export interface DeckBuilderOptions {
   readonly base?: string;
   /** Called after a successful save (e.g. so the app can refresh the account). */
   readonly onSaved?: () => void;
+  /**
+   * Called when the user clicks "Play match" with the builder's faction, so the
+   * app can launch an interactive match using their resolved active deck.
+   */
+  readonly onPlayMatch?: (faction: StarterFaction) => void;
 }
 
 function notice(message: string): HTMLElement {
@@ -310,7 +315,7 @@ export async function mountDeckBuilder(
   container: HTMLElement,
   options: DeckBuilderOptions,
 ): Promise<void> {
-  const { auth, pool, base = "/", onSaved } = options;
+  const { auth, pool, base = "/", onSaved, onPlayMatch } = options;
 
   const session = await auth.getSession();
   if (session === null) {
@@ -355,5 +360,18 @@ export async function mountDeckBuilder(
     onInspect: (card) => detail.open(card),
   });
 
-  container.replaceChildren(view, detail.element);
+  const children: Node[] = [view];
+  if (onPlayMatch !== undefined) {
+    const bar = document.createElement("div");
+    bar.className = "deck-builder__playbar";
+    const play = document.createElement("button");
+    play.type = "button";
+    play.className = "account__play deck-builder__play";
+    play.textContent = "Play match with this deck";
+    play.addEventListener("click", () => onPlayMatch(faction));
+    bar.append(play);
+    children.push(bar);
+  }
+  children.push(detail.element);
+  container.replaceChildren(...children);
 }
