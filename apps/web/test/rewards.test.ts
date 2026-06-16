@@ -222,6 +222,17 @@ describe("rewardForMatch (milestone gating)", () => {
       expect(rewardForMatch(true, wins)).toEqual({ milestone: wins, tier });
     }
   });
+
+  it("gates on wins only — total games played never grants progress", () => {
+    // The function takes only (won, totalWins); total games is not an input, so
+    // a player with 4 wins across 20 games gets nothing until their 5th WIN.
+    expect(rewardForMatch(true, 4)).toBeNull(); // 5th game/loss, still 4 wins
+    expect(rewardForMatch(false, 4)).toBeNull(); // a loss never progresses
+    expect(rewardForMatch(true, 5)).toEqual({ milestone: 5, tier: 1 }); // 5th win
+    expect(rewardForMatch(true, 6)).toBeNull(); // basic reward only on multiples
+    expect(rewardForMatch(true, 10)).toEqual({ milestone: 10, tier: 2 });
+    expect(rewardForMatch(true, 15)).toEqual({ milestone: 15, tier: 3 });
+  });
 });
 
 describe("nextRewardMilestone (account page)", () => {

@@ -1080,6 +1080,47 @@ body {
   color: var(--text-dim);
 }
 
+.reward-choice__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.reward-choice__inspect {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+/* Reward modal: a fixed overlay so an earned reward is seen without scrolling. */
+.reward-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.reward-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.reward-modal__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(540px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
 /* --- Deck builder --------------------------------------------------------- */
 
 .deck-builder {

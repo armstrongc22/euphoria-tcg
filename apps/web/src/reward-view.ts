@@ -23,6 +23,12 @@ export function renderRewardChoice(
   options: readonly Card[],
   base: string,
   onChoose: (card: Card) => void,
+  /**
+   * Optional: when provided, each option gets a "Details" button that calls back
+   * to open the shared card-detail modal. Omitted in pure tests that don't
+   * exercise the modal.
+   */
+  onInspect?: (card: Card) => void,
 ): HTMLElement {
   const panel = document.createElement("section");
   panel.className = "account__panel reward-choice";
@@ -60,7 +66,23 @@ export function renderRewardChoice(
       button.classList.add("reward-choice__option--chosen");
       onChoose(card);
     });
-    grid.append(button);
+
+    if (onInspect === undefined) {
+      grid.append(button);
+    } else {
+      // Claim button + a separate Details button so inspecting never claims
+      // (nested interactive elements would be invalid markup).
+      const wrap = document.createElement("div");
+      wrap.className = "reward-choice__card";
+      const info = document.createElement("button");
+      info.type = "button";
+      info.className = "reward-choice__inspect";
+      info.textContent = "Details";
+      info.setAttribute("aria-label", `${card.name} details`);
+      info.addEventListener("click", () => onInspect(card));
+      wrap.append(button, info);
+      grid.append(wrap);
+    }
   }
   panel.append(grid);
 
@@ -69,4 +91,33 @@ export function renderRewardChoice(
   }
 
   return panel;
+}
+
+/**
+ * Wraps {@link renderRewardChoice} in a fixed-position modal overlay so an
+ * earned reward is shown immediately, centered, without the user scrolling. The
+ * backdrop is non-dismissable — a reward must be claimed — but each card can be
+ * inspected via `onInspect`. Returns the overlay element to append to a
+ * container; the caller removes it after `onChoose` fires.
+ */
+export function renderRewardModal(
+  options: readonly Card[],
+  base: string,
+  onChoose: (card: Card) => void,
+  onInspect?: (card: Card) => void,
+): HTMLElement {
+  const overlay = document.createElement("div");
+  overlay.className = "reward-modal";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "reward-modal__backdrop";
+
+  const dialog = document.createElement("div");
+  dialog.className = "reward-modal__dialog";
+  dialog.append(renderRewardChoice(options, base, onChoose, onInspect));
+
+  overlay.append(backdrop, dialog);
+  return overlay;
 }

@@ -181,3 +181,85 @@ describe("account page test-match flow (local fallback)", () => {
     expect(container.querySelector(".match-result")).not.toBeNull();
   });
 });
+
+describe("reward modal (Feature A)", () => {
+  async function mountedDemoAccount(store: KeyValueStore): Promise<HTMLElement> {
+    const auth = createLocalAuth(store);
+    await auth.signUp("player@example.com", "pw");
+    await auth.saveFaction(
+      { userId: "local-demo", email: "player@example.com" },
+      "Dwarf",
+    );
+    const container = document.createElement("div");
+    await mountAccount(container, { auth, pool: cards, onSignOut: () => {} });
+    return container;
+  }
+
+  /** First seed for which `faction` loses, so a played match is a loss. */
+  function losingSeed(faction: StarterFaction): number {
+    for (let seed = 1; seed < 500; seed++) {
+      if (!runTestMatch({ faction, pool: cards, seed }).playerWon) return seed;
+    }
+    throw new Error(`No losing seed found for ${faction}`);
+  }
+
+  it("pops the reward modal immediately on a milestone win", async () => {
+    const store = memoryStore();
+    seedWins(store, "Dwarf", 4);
+    forceSeed(winningSeed("Dwarf"));
+    const container = await mountedDemoAccount(store);
+
+    container.querySelector<HTMLButtonElement>(".account__play--sim")!.click();
+    await flush();
+
+    const modal = container.querySelector(".reward-modal");
+    expect(modal).not.toBeNull();
+    expect(modal!.querySelectorAll(".reward-choice__option")).toHaveLength(3);
+    // No "next reward" note when a reward IS offered.
+    expect(container.querySelector(".match-result__reward-note")).toBeNull();
+  });
+
+  it("shows no modal and a 'next reward' note on a non-milestone win", async () => {
+    const store = memoryStore();
+    forceSeed(winningSeed("Dwarf")); // first win → win #1, not a milestone
+    const container = await mountedDemoAccount(store);
+
+    container.querySelector<HTMLButtonElement>(".account__play--sim")!.click();
+    await flush();
+
+    expect(container.querySelector(".reward-modal")).toBeNull();
+    const note = container.querySelector(".match-result__reward-note");
+    expect(note?.textContent).toBe("Next reward at 5 wins.");
+  });
+
+  it("shows no modal on a loss", async () => {
+    const store = memoryStore();
+    seedWins(store, "Dwarf", 4); // 4 wins; a loss keeps it at 4
+    forceSeed(losingSeed("Dwarf"));
+    const container = await mountedDemoAccount(store);
+
+    container.querySelector<HTMLButtonElement>(".account__play--sim")!.click();
+    await flush();
+
+    expect(container.querySelector(".reward-modal")).toBeNull();
+    expect(container.querySelector(".match-result__reward-note")?.textContent).toBe(
+      "Next reward at 5 wins.",
+    );
+  });
+
+  it("claiming from the modal saves the reward and dismisses the overlay", async () => {
+    const store = memoryStore();
+    seedWins(store, "Dwarf", 4);
+    forceSeed(winningSeed("Dwarf"));
+    const container = await mountedDemoAccount(store);
+
+    container.querySelector<HTMLButtonElement>(".account__play--sim")!.click();
+    await flush();
+    container.querySelector<HTMLButtonElement>(".reward-modal .reward-choice__option")!.click();
+    await flush();
+
+    expect(container.querySelector(".reward-modal")).toBeNull();
+    expect(JSON.parse(store.getItem("euphoria.rewardEvents.v1")!)).toHaveLength(1);
+    expect(container.querySelector(".account__rewards")?.querySelectorAll(".account__owned-row")).toHaveLength(1);
+  });
+});

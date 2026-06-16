@@ -31,7 +31,7 @@ import {
   type StarterFaction,
 } from "./starter";
 import { chooseActiveDeck, type ChosenActiveDeck } from "./deck-builder";
-import { renderRewardChoice } from "./reward-view";
+import { renderRewardModal } from "./reward-view";
 import { createRng } from "@euphoria/game-engine";
 import {
   buildOwnedCardInsert,
@@ -401,28 +401,36 @@ export async function mountAccount(
 
   // After a qualifying match the player picks one of three reward cards. The
   // options are derived from the faction's eligible pool, seeded by the match
-  // seed so the offer is reproducible. Saving writes owned_cards + reward_events
-  // (best effort, now stamped with the milestone/tier); either way we return to
-  // the account, which reloads the inventory.
+  // seed so the offer is reproducible. Shown in a modal overlay so it's visible
+  // without scrolling. Saving writes owned_cards + reward_events (best effort,
+  // stamped with the milestone/tier); either way we return to the account, which
+  // reloads the inventory. Cards can be inspected via the shared detail modal.
   const showReward = (
     faction: StarterFaction,
     seed: number,
     milestone: RewardMilestone,
   ): void => {
     const options = generateRewardOptions(faction, pool, createRng(seed));
-    const panel = renderRewardChoice(options, assetBase, (card) => {
-      void auth
-        .saveReward(
-          session,
-          buildOwnedCardInsert(session.userId, card),
-          buildRewardEventInsert(session.userId, faction, options, card, milestone),
-        )
-        .catch(() => {
-          /* persistence is best-effort; never block returning to account */
-        })
-        .finally(() => void showAccount());
-    });
-    container.append(panel);
+    const detail = createCardDetail(assetBase);
+    const overlay = renderRewardModal(
+      options,
+      assetBase,
+      (card) => {
+        overlay.remove();
+        void auth
+          .saveReward(
+            session,
+            buildOwnedCardInsert(session.userId, card),
+            buildRewardEventInsert(session.userId, faction, options, card, milestone),
+          )
+          .catch(() => {
+            /* persistence is best-effort; never block returning to account */
+          })
+          .finally(() => void showAccount());
+      },
+      (card) => detail.open(card),
+    );
+    container.append(overlay, detail.element);
   };
 
   // A note about which deck is in play, shown above the result/board when a
@@ -467,6 +475,13 @@ export async function mountAccount(
     const milestone = rewardForMatch(summary.playerWon, wins);
     if (milestone !== null) {
       showReward(faction, summary.seed, milestone);
+    } else {
+      // No reward this match: tell the player when the next one unlocks rather
+      // than leaving them wondering. Rewards are win-count based.
+      const note = document.createElement("p");
+      note.className = "account__panel-body match-result__reward-note";
+      note.textContent = `Next reward at ${nextRewardMilestone(wins)} wins.`;
+      result.append(note);
     }
   };
 

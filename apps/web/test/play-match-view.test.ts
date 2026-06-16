@@ -8,10 +8,10 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { Card } from "@euphoria/card-data/schema";
-import type { WarriorInPlay } from "@euphoria/game-engine";
+import type { GameState, WarriorInPlay } from "@euphoria/game-engine";
 import { cards } from "../src/cards";
 import { createPlayableMatch } from "../src/play-match";
-import { renderPlayableMatch } from "../src/play-match-view";
+import { battleLogLines, renderPlayableMatch } from "../src/play-match-view";
 import { createCardDetail } from "../src/detail";
 
 /** Minimal in-play Warrior for white-box board scenarios. */
@@ -658,5 +658,111 @@ describe("renderPlayableMatch — A Thief's Pride hand steal", () => {
     )!.click();
     expect(onInspect).toHaveBeenCalledTimes(1);
     expect(onInspect.mock.calls[0]![0].id).toBe(item.id);
+  });
+});
+
+describe("battleLogLines (Feature C)", () => {
+  // A minimal GameState carrying just what battleLogLines reads: card name
+  // resolution from zones + the event log. Referenced cards live in player1's
+  // Out Deck so name lookups resolve regardless of where they ended up.
+  function stateWith(
+    events: GameState["events"],
+    cardsInPlay: Card[] = [],
+  ): GameState {
+    const seat = (outDeck: Card[]) => ({
+      hand: [],
+      deck: [],
+      outDeck,
+      field: [] as { card: Card }[],
+    });
+    return {
+      players: { player1: seat(cardsInPlay), player2: seat([]) },
+      events,
+    } as unknown as GameState;
+  }
+
+  const titus = cards.find((c) => c.type === "Warrior")!;
+  const kit = cards.find((c) => c.type === "Warrior" && c.id !== titus.id)!;
+
+  it("uses readable card names and player/opponent labels for summons", () => {
+    const lines = battleLogLines(
+      stateWith(
+        [
+          { type: "warriorSummoned", player: "player1", cardId: titus.id, instanceId: "t1", cost: 1 },
+          { type: "warriorSummoned", player: "player2", cardId: kit.id, instanceId: "k1", cost: 1 },
+        ] as GameState["events"],
+        [titus, kit],
+      ),
+    );
+    expect(lines).toContain(`You summoned ${titus.name}.`);
+    expect(lines).toContain(`Opponent summoned ${kit.name}.`);
+  });
+
+  it("renders attack, damage/destruction, and direct-attack lines from events", () => {
+    const lines = battleLogLines(
+      stateWith(
+        [
+          { type: "warriorSummoned", player: "player1", cardId: titus.id, instanceId: "t1", cost: 1 },
+          { type: "warriorSummoned", player: "player2", cardId: kit.id, instanceId: "k1", cost: 1 },
+          { type: "warriorAttacked", player: "player1", attackerInstanceId: "t1", defenderInstanceId: "k1", damage: 1200 },
+          { type: "warriorDestroyed", player: "player2", instanceId: "k1", cardId: kit.id },
+          { type: "directAttacked", player: "player2", attackerInstanceId: "x", livesRemaining: 2 },
+        ] as GameState["events"],
+        [titus, kit],
+      ),
+    );
+    expect(lines).toContain(`${titus.name} attacked ${kit.name} for 1200 HEALTH.`);
+    expect(lines).toContain(`${kit.name} was destroyed.`);
+    expect(lines).toContain("Opponent landed a direct attack — your lives: 2.");
+  });
+
+  it("describes deck search, steal, revive, and item plays readably", () => {
+    const item = cards.find((c) => c.type === "Item")!;
+    const lines = battleLogLines(
+      stateWith(
+        [
+          { type: "itemPlayed", player: "player2", cardId: item.id, cost: 1 },
+          { type: "deckSearched", player: "player1", cardId: titus.id },
+          { type: "cardStolenFromHand", player: "player1", fromPlayer: "player2", cardId: item.id },
+          { type: "warriorRevived", player: "player1", cardId: kit.id, instanceId: "k2" },
+        ] as GameState["events"],
+        [titus, kit, item],
+      ),
+    );
+    expect(lines).toContain(`Opponent played ${item.name}.`);
+    expect(lines).toContain(`You searched their deck and added ${titus.name} to hand.`);
+    expect(lines).toContain(`You took ${item.name} from the opponent's hand.`);
+    expect(lines).toContain(`You revived ${kit.name}.`);
+  });
+
+  it("hides the opponent's drawn card but names the player's own", () => {
+    const lines = battleLogLines(
+      stateWith(
+        [
+          { type: "cardDrawn", player: "player1", cardId: titus.id },
+          { type: "cardDrawn", player: "player2", cardId: kit.id },
+        ] as GameState["events"],
+        [titus, kit],
+      ),
+    );
+    expect(lines).toContain(`You drew ${titus.name}.`);
+    expect(lines).toContain("Opponent drew a card.");
+    expect(lines).not.toContain(`Opponent drew ${kit.name}.`);
+  });
+});
+
+describe("renderPlayableMatch — live battle log shows both sides", () => {
+  it("logs the player's summon and the opponent's turn before control returns", () => {
+    const match = newMatch(5);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    // End the turn so the AI opponent plays out; its actions must be logged.
+    root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+    const logText = root.querySelector(".play-match__log-list")?.textContent ?? "";
+    expect(logText).toContain("You summoned");
+    if (!match.isOver()) {
+      // After the opponent's turn the log carries at least one Opponent line.
+      expect(logText).toContain("Opponent");
+    }
   });
 });
