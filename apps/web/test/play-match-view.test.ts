@@ -461,3 +461,97 @@ describe("renderPlayableMatch — Attack-card prompt (Bug B)", () => {
     expect(match.state().events.map((e) => e.type)).toContain("directAttacked");
   });
 });
+
+describe("renderPlayableMatch — Lahkt Brand Family Products deck search", () => {
+  const lahkt = (): Card => {
+    const c = cards.find((card) => card.slug === "lahkt-brand-family-products");
+    if (c === undefined) throw new Error("lahkt-brand-family-products missing from pool");
+    return c;
+  };
+  const anItem = (): Card =>
+    cards.find((c) => c.type === "Item" && c.slug !== "lahkt-brand-family-products")!;
+  const aWeapon = (): Card => cards.find((c) => c.type === "Weapon")!;
+  const aWarrior = (): Card => cards.find((c) => c.type === "Warrior")!;
+
+  function craftSearch(deck: Card[]): ReturnType<typeof createPlayableMatch> {
+    const match = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed: 1,
+      opponentFaction: "Dwarf",
+    });
+    const s = match.state();
+    s.players.player1.spirit = 5;
+    s.players.player1.hand = [lahkt()];
+    s.players.player1.deck = deck;
+    return match;
+  }
+
+  it("disables Lahkt when no eligible Item/Weapon is in the deck", () => {
+    const match = craftSearch([aWarrior()]); // only a Warrior, not eligible
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const btn = buttonByText(root, ".play-match__card-btn", "No Item/Weapon in deck");
+    expect(btn).toBeDefined();
+    expect(btn!.disabled).toBe(true);
+  });
+
+  it("offers Lahkt when at least one eligible Item or Weapon is in the deck", () => {
+    const match = craftSearch([aWeapon()]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(buttonByText(root, ".play-match__card-btn", "Play")).toBeDefined();
+  });
+
+  it("shows valid deck Item/Weapon targets, excluding non-eligible cards", () => {
+    const item = anItem();
+    const warrior = aWarrior();
+    const match = craftSearch([item, warrior]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    const panel = root.querySelector(".play-match__choice")!;
+    expect(panel).not.toBeNull();
+    expect(panel.textContent).toContain(item.name);
+    // The Warrior in deck is not a valid target.
+    expect(buttonByText(root, ".play-match__choice-btn", `Add ${warrior.name}`)).toBeUndefined();
+  });
+
+  it("adds the chosen card to hand, passing the correct target", () => {
+    const weapon = aWeapon();
+    const match = craftSearch([weapon]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    buttonByText(root, ".play-match__choice-btn", `Add ${weapon.name}`)!.click();
+
+    const p1 = match.state().players.player1;
+    expect(p1.hand.map((c) => c.id)).toContain(weapon.id);
+    expect(p1.deck.map((c) => c.id)).not.toContain(weapon.id);
+    // Lahkt itself was spent (no longer in hand).
+    expect(p1.hand.some((c) => c.slug === "lahkt-brand-family-products")).toBe(false);
+    expect(match.state().events.map((e) => e.type)).toContain("deckSearched");
+  });
+
+  it("does not spend Lahkt when the picker is canceled", () => {
+    const weapon = aWeapon();
+    const match = craftSearch([weapon]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    root.querySelector<HTMLButtonElement>(".play-match__choice-cancel")!.click();
+    expect(root.querySelector(".play-match__choice")).toBeNull();
+    expect(match.state().players.player1.hand.some((c) => c.slug === "lahkt-brand-family-products")).toBe(true);
+    expect(match.state().players.player1.deck.map((c) => c.id)).toContain(weapon.id);
+  });
+
+  it("lets deck target cards be inspected before selecting", () => {
+    const weapon = aWeapon();
+    const match = craftSearch([weapon]);
+    const onInspect = vi.fn();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop, onInspect });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    const look = root.querySelector<HTMLButtonElement>(
+      ".play-match__choice .play-match__card-inspect",
+    );
+    expect(look).not.toBeNull();
+    look!.click();
+    expect(onInspect).toHaveBeenCalledTimes(1);
+    expect(onInspect.mock.calls[0]![0].id).toBe(weapon.id);
+  });
+});
