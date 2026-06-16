@@ -13,7 +13,11 @@ import type { DeckEntry } from "../src/starter";
 
 const BASE = "/";
 
-function build(initialDeck: readonly DeckEntry[], onSave = vi.fn()): HTMLElement {
+function build(
+  initialDeck: readonly DeckEntry[],
+  onSave = vi.fn(),
+  onInspect?: (card: unknown) => void,
+): HTMLElement {
   return renderDeckBuilder({
     faction: "Dwarf",
     pool: cards,
@@ -21,6 +25,7 @@ function build(initialDeck: readonly DeckEntry[], onSave = vi.fn()): HTMLElement
     initialDeck,
     base: BASE,
     onSave,
+    onInspect,
   });
 }
 
@@ -91,5 +96,29 @@ describe("renderDeckBuilder", () => {
     // Save is disabled, but guard the handler too.
     el.querySelector<HTMLButtonElement>(".deck-builder__save")!.click();
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("clicking a card's art/text fires onInspect with that card", () => {
+    const onInspect = vi.fn();
+    const el = build(starterActiveDeck("Dwarf"), vi.fn(), onInspect);
+    const titanRow = el.querySelector<HTMLElement>('[data-slug="titan"]')!;
+    titanRow.querySelector<HTMLButtonElement>(".deck-builder__inspect")!.click();
+    expect(onInspect).toHaveBeenCalledTimes(1);
+    expect((onInspect.mock.calls[0]![0] as { slug: string }).slug).toBe("titan");
+  });
+
+  it("adjusting copies with +/− does not fire onInspect", () => {
+    const onInspect = vi.fn();
+    const el = build(starterActiveDeck("Dwarf"), vi.fn(), onInspect);
+    const titanRow = el.querySelector<HTMLElement>('[data-slug="titan"]')!;
+    titanRow.querySelector<HTMLButtonElement>(".deck-builder__btn--remove")!.click();
+    expect(onInspect).not.toHaveBeenCalled();
+  });
+
+  it("omits the inspect trigger when no onInspect is provided", () => {
+    const el = build(starterActiveDeck("Dwarf"));
+    expect(el.querySelector(".deck-builder__inspect")).toBeNull();
+    // Card art and name still render directly in the row.
+    expect(el.querySelector(".deck-builder__art")).not.toBeNull();
   });
 });

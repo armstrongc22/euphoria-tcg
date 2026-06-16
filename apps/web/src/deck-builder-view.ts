@@ -13,6 +13,7 @@
 import type { Card } from "@euphoria/card-data/schema";
 import type { Auth } from "./auth";
 import { cardImageUrl } from "./cards";
+import { createCardDetail } from "./detail";
 import type { OwnedCardRecord } from "./rewards";
 import type { DeckEntry, StarterFaction } from "./starter";
 import {
@@ -76,6 +77,11 @@ export interface DeckBuilderProps {
   readonly base: string;
   /** Called with the current deck when Save is clicked and the deck is valid. */
   readonly onSave: (entries: DeckEntry[]) => void | Promise<void>;
+  /**
+   * Called when a card's art/row is clicked to inspect it. When omitted, cards
+   * are not interactive (e.g. in unit tests that don't exercise the modal).
+   */
+  readonly onInspect?: (card: Card) => void;
 }
 
 /**
@@ -84,7 +90,7 @@ export interface DeckBuilderProps {
  * the injected `onSave` callback.
  */
 export function renderDeckBuilder(props: DeckBuilderProps): HTMLElement {
-  const { faction, pool, owned, initialDeck, base, onSave } = props;
+  const { faction, pool, owned, initialDeck, base, onSave, onInspect } = props;
   const nameOf = (slug: string): string =>
     pool.find((c) => c.slug === slug)?.name ?? slug;
 
@@ -110,7 +116,7 @@ export function renderDeckBuilder(props: DeckBuilderProps): HTMLElement {
     row.dataset.slug = ac.card.slug;
     row.dataset.source = ac.source;
 
-    row.append(cardArt(ac.card, base));
+    const art = cardArt(ac.card, base);
 
     const text = document.createElement("div");
     text.className = "deck-builder__text";
@@ -122,7 +128,21 @@ export function renderDeckBuilder(props: DeckBuilderProps): HTMLElement {
       `<span class="deck-builder__name">${escapeHtml(ac.card.name)}</span>` +
       `<span class="deck-builder__meta">${escapeHtml(ac.card.faction)} · ${escapeHtml(ac.card.type)}</span>` +
       rewardNote;
-    row.append(text);
+
+    if (onInspect !== undefined) {
+      // Clicking/tapping the art or row text opens the shared card-detail modal,
+      // matching the Card Viewer. A real <button> gives focus + Enter/Space for
+      // free; the +/− controls stay outside it so adjusting copies never inspects.
+      const inspect = document.createElement("button");
+      inspect.type = "button";
+      inspect.className = "deck-builder__inspect";
+      inspect.setAttribute("aria-label", `${ac.card.name} details`);
+      inspect.addEventListener("click", () => onInspect(ac.card));
+      inspect.append(art, text);
+      row.append(inspect);
+    } else {
+      row.append(art, text);
+    }
 
     const counts = document.createElement("span");
     counts.className = "deck-builder__counts";
@@ -313,6 +333,10 @@ export async function mountDeckBuilder(
   const saved = await auth.getActiveDeck(session, faction).catch(() => null);
   const chosen = chooseActiveDeck(saved, faction, pool, owned);
 
+  // One reusable detail modal for the whole panel, reused across re-renders and
+  // shared behaviour with the Card Viewer (Esc / backdrop-click to close).
+  const detail = createCardDetail(base);
+
   const view = renderDeckBuilder({
     faction,
     pool,
@@ -328,7 +352,8 @@ export async function mountDeckBuilder(
         .then(() => {
           onSaved?.();
         }),
+    onInspect: (card) => detail.open(card),
   });
 
-  container.replaceChildren(view);
+  container.replaceChildren(view, detail.element);
 }

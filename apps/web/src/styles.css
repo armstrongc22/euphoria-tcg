@@ -1201,6 +1201,27 @@ body {
   background: var(--bg);
 }
 
+.deck-builder__inspect {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+.deck-builder__inspect:focus-visible {
+  outline: 2px solid var(--sonic);
+  outline-offset: 2px;
+}
+
 .deck-builder__art {
   width: 2.6rem;
   aspect-ratio: 3 / 4;
