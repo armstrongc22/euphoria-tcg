@@ -29,6 +29,14 @@ import {
 } from "@euphoria/game-engine";
 import type { MatchSummary } from "./match";
 import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "./play-match";
+import {
+  battleLogLines,
+  toPlaybackSteps,
+  type PlaybackStep,
+} from "./match-playback";
+
+/** Re-exported so existing callers keep importing it from the view. */
+export { battleLogLines } from "./match-playback";
 
 function escapeHtml(text: string): string {
   const div = document.createElement("div");
@@ -39,6 +47,17 @@ function escapeHtml(text: string): string {
 /** True when an attack action resolves through a chosen Attack card. */
 function hasAttackCard(action: GameAction): boolean {
   return action.kind === "attack" && action.selectedAttackCardId !== undefined;
+}
+
+/** How playback delays are scheduled; injectable so tests can step manually. */
+export type PlaybackScheduler = (cb: () => void, ms: number) => void;
+
+/** Extra options for the board (playback pacing, mainly for tests). */
+export interface PlayableMatchViewOptions {
+  /** Schedules each playback advance; defaults to setTimeout. */
+  readonly scheduler?: PlaybackScheduler;
+  /** Override per-step delay (ms); defaults to each step's own duration. */
+  readonly stepDelayMs?: number;
 }
 
 /** Callbacks for the board. */
@@ -56,114 +75,16 @@ export interface PlayableMatchActions {
 }
 
 /**
- * Builds the human-readable battle-log lines for the whole game so far, for both
- * the player and the AI opponent. PURE (exported for testing). Card ids resolve
- * to names from every zone (cards never leave the game — they end in the Out
- * Deck), and Warrior instance ids resolve via a map accumulated from the
- * events that introduced each Warrior (summon/revive/return/steal).
- *
- * Known limitations: lines come only from the engine's structured event log.
- * Combat damage is reported from the single `warriorAttacked` event (one line,
- * "attacked X for N HEALTH") rather than a separate "lost N HEALTH" line; an
- * opponent's drawn card is hidden ("drew a card"); effect outcomes the engine
- * does not event (e.g. an unimplemented handler) are not logged.
- */
-export function battleLogLines(state: GameState): string[] {
-  const who = (p: "player1" | "player2"): string =>
-    p === PLAYER_SEAT ? "You" : "Opponent";
-  const possessive = (p: "player1" | "player2"): string =>
-    p === PLAYER_SEAT ? "your" : "the opponent's";
-
-  const cardName = (id: string): string => {
-    for (const seat of [state.players.player1, state.players.player2]) {
-      for (const c of [...seat.hand, ...seat.deck, ...seat.outDeck]) {
-        if (c.id === id) return c.name;
-      }
-      for (const w of seat.field) if (w.card.id === id) return w.card.name;
-    }
-    return id;
-  };
-
-  // instanceId → cardId, accumulated from every event that introduced a Warrior,
-  // so attacker/defender ids resolve even after the Warrior has left the field.
-  const instanceToCard = new Map<string, string>();
-  for (const ev of state.events) {
-    if ("instanceId" in ev && "cardId" in ev) {
-      instanceToCard.set(ev.instanceId, ev.cardId);
-    }
-  }
-  const instanceName = (id: string): string => {
-    const cardId = instanceToCard.get(id);
-    return cardId !== undefined ? cardName(cardId) : id;
-  };
-
-  const lines: string[] = [];
-  for (const ev of state.events) {
-    const line = describeEvent(ev, who, possessive, cardName, instanceName);
-    if (line !== null) lines.push(line);
-  }
-  return lines;
-}
-
-/** A short, human-readable line for one battle-log event (null = not shown). */
-function describeEvent(
-  ev: GameState["events"][number],
-  who: (p: "player1" | "player2") => string,
-  possessive: (p: "player1" | "player2") => string,
-  cardName: (id: string) => string,
-  instanceName: (id: string) => string,
-): string | null {
-  switch (ev.type) {
-    case "turnStarted":
-      return `— ${who(ev.player)} · turn ${ev.turn} —`;
-    case "cardDrawn":
-      // Don't reveal the opponent's drawn card (hidden information).
-      return ev.player === PLAYER_SEAT
-        ? `You drew ${cardName(ev.cardId)}.`
-        : "Opponent drew a card.";
-    case "warriorSummoned":
-      return `${who(ev.player)} summoned ${cardName(ev.cardId)}.`;
-    case "warriorRevived":
-      return `${who(ev.player)} revived ${cardName(ev.cardId)}.`;
-    case "itemPlayed":
-      return `${who(ev.player)} played ${cardName(ev.cardId)}.`;
-    case "weaponEquipped":
-      return `${who(ev.player)} equipped ${cardName(ev.cardId)}.`;
-    case "attackCardUsed":
-      return `${who(ev.player)} used ${cardName(ev.cardId)}.`;
-    case "deckSearched":
-      return `${who(ev.player)} searched their deck and added ${cardName(ev.cardId)} to hand.`;
-    case "cardStolenFromHand":
-      return `${who(ev.player)} took ${cardName(ev.cardId)} from ${possessive(ev.fromPlayer)} hand.`;
-    case "warriorAttacked":
-      return `${instanceName(ev.attackerInstanceId)} attacked ${instanceName(ev.defenderInstanceId)} for ${ev.damage} HEALTH.`;
-    case "warriorHealthModified":
-      return ev.amount < 0
-        ? `${instanceName(ev.instanceId)} lost ${-ev.amount} HEALTH.`
-        : `${instanceName(ev.instanceId)} gained ${ev.amount} HEALTH.`;
-    case "warriorDestroyed":
-      return `${cardName(ev.cardId)} was destroyed.`;
-    case "weaponDestroyed":
-      return `${cardName(ev.cardId)} was destroyed.`;
-    case "directAttacked":
-      return ev.player === PLAYER_SEAT
-        ? `You landed a direct attack — opponent lives: ${ev.livesRemaining}.`
-        : `Opponent landed a direct attack — your lives: ${ev.livesRemaining}.`;
-    case "gameWon":
-      return `${who(ev.winner)} won the match.`;
-    default:
-      return null;
-  }
-}
-
-/**
  * Renders the board for `match` into a fresh element and returns it. The element
- * re-renders itself in place after every action. Pure of network/auth; the only
- * outside effects are the supplied callbacks.
+ * re-renders itself in place after every action, and plays the opponent's turn
+ * back step by step (floating combat text + a current-action callout) instead of
+ * jumping straight to the result. Pure of network/auth; the only outside effects
+ * are the supplied callbacks.
  */
 export function renderPlayableMatch(
   match: PlayableMatch,
   actions: PlayableMatchActions,
+  options: PlayableMatchViewOptions = {},
 ): HTMLElement {
   const root = document.createElement("section");
   root.className = "account play-match";
@@ -182,6 +103,17 @@ export function renderPlayableMatch(
   let error: string | null = null;
   let completed = false;
 
+  // --- playback (opponent turn) + floating-text state ----------------------
+  const schedule: PlaybackScheduler =
+    options.scheduler ?? ((cb, ms) => void setTimeout(cb, ms));
+  // Set while the opponent's turn is animating: input is locked and the board
+  // renders the step's snapshot instead of the live state.
+  let playback: { steps: PlaybackStep[]; index: number } | null = null;
+  // The current-action callout text (player action or current playback step).
+  let callout: string | null = null;
+  // Floating combat texts to overlay on the current paint.
+  let floaters: PlaybackStep[] = [];
+
   const clearSelections = (): void => {
     selectedAttacker = null;
     pendingWeapon = null;
@@ -191,11 +123,53 @@ export function renderPlayableMatch(
     pendingSteal = null;
   };
 
-  const act = (action: GameAction): void => {
-    const res = match.apply(action);
-    error = res.ok ? null : res.message;
-    clearSelections();
+  const startPlayback = (steps: PlaybackStep[]): void => {
+    playback = { steps, index: 0 };
     paint();
+    scheduleNext();
+  };
+
+  const scheduleNext = (): void => {
+    if (playback === null) return;
+    const step = playback.steps[playback.index]!;
+    schedule(() => {
+      if (playback === null) return;
+      playback.index += 1;
+      if (playback.index >= playback.steps.length) {
+        playback = null;
+        callout = null;
+        floaters = [];
+        paint();
+      } else {
+        paint();
+        scheduleNext();
+      }
+    }, options.stepDelayMs ?? step.durationMs);
+  };
+
+  const act = (action: GameAction): void => {
+    // Input is locked while the opponent's turn plays back.
+    if (playback !== null) return;
+    const res = match.apply(action);
+    clearSelections();
+    if (!res.ok) {
+      error = res.message;
+      paint();
+      return;
+    }
+    error = null;
+    const steps = toPlaybackSteps(res.frames);
+    const passedTurn = res.frames.some((f) => f.actor === "opponent");
+    if (passedTurn && steps.length > 0) {
+      // The turn passed to the AI: play the whole reply back, locked.
+      floaters = [];
+      startPlayback(steps);
+    } else {
+      // Still the player's turn: immediate floating feedback, no lock.
+      floaters = steps.filter((s) => s.floatingText !== undefined);
+      callout = steps.length > 0 ? steps[steps.length - 1]!.message : null;
+      paint();
+    }
   };
 
   // --- legal-action indexes, rebuilt each paint -----------------------------
@@ -268,6 +242,7 @@ export function renderPlayableMatch(
   const statBar = (label: string, p: PlayerState): HTMLElement => {
     const el = document.createElement("div");
     el.className = "play-match__stats";
+    el.dataset.seat = p.id; // anchor for "-1 LIFE" floats on direct attacks
     el.innerHTML =
       `<span class="play-match__seat">${escapeHtml(label)}</span>` +
       `<span class="play-match__stat play-match__stat--lives" title="Lives">` +
@@ -298,6 +273,7 @@ export function renderPlayableMatch(
       "play-match__warrior" +
       (opts.selected ? " play-match__warrior--selected" : "") +
       (opts.highlighted ? " play-match__warrior--target" : "");
+    el.dataset.instance = w.instanceId; // anchor for floating combat text
 
     const body = document.createElement("button");
     body.type = "button";
@@ -519,7 +495,9 @@ export function renderPlayableMatch(
 
   // --- the painter ----------------------------------------------------------
   function paint(): void {
-    if (match.isOver()) {
+    const playing = playback !== null;
+    // onComplete fires only once playback (if any) has finished.
+    if (!playing && match.isOver()) {
       if (!completed) {
         completed = true;
         actions.onComplete(match.summary());
@@ -527,10 +505,14 @@ export function renderPlayableMatch(
       return;
     }
 
-    const state = match.state();
+    const step = playing ? playback!.steps[playback!.index]! : null;
+    // During playback we render the step's board snapshot; otherwise the live
+    // state. Legal actions are suppressed during playback so every gameplay
+    // control is disabled — the player can't act mid-opponent-turn.
+    const state = step ? step.state : match.state();
     const me = state.players[PLAYER_SEAT];
     const opp = state.players[OPPONENT_SEAT];
-    const legal = match.legalActions();
+    const legal = playing ? [] : match.legalActions();
     const idx = indexLegal(legal);
     const yourTurn = state.activePlayer === PLAYER_SEAT;
 
@@ -539,12 +521,17 @@ export function renderPlayableMatch(
     // Header: turn / phase / whose turn + concede.
     const header = document.createElement("div");
     header.className = "account__header play-match__header";
+    const mode = playing
+      ? "Opponent is acting…"
+      : yourTurn
+        ? "Your move"
+        : "Opponent…";
     header.innerHTML =
       `<p class="account__eyebrow">Euphoria TCG · Live match</p>` +
       `<h2 class="account__title">${escapeHtml(match.playerFaction)} vs ` +
       `${escapeHtml(match.opponentFaction)}</h2>` +
       `<p class="account__mode">Turn ${state.turn} · ${escapeHtml(state.phase)} phase · ` +
-      `${yourTurn ? "Your move" : "Opponent…"}</p>`;
+      `${escapeHtml(mode)}</p>`;
     const concede = document.createElement("button");
     concede.type = "button";
     concede.className = "account__signout play-match__quit";
@@ -552,6 +539,21 @@ export function renderPlayableMatch(
     concede.addEventListener("click", actions.onQuit);
     header.append(concede);
     frag.append(header);
+
+    // "Opponent is acting…" banner during playback.
+    if (playing) {
+      const banner = document.createElement("p");
+      banner.className = "play-match__playback-banner";
+      banner.textContent = "Opponent is acting…";
+      frag.append(banner);
+    }
+
+    // Current-action callout, visible without scrolling (Feature D).
+    const calloutText = step ? step.message : callout;
+    const calloutEl = document.createElement("p");
+    calloutEl.className = "play-match__callout";
+    calloutEl.textContent = calloutText && calloutText.length > 0 ? calloutText : " ";
+    frag.append(calloutEl);
 
     if (error !== null) {
       const err = document.createElement("p");
@@ -565,15 +567,17 @@ export function renderPlayableMatch(
     hint.textContent = "Tap any card to view its full details.";
     frag.append(hint);
 
-    // Pending choice prompts (Attack card / revive target), if any.
-    const attackPanel = attackChoicePanel(idx, me);
-    if (attackPanel !== null) frag.append(attackPanel);
-    const revivePanel = reviveChoicePanel(state, me);
-    if (revivePanel !== null) frag.append(revivePanel);
-    const searchPanel = deckSearchChoicePanel(state, me);
-    if (searchPanel !== null) frag.append(searchPanel);
-    const stealPanel = stealChoicePanel(state, me);
-    if (stealPanel !== null) frag.append(stealPanel);
+    // Pending choice prompts (player-only; never during playback).
+    if (!playing) {
+      const attackPanel = attackChoicePanel(idx, me);
+      if (attackPanel !== null) frag.append(attackPanel);
+      const revivePanel = reviveChoicePanel(state, me);
+      if (revivePanel !== null) frag.append(revivePanel);
+      const searchPanel = deckSearchChoicePanel(state, me);
+      if (searchPanel !== null) frag.append(searchPanel);
+      const stealPanel = stealChoicePanel(state, me);
+      if (stealPanel !== null) frag.append(stealPanel);
+    }
 
     // Opponent: stats + field.
     frag.append(statBar("Opponent", opp));
@@ -584,7 +588,7 @@ export function renderPlayableMatch(
     frag.append(statBar("You", me));
     frag.append(handRow(me, idx));
 
-    // Action bar: enter battle / end turn.
+    // Action bar: enter battle / end turn (disabled during playback).
     const bar = document.createElement("div");
     bar.className = "play-match__actionbar";
     bar.append(
@@ -593,10 +597,44 @@ export function renderPlayableMatch(
     );
     frag.append(bar);
 
-    // Battle log.
+    // Battle log (full history).
     frag.append(logPanel(state));
 
+    // Floating combat text overlays, anchored to their target if visible.
+    const activeFloaters = step
+      ? step.floatingText !== undefined
+        ? [step]
+        : []
+      : floaters;
+    renderFloaters(frag, activeFloaters);
+
     root.replaceChildren(frag);
+  }
+
+  /** Anchors each floater near its target Warrior tile or player life area. */
+  function renderFloaters(frag: DocumentFragment, steps: PlaybackStep[]): void {
+    for (const step of steps) {
+      if (step.floatingText === undefined) continue;
+      const float = document.createElement("span");
+      float.className = `play-match__float play-match__float--${step.tone}`;
+      float.textContent = step.floatingText;
+
+      let anchor: Element | null = null;
+      if (step.targetInstanceId !== undefined) {
+        anchor = frag.querySelector(`[data-instance="${step.targetInstanceId}"]`);
+      } else if (step.targetPlayer !== undefined) {
+        anchor = frag.querySelector(`[data-seat="${step.targetPlayer}"]`);
+      }
+      // Fallback: the relevant field zone, else the board itself, so the text is
+      // never lost (e.g. a Warrior already removed by its own destruction).
+      if (anchor === null && step.targetPlayer !== undefined) {
+        anchor = frag.querySelector(`[data-seat="${step.targetPlayer}"]`);
+      }
+      if (anchor === null) {
+        anchor = frag.querySelector(".play-match__field--theirs");
+      }
+      if (anchor instanceof HTMLElement) anchor.append(float);
+    }
   }
 
   const barButton = (
