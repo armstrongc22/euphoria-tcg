@@ -1471,6 +1471,43 @@ body {
   font-style: italic;
 }
 
+/* Pending-choice prompts (Attack card / revive target). */
+.play-match__choice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border: 1px solid var(--surfer);
+  border-radius: 8px;
+  padding: 0.6rem;
+}
+
+.play-match__choice-option {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.play-match__choice-btn {
+  padding: 0.35rem 0.6rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.play-match__choice-cancel {
+  align-self: flex-start;
+  margin-top: 0.2rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
 .play-match__hand {
   display: flex;
   flex-wrap: wrap;

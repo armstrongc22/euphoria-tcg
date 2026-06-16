@@ -19,6 +19,7 @@ import type {
   PlayerState,
   WarriorInPlay,
 } from "@euphoria/game-engine";
+import { getReviveTargets, isOutDeckReviveItem } from "@euphoria/game-engine";
 import type { MatchSummary } from "./match";
 import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "./play-match";
 
@@ -26,6 +27,11 @@ function escapeHtml(text: string): string {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+/** True when an attack action resolves through a chosen Attack card. */
+function hasAttackCard(action: GameAction): boolean {
+  return action.kind === "attack" && action.selectedAttackCardId !== undefined;
 }
 
 /** Callbacks for the board. */
@@ -93,14 +99,24 @@ export function renderPlayableMatch(
   // Transient UI selection state, reset on every successful action.
   let selectedAttacker: string | null = null;
   let pendingWeapon: string | null = null;
+  // An open Attack-card prompt for a declared (attacker → defender) pair.
+  let pendingAttack: { attacker: string; defender: string } | null = null;
+  // An open revive-target prompt for a chosen Out-Deck revive Item (card id).
+  let pendingRevive: string | null = null;
   let error: string | null = null;
   let completed = false;
+
+  const clearSelections = (): void => {
+    selectedAttacker = null;
+    pendingWeapon = null;
+    pendingAttack = null;
+    pendingRevive = null;
+  };
 
   const act = (action: GameAction): void => {
     const res = match.apply(action);
     error = res.ok ? null : res.message;
-    selectedAttacker = null;
-    pendingWeapon = null;
+    clearSelections();
     paint();
   };
 
@@ -110,7 +126,9 @@ export function renderPlayableMatch(
     playItem: Map<string, GameAction>;
     equip: Map<string, GameAction[]>;
     reclaim: Map<string, GameAction>;
-    attack: Map<string, Map<string, GameAction>>;
+    // attacker → defender → all legal attack variants (regular + one per
+    // compatible Attack card). The UI prompts when more than one exists.
+    attack: Map<string, Map<string, GameAction[]>>;
     direct: Map<string, GameAction>;
     enterBattle?: GameAction;
     endTurn?: GameAction;
@@ -143,13 +161,14 @@ export function renderPlayableMatch(
           idx.reclaim.set(a.warriorInstanceId, a);
           break;
         case "attack": {
-          const byDef = idx.attack.get(a.attackerInstanceId) ?? new Map();
-          const prev = byDef.get(a.defenderInstanceId);
-          // One control per (attacker, defender): prefer the skip-attack-card
-          // variant so v1 never has to choose an Attack card.
-          if (prev === undefined || a.skipAttackCard === true) {
-            byDef.set(a.defenderInstanceId, a);
-          }
+          const byDef =
+            idx.attack.get(a.attackerInstanceId) ??
+            new Map<string, GameAction[]>();
+          // Keep every variant for this (attacker, defender): the bare/skip
+          // attack and one per compatible Attack card, so the UI can prompt.
+          const list = byDef.get(a.defenderInstanceId) ?? [];
+          list.push(a);
+          byDef.set(a.defenderInstanceId, list);
           idx.attack.set(a.attackerInstanceId, byDef);
           break;
         }
@@ -244,6 +263,129 @@ export function renderPlayableMatch(
     return b;
   };
 
+  // A button inside a choice prompt.
+  const choiceBtn = (label: string, onClick: () => void): HTMLButtonElement => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "play-match__choice-btn";
+    b.textContent = label;
+    b.addEventListener("click", onClick);
+    return b;
+  };
+
+  const cancelRow = (onCancel: () => void): HTMLButtonElement => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "play-match__choice-cancel";
+    b.textContent = "Cancel";
+    b.addEventListener("click", onCancel);
+    return b;
+  };
+
+  // "Use an Attack card?" — shown after declaring an attack whose attacker has
+  // compatible Attack cards in hand. Offers a regular attack, each Attack-card
+  // option, and Cancel. Every option maps to a legal action from the engine.
+  const attackChoicePanel = (idx: ActionIndex, me: PlayerState): HTMLElement | null => {
+    if (pendingAttack === null) return null;
+    const variants = idx.attack.get(pendingAttack.attacker)?.get(pendingAttack.defender);
+    if (variants === undefined || variants.length === 0) return null;
+
+    const panel = document.createElement("section");
+    panel.className = "account__panel play-match__choice";
+    const heading = document.createElement("h3");
+    heading.className = "account__panel-heading";
+    heading.textContent = "Use an Attack card?";
+    panel.append(heading);
+
+    const regular =
+      variants.find((a) => a.kind === "attack" && a.skipAttackCard === true) ??
+      variants.find((a) => a.kind === "attack" && a.selectedAttackCardId === undefined);
+    if (regular !== undefined) {
+      panel.append(choiceBtn("Regular attack (no card)", () => act(regular)));
+    }
+    for (const variant of variants) {
+      if (variant.kind !== "attack" || variant.selectedAttackCardId === undefined) continue;
+      const card = me.hand.find((c) => c.id === variant.selectedAttackCardId);
+      const row = document.createElement("div");
+      row.className = "play-match__choice-option";
+      if (card !== undefined) {
+        const look = document.createElement("button");
+        look.type = "button";
+        look.className = "play-match__card-inspect";
+        look.title = "View card details";
+        look.innerHTML =
+          `<span class="play-match__card-name">${escapeHtml(card.name)}</span>` +
+          `<span class="play-match__card-meta">Attack · ◆${card.cost}</span>`;
+        look.addEventListener("click", () => inspect(card));
+        row.append(look);
+      }
+      row.append(
+        choiceBtn(
+          card !== undefined ? `Use ${card.name}` : "Use Attack card",
+          () => act(variant),
+        ),
+      );
+      panel.append(row);
+    }
+    panel.append(
+      cancelRow(() => {
+        pendingAttack = null;
+        paint();
+      }),
+    );
+    return panel;
+  };
+
+  // "Choose a Warrior to revive" — shown after playing a revive Item (Totem's
+  // Creation). Lists the Out-Deck Warriors (inspectable), each resolving the
+  // engine's existing revive via playItem + targetOutDeckCardId.
+  const reviveChoicePanel = (state: GameState, me: PlayerState): HTMLElement | null => {
+    if (pendingRevive === null) return null;
+    const card = me.hand.find((c) => c.id === pendingRevive);
+    if (card === undefined) return null;
+    const targets = getReviveTargets(state, card);
+    if (targets.length === 0) return null;
+
+    const panel = document.createElement("section");
+    panel.className = "account__panel play-match__choice";
+    const heading = document.createElement("h3");
+    heading.className = "account__panel-heading";
+    heading.textContent = `Revive a Warrior with ${card.name}`;
+    panel.append(heading);
+
+    for (const target of targets) {
+      const row = document.createElement("div");
+      row.className = "play-match__choice-option";
+      const look = document.createElement("button");
+      look.type = "button";
+      look.className = "play-match__card-inspect";
+      look.title = "View card details";
+      look.innerHTML =
+        `<span class="play-match__card-name">${escapeHtml(target.name)}</span>` +
+        `<span class="play-match__card-meta">${escapeHtml(target.faction)} · ` +
+        `${target.attack ?? 0}/${target.health ?? 0}</span>`;
+      look.addEventListener("click", () => inspect(target));
+      row.append(look);
+      row.append(
+        choiceBtn(`Revive ${target.name}`, () =>
+          act({
+            kind: "playItem",
+            cardId: pendingRevive!,
+            targetOutDeckCardId: target.id,
+          }),
+        ),
+      );
+      panel.append(row);
+    }
+    panel.append(
+      cancelRow(() => {
+        pendingRevive = null;
+        paint();
+      }),
+    );
+    return panel;
+  };
+
   // --- the painter ----------------------------------------------------------
   function paint(): void {
     if (match.isOver()) {
@@ -291,6 +433,12 @@ export function renderPlayableMatch(
     hint.className = "play-match__hint";
     hint.textContent = "Tap any card to view its full details.";
     frag.append(hint);
+
+    // Pending choice prompts (Attack card / revive target), if any.
+    const attackPanel = attackChoicePanel(idx, me);
+    if (attackPanel !== null) frag.append(attackPanel);
+    const revivePanel = reviveChoicePanel(state, me);
+    if (revivePanel !== null) frag.append(revivePanel);
 
     // Opponent: stats + field.
     frag.append(statBar("Opponent", opp));
@@ -386,21 +534,34 @@ export function renderPlayableMatch(
         // Enemy Warrior: an "Attack" control while an attacker is selected and
         // this is a legal target, or "Reclaim" if it is one of ours under
         // foreign control. Body stays inspectable either way.
-        const attackAction =
+        const variants =
           selectedAttacker !== null
             ? idx.attack.get(selectedAttacker)?.get(w.instanceId)
             : undefined;
         const reclaim = idx.reclaim.get(w.instanceId);
         const controls: HTMLButtonElement[] = [];
-        if (attackAction !== undefined) {
-          controls.push(warriorBtn("Attack", () => act(attackAction)));
+        if (variants !== undefined && variants.length > 0) {
+          const attacker = selectedAttacker!;
+          controls.push(
+            warriorBtn("Attack", () => {
+              // If any variant uses an Attack card, prompt to choose; otherwise
+              // resolve the single regular attack immediately.
+              if (variants.some((a) => hasAttackCard(a))) {
+                pendingAttack = { attacker, defender: w.instanceId };
+                error = null;
+                paint();
+              } else {
+                act(variants[0]!);
+              }
+            }),
+          );
         }
         if (reclaim !== undefined) {
           controls.push(warriorBtn("Reclaim", () => act(reclaim)));
         }
         row.append(
           warriorEl(w, {
-            highlighted: attackAction !== undefined,
+            highlighted: variants !== undefined && variants.length > 0,
             badge: reclaim !== undefined ? "reclaim" : undefined,
             controls,
           }),
@@ -463,6 +624,28 @@ export function renderPlayableMatch(
 
       if (playWarrior !== undefined) {
         controls.append(cardButton("Summon", () => act(playWarrior)));
+      } else if (playItem !== undefined && isOutDeckReviveItem(card)) {
+        // Revive Items (Totem's Creation) need a chosen Out-Deck Warrior. Guard
+        // the no-target and field-full cases with a clear, disabled message
+        // rather than wasting the card on a no-op resolution.
+        const fieldFull = me.field.length >= match.state().config.warriorSlots;
+        const targets = getReviveTargets(match.state(), card);
+        if (fieldFull) {
+          controls.append(cardButton("Field is full", undefined));
+        } else if (targets.length === 0) {
+          controls.append(cardButton("No Warrior to revive", undefined));
+        } else {
+          const b = cardButton(
+            pendingRevive === card.id ? "Pick a Warrior…" : "Play",
+            () => {
+              pendingRevive = pendingRevive === card.id ? null : card.id;
+              error = null;
+              paint();
+            },
+          );
+          if (pendingRevive === card.id) b.classList.add("play-match__card-btn--active");
+          controls.append(b);
+        }
       } else if (playItem !== undefined) {
         controls.append(cardButton("Play", () => act(playItem)));
       } else if (equip !== undefined && equip.length > 0) {

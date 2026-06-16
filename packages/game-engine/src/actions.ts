@@ -234,6 +234,34 @@ export function getCompatibleAttackCards(
   return compatible;
 }
 
+/**
+ * True for an Item whose effect revives a Warrior from the controller's own Out
+ * Deck (REVIVE_WARRIOR, e.g. Totem's Creation). Such Items need a chosen
+ * targetOutDeckCardId on the playItem action; without one the revive handler
+ * fails safely and nothing is revived. Callers (e.g. the manual-match UI) use
+ * this to know when to prompt for a revive target. The engine's auto-sim path is
+ * unchanged — getLegalActions still emits a bare playItem.
+ */
+export function isOutDeckReviveItem(card: Card): boolean {
+  return (
+    card.type === "Item" &&
+    card.effectCode !== undefined &&
+    normalizeEffectCode(card.effectCode) === "REVIVE_WARRIOR"
+  );
+}
+
+/**
+ * The valid revive targets for `card` right now: the Warriors in the active
+ * player's Out Deck (mirrors the REVIVE_WARRIOR handler's "Warriors only" rule).
+ * Empty when `card` is not a revive Item or no Warrior is available to revive.
+ */
+export function getReviveTargets(state: GameState, card: Card): Card[] {
+  if (!isOutDeckReviveItem(card)) return [];
+  return state.players[state.activePlayer].outDeck.filter(
+    (c) => c.type === "Warrior",
+  );
+}
+
 function attachedWeaponCode(warrior: WarriorInPlay): string | undefined {
   const code = warrior.attachedWeapon?.effectCode;
   return code === undefined ? undefined : normalizeEffectCode(code);
