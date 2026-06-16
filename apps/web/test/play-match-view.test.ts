@@ -73,6 +73,21 @@ describe("renderPlayableMatch — summon flow", () => {
     // The board re-rendered in place: a warrior tile now exists.
     expect(root.querySelectorAll(".play-match__field--mine .play-match__warrior").length).toBe(1);
   });
+
+  it("does not offer/enable a second Warrior summon the same turn", () => {
+    const match = newMatch(); // seed 1: opening hand holds several Warriors
+    // Plenty of Spirit so leftover Warriors aren't disabled for cost reasons —
+    // isolating the one-summon-per-turn rule.
+    match.state().players.player1.spirit = 99;
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    // No enabled Summon control remains this turn.
+    expect(buttonByText(root, ".play-match__card-btn", "Summon")).toBeUndefined();
+    // Remaining Warriors are shown disabled with the limit reason.
+    const limited = buttonByText(root, ".play-match__card-btn", "One summon per turn");
+    expect(limited).toBeDefined();
+    expect(limited!.disabled).toBe(true);
+  });
 });
 
 describe("renderPlayableMatch — completion", () => {

@@ -10,6 +10,7 @@ export const DEFAULT_RULES: RulesConfig = {
   warriorSlots: 5,
   noAttacksOnFirstTurn: true,
   directAttackLimitPerTurn: 1,
+  warriorSummonsPerTurn: 1,
   warriorsCanAttackTurnSummoned: true,
   combatDamageSimultaneous: false,
   attackCardsOnDirectAttacks: false,

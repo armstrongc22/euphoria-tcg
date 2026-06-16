@@ -32,6 +32,7 @@ export type EngineErrorCode =
   | "WRONG_CARD_TYPE"
   | "INSUFFICIENT_SPIRIT"
   | "FIELD_FULL"
+  | "SUMMON_LIMIT_REACHED"
   | "WARRIOR_NOT_FOUND"
   | "WEAPON_ALREADY_EQUIPPED"
   | "FIRST_TURN_NO_ATTACKS"
@@ -825,6 +826,15 @@ function playWarrior(state: GameState, cardId: string): ActionResult {
       `The Warrior field is full (${state.config.warriorSlots} slots).`,
     );
   }
+  // One normal Warrior summon per turn. Effect/revive summons do not pass
+  // through this action, so they are unaffected by this limit.
+  if (player.warriorSummonsUsedThisTurn >= state.config.warriorSummonsPerTurn) {
+    return fail(
+      "SUMMON_LIMIT_REACHED",
+      `Only ${state.config.warriorSummonsPerTurn} Warrior summon` +
+        `${state.config.warriorSummonsPerTurn === 1 ? "" : "s"} allowed per turn.`,
+    );
+  }
 
   const next = structuredClone(state);
   const nextPlayer = next.players[next.activePlayer];
@@ -832,6 +842,7 @@ function playWarrior(state: GameState, cardId: string): ActionResult {
 
   nextPlayer.spirit -= card.cost;
   nextPlayer.hand.splice(validated.handIndex, 1);
+  nextPlayer.warriorSummonsUsedThisTurn += 1;
 
   const warrior = createWarriorInPlay(next, card);
   nextPlayer.field.push(warrior);
@@ -970,7 +981,10 @@ export function getLegalActions(state: GameState): GameAction[] {
       if (card.cost > player.spirit) continue;
 
       if (card.type === "Warrior") {
-        if (player.field.length < state.config.warriorSlots) {
+        if (
+          player.field.length < state.config.warriorSlots &&
+          player.warriorSummonsUsedThisTurn < state.config.warriorSummonsPerTurn
+        ) {
           actions.push({ kind: "playWarrior", cardId: card.id });
         }
       } else if (card.type === "Item") {

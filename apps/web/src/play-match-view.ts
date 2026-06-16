@@ -478,16 +478,21 @@ export function renderPlayableMatch(
         controls.append(b);
       } else {
         // No legal play for this card right now — show why, disabled.
+        const summonUsedUp =
+          card.type === "Warrior" &&
+          me.warriorSummonsUsedThisTurn >= match.state().config.warriorSummonsPerTurn;
         const reason =
           card.cost > me.spirit
             ? "Not enough Spirit"
             : match.state().phase === "battle"
               ? "Not during Battle"
-              : card.type === "Weapon"
-                ? "No Warrior to equip"
-                : card.type === "Attack"
-                  ? "Used with an attack"
-                  : "No legal play";
+              : summonUsedUp
+                ? "One summon per turn"
+                : card.type === "Weapon"
+                  ? "No Warrior to equip"
+                  : card.type === "Attack"
+                    ? "Used with an attack"
+                    : "No legal play";
         const b = cardButton(reason, undefined);
         controls.append(b);
       }

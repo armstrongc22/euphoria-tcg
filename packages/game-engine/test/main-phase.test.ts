@@ -52,7 +52,13 @@ describe("summon Warrior", () => {
   });
 
   it("assigns unique instance ids across summons", () => {
-    const game = newGame();
+    // Verifies instance-id uniqueness, not the per-turn summon cap, so raise the
+    // cap (default 1) to allow two summons in the same turn.
+    const game = createGame({
+      decks: makeDecks(),
+      seed: 1,
+      config: { warriorSummonsPerTurn: 2 },
+    });
     game.players.player1.spirit = 5;
     const a = makeWarriorCard();
     const b = makeWarriorCard();

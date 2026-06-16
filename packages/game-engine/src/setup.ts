@@ -87,6 +87,7 @@ function createPlayer(id: PlayerId, config: RulesConfig): PlayerState {
     field: [],
     outDeck: [],
     directAttackUsedThisTurn: false,
+    warriorSummonsUsedThisTurn: 0,
     delayedEffects: [],
     outOfPlay: [],
   };
