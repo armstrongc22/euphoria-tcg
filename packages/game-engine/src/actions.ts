@@ -299,6 +299,33 @@ export function getDeckSearchTargets(state: GameState, card: Card): Card[] {
   );
 }
 
+/**
+ * True for an Item that takes an Item from the opponent's revealed hand
+ * (STEAL_ITEM_FROM_HAND, e.g. A Thief's Pride). Such Items need a chosen
+ * targetOpponentHandCardId on the playItem action; without one the steal handler
+ * fails safely and nothing is taken. The auto-sim path is unchanged.
+ */
+export function isStealHandItem(card: Card): boolean {
+  return (
+    card.type === "Item" &&
+    card.effectCode !== undefined &&
+    normalizeEffectCode(card.effectCode) === "STEAL_ITEM_FROM_HAND"
+  );
+}
+
+/**
+ * The valid steal targets for `card` right now: the Item cards in the opponent's
+ * hand (mirrors the STEAL_ITEM_FROM_HAND handler's "Item only" rule; the card
+ * reveals the opponent's hand). Empty when `card` is not a steal Item or the
+ * opponent holds no Item.
+ */
+export function getStealTargets(state: GameState, card: Card): Card[] {
+  if (!isStealHandItem(card)) return [];
+  return state.players[opponentOf(state.activePlayer)].hand.filter(
+    (c) => c.type === "Item",
+  );
+}
+
 function attachedWeaponCode(warrior: WarriorInPlay): string | undefined {
   const code = warrior.attachedWeapon?.effectCode;
   return code === undefined ? undefined : normalizeEffectCode(code);
