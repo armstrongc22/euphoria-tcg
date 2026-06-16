@@ -20,6 +20,7 @@ import {
   createRng,
   getLegalActions,
   type GameAction,
+  type GameEvent,
   type GameState,
 } from "@euphoria/game-engine";
 import { buildGameResult, smartAgent, type EndReason } from "@euphoria/simulator";
@@ -55,9 +56,23 @@ export interface PlayableMatchOptions {
   readonly maxOpponentActionsPerTurn?: number;
 }
 
-/** Result of applying a human action: ok, or the engine's rejection message. */
+/**
+ * One resolved action's snapshot: the engine state immediately after it, the
+ * events it produced (the delta), and who acted. Returned in order from
+ * {@link PlayableMatch.apply} so the UI can play actions back progressively
+ * (the human's action first, then each of the opponent's). The state is a
+ * distinct post-action object (applyAction never mutates its input), so frames
+ * are safe to render as a sequence of board snapshots.
+ */
+export interface MatchFrame {
+  readonly state: GameState;
+  readonly events: readonly GameEvent[];
+  readonly actor: "player" | "opponent";
+}
+
+/** Result of applying a human action: ok with the resolved frames, or an error. */
 export type ApplyResult =
-  | { readonly ok: true }
+  | { readonly ok: true; readonly frames: MatchFrame[] }
   | { readonly ok: false; readonly message: string };
 
 /** A human-controlled match in progress. All reads reflect the latest state. */
@@ -74,7 +89,11 @@ export interface PlayableMatch {
    * or while it is the opponent's turn (the controller runs that automatically).
    */
   legalActions(): GameAction[];
-  /** Applies one human action, then auto-runs the opponent if the turn passed. */
+  /**
+   * Applies one human action, then auto-runs the opponent if the turn passed.
+   * Returns the resolved frames in order (human first, then the opponent's), so
+   * the caller can play them back rather than jumping straight to the result.
+   */
   apply(action: GameAction): ApplyResult;
   /** The display-ready summary; only meaningful once {@link isOver} is true. */
   summary(): MatchSummary;
@@ -117,7 +136,7 @@ export function createPlayableMatch(
   // legal actions, let smartAgent choose, apply, repeat until control returns to
   // the human or the game ends. The same contract as the simulator loop — an
   // agent that returns an illegal action is a bug surfaced as a thrown error.
-  const runOpponent = (): void => {
+  const runOpponent = (frames: MatchFrame[]): void => {
     let steps = 0;
     while (
       state.winner === null &&
@@ -130,6 +149,7 @@ export function createPlayableMatch(
       const legal = getLegalActions(state);
       if (legal.length === 0) break;
       const choice = agent(state, legal);
+      const before = state.events.length;
       const result = applyAction(state, choice);
       if (!result.ok) {
         throw new Error(
@@ -139,6 +159,11 @@ export function createPlayableMatch(
       state = result.state;
       actions += 1;
       steps += 1;
+      frames.push({
+        state,
+        events: state.events.slice(before),
+        actor: "opponent",
+      });
     }
   };
 
@@ -159,15 +184,20 @@ export function createPlayableMatch(
       if (state.activePlayer !== PLAYER_SEAT) {
         return { ok: false, message: "It is not your turn." };
       }
+      const before = state.events.length;
       const result = applyAction(state, action);
       if (!result.ok) {
         return { ok: false, message: result.error.message };
       }
       state = result.state;
       actions += 1;
-      // If that action ended the human's turn, play out the opponent's reply.
-      if (state.activePlayer === OPPONENT_SEAT) runOpponent();
-      return { ok: true };
+      const frames: MatchFrame[] = [
+        { state, events: state.events.slice(before), actor: "player" },
+      ];
+      // If that action ended the human's turn, play out the opponent's reply,
+      // capturing each of its actions as its own frame for progressive playback.
+      if (state.activePlayer === OPPONENT_SEAT) runOpponent(frames);
+      return { ok: true, frames };
     },
     summary: () => {
       const reason: EndReason = stalled ? "maxActions" : "win";

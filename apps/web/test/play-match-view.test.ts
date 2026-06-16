@@ -766,3 +766,189 @@ describe("renderPlayableMatch — live battle log shows both sides", () => {
     }
   });
 });
+
+describe("renderPlayableMatch — match playback & floating text (Feature B/C/D)", () => {
+  // A scheduler the test drains manually so playback can be observed step by step.
+  function manualScheduler() {
+    let pending: (() => void) | null = null;
+    const scheduler = (cb: () => void): void => {
+      pending = cb;
+    };
+    const step = (): void => {
+      const cb = pending;
+      pending = null;
+      cb?.();
+    };
+    const flush = (): void => {
+      let guard = 0;
+      while (pending && guard++ < 2000) step();
+    };
+    return { scheduler, step, flush, pending: () => pending !== null };
+  }
+
+  /** Battle scenario: P1 `attacker` vs P2 `defender`, no Attack cards in hand. */
+  function craftAttack(attack: number, defenderHealth: number) {
+    const atkCard = cards.find((c) => c.type === "Warrior")!;
+    const defCard = cards.find((c) => c.type === "Warrior" && c.id !== atkCard.id)!;
+    const match = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed: 1,
+      opponentFaction: "Dwarf",
+    });
+    const s = match.state();
+    s.phase = "battle";
+    s.turn = 3;
+    s.activePlayer = "player1";
+    s.players.player1.hand = [];
+    const a = wip(atkCard, "a1");
+    a.currentAttack = attack;
+    const d = wip(defCard, "e1");
+    d.currentHealth = defenderHealth;
+    s.players.player1.field = [a];
+    s.players.player2.field = [d];
+    return { match, defenderName: defCard.name };
+  }
+
+  it("shows a current-action callout and floating damage on a player attack", () => {
+    const { match } = craftAttack(100, 5000); // non-lethal: defender tile remains
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__warrior-btn", "Choose to attack")!.click();
+    buttonByText(root, ".play-match__warrior-btn", "Attack")!.click();
+
+    expect(root.querySelector(".play-match__callout")?.textContent).toContain("attacked");
+    const float = root.querySelector(".play-match__float--damage");
+    expect(float).not.toBeNull();
+    expect(float!.textContent).toBe("-100 HEALTH");
+    // Anchored to the defender's tile.
+    expect(
+      root.querySelector('[data-instance="e1"] .play-match__float--damage'),
+    ).not.toBeNull();
+  });
+
+  it("does not return control instantly on the opponent's turn — it plays back", () => {
+    const { scheduler, pending } = manualScheduler();
+    const match = newMatch(5);
+    const root = renderPlayableMatch(
+      match,
+      { onComplete: noop, onQuit: noop },
+      { scheduler },
+    );
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+
+    // Playback is in progress: banner shown, more steps scheduled.
+    expect(root.querySelector(".play-match__playback-banner")).not.toBeNull();
+    expect(pending()).toBe(true);
+  });
+
+  it("disables player actions during opponent playback", () => {
+    const { scheduler } = manualScheduler();
+    const match = newMatch(5);
+    const root = renderPlayableMatch(
+      match,
+      { onComplete: noop, onQuit: noop },
+      { scheduler },
+    );
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+
+    // No enabled gameplay controls while the opponent acts.
+    expect(root.querySelector<HTMLButtonElement>(".play-match__end")!.disabled).toBe(true);
+    expect(root.querySelector<HTMLButtonElement>(".play-match__enter")!.disabled).toBe(true);
+    const enabledCardBtns = Array.from(
+      root.querySelectorAll<HTMLButtonElement>(".play-match__card-btn"),
+    ).filter((b) => !b.disabled);
+    expect(enabledCardBtns).toHaveLength(0);
+  });
+
+  it("plays the opponent's actions back, then returns control to the player", () => {
+    const { scheduler, flush } = manualScheduler();
+    const match = newMatch(5);
+    const root = renderPlayableMatch(
+      match,
+      { onComplete: noop, onQuit: noop },
+      { scheduler },
+    );
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+    flush();
+
+    // Playback finished: banner gone and (game not over) control is back.
+    expect(root.querySelector(".play-match__playback-banner")).toBeNull();
+    if (!match.isOver()) {
+      expect(root.querySelector<HTMLButtonElement>(".play-match__end")).not.toBeNull();
+      // The full battle log records both the player's and opponent's actions.
+      const log = root.querySelector(".play-match__log-list")?.textContent ?? "";
+      expect(log).toContain("You summoned");
+      expect(log).toContain("Opponent");
+    }
+  });
+
+  it("surfaces opponent action callouts during playback", () => {
+    const { scheduler, step, pending } = manualScheduler();
+    const match = newMatch(5);
+    const root = renderPlayableMatch(
+      match,
+      { onComplete: noop, onQuit: noop },
+      { scheduler },
+    );
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+
+    const callouts: string[] = [];
+    let guard = 0;
+    while (pending() && guard++ < 200) {
+      const text = root.querySelector(".play-match__callout")?.textContent ?? "";
+      if (text.trim().length > 0) callouts.push(text);
+      step();
+    }
+    // At least one opponent-turn callout was shown during playback.
+    expect(callouts.some((c) => c.includes("Opponent") || c.includes("turn"))).toBe(true);
+  });
+});
+
+describe("renderPlayableMatch — reduced motion", () => {
+  it("renders floating text without breaking under prefers-reduced-motion", () => {
+    // Reduced motion is handled purely in CSS, so rendering must be unaffected.
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("prefers-reduced-motion"),
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const atkCard = cards.find((c) => c.type === "Warrior")!;
+      const defCard = cards.find((c) => c.type === "Warrior" && c.id !== atkCard.id)!;
+      const match = createPlayableMatch({
+        faction: "Sonic",
+        pool: cards,
+        seed: 1,
+        opponentFaction: "Dwarf",
+      });
+      const s = match.state();
+      s.phase = "battle";
+      s.turn = 3;
+      s.activePlayer = "player1";
+      s.players.player1.hand = [];
+      const a = wip(atkCard, "a1");
+      a.currentAttack = 100;
+      const d = wip(defCard, "e1");
+      d.currentHealth = 5000;
+      s.players.player1.field = [a];
+      s.players.player2.field = [d];
+
+      const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+      buttonByText(root, ".play-match__warrior-btn", "Choose to attack")!.click();
+      buttonByText(root, ".play-match__warrior-btn", "Attack")!.click();
+      expect(root.querySelector(".play-match__float--damage")?.textContent).toBe("-100 HEALTH");
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+});
