@@ -22,8 +22,10 @@ import type {
 import {
   getDeckSearchTargets,
   getReviveTargets,
+  getStealTargets,
   isDeckSearchItem,
   isOutDeckReviveItem,
+  isStealHandItem,
 } from "@euphoria/game-engine";
 import type { MatchSummary } from "./match";
 import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "./play-match";
@@ -110,6 +112,8 @@ export function renderPlayableMatch(
   let pendingRevive: string | null = null;
   // An open deck-search prompt for a chosen SEARCH_DECK Item (card id).
   let pendingSearch: string | null = null;
+  // An open hand-steal prompt for a chosen STEAL_ITEM_FROM_HAND Item (card id).
+  let pendingSteal: string | null = null;
   let error: string | null = null;
   let completed = false;
 
@@ -119,6 +123,7 @@ export function renderPlayableMatch(
     pendingAttack = null;
     pendingRevive = null;
     pendingSearch = null;
+    pendingSteal = null;
   };
 
   const act = (action: GameAction): void => {
@@ -424,6 +429,29 @@ export function renderPlayableMatch(
     );
   };
 
+  // "Take an Item from the opponent's hand" — shown after playing a hand-steal
+  // Item (A Thief's Pride), resolving via playItem + targetOpponentHandCardId.
+  const stealChoicePanel = (
+    state: GameState,
+    me: PlayerState,
+  ): HTMLElement | null => {
+    if (pendingSteal === null) return null;
+    const card = me.hand.find((c) => c.id === pendingSteal);
+    if (card === undefined) return null;
+    const targets = getStealTargets(state, card);
+    if (targets.length === 0) return null;
+    return targetChoicePanel(
+      `Take an Item from the opponent's hand with ${card.name}`,
+      targets,
+      (t) => `Take ${t.name}`,
+      (t) => ({ kind: "playItem", cardId: card.id, targetOpponentHandCardId: t.id }),
+      () => {
+        pendingSteal = null;
+        paint();
+      },
+    );
+  };
+
   // --- the painter ----------------------------------------------------------
   function paint(): void {
     if (match.isOver()) {
@@ -479,6 +507,8 @@ export function renderPlayableMatch(
     if (revivePanel !== null) frag.append(revivePanel);
     const searchPanel = deckSearchChoicePanel(state, me);
     if (searchPanel !== null) frag.append(searchPanel);
+    const stealPanel = stealChoicePanel(state, me);
+    if (stealPanel !== null) frag.append(stealPanel);
 
     // Opponent: stats + field.
     frag.append(statBar("Opponent", opp));
@@ -702,6 +732,23 @@ export function renderPlayableMatch(
             },
           );
           if (pendingSearch === card.id) b.classList.add("play-match__card-btn--active");
+          controls.append(b);
+        }
+      } else if (playItem !== undefined && isStealHandItem(card)) {
+        // Hand-steal Items (A Thief's Pride) need a chosen opponent-hand Item.
+        const targets = getStealTargets(match.state(), card);
+        if (targets.length === 0) {
+          controls.append(cardButton("No Item in opponent's hand", undefined));
+        } else {
+          const b = cardButton(
+            pendingSteal === card.id ? "Pick a card…" : "Play",
+            () => {
+              pendingSteal = pendingSteal === card.id ? null : card.id;
+              error = null;
+              paint();
+            },
+          );
+          if (pendingSteal === card.id) b.classList.add("play-match__card-btn--active");
           controls.append(b);
         }
       } else if (playItem !== undefined) {

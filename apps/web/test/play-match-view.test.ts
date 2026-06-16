@@ -555,3 +555,108 @@ describe("renderPlayableMatch — Lahkt Brand Family Products deck search", () =
     expect(onInspect.mock.calls[0]![0].id).toBe(weapon.id);
   });
 });
+
+describe("renderPlayableMatch — SEARCH_DECK genericity (not just Lahkt)", () => {
+  it("offers a deck-search picker for other SEARCH_DECK Items too", () => {
+    // Greenskin Auction House: "Add 1 Weapon from your deck to your hand."
+    const greenskin = cards.find((c) => c.slug === "greenskin-auction-house");
+    if (greenskin === undefined) throw new Error("greenskin-auction-house missing");
+    const weapon = cards.find((c) => c.type === "Weapon")!;
+    const match = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed: 1,
+      opponentFaction: "Dwarf",
+    });
+    const s = match.state();
+    s.players.player1.spirit = 5;
+    s.players.player1.hand = [greenskin];
+    s.players.player1.deck = [weapon, cards.find((c) => c.type === "Warrior")!];
+
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    buttonByText(root, ".play-match__choice-btn", `Add ${weapon.name}`)!.click();
+    expect(match.state().players.player1.hand.map((c) => c.id)).toContain(weapon.id);
+  });
+});
+
+describe("renderPlayableMatch — A Thief's Pride hand steal", () => {
+  const thief = (): Card => {
+    const c = cards.find((card) => card.slug === "a-thiefs-pride");
+    if (c === undefined) throw new Error("a-thiefs-pride missing from pool");
+    return c;
+  };
+  const anItem = (): Card =>
+    cards.find((c) => c.type === "Item" && c.slug !== "a-thiefs-pride")!;
+  const aWarrior = (): Card => cards.find((c) => c.type === "Warrior")!;
+
+  function craftSteal(opponentHand: Card[]): ReturnType<typeof createPlayableMatch> {
+    const match = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed: 1,
+      opponentFaction: "Dwarf",
+    });
+    const s = match.state();
+    s.players.player1.spirit = 5;
+    s.players.player1.hand = [thief()];
+    s.players.player2.hand = opponentHand;
+    return match;
+  }
+
+  it("disables A Thief's Pride when the opponent has no Item", () => {
+    const match = craftSteal([aWarrior()]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const btn = buttonByText(root, ".play-match__card-btn", "No Item in opponent's hand");
+    expect(btn).toBeDefined();
+    expect(btn!.disabled).toBe(true);
+  });
+
+  it("shows the opponent's Item cards, excluding non-Items", () => {
+    const item = anItem();
+    const warrior = aWarrior();
+    const match = craftSteal([item, warrior]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    const panel = root.querySelector(".play-match__choice")!;
+    expect(panel.textContent).toContain(item.name);
+    expect(buttonByText(root, ".play-match__choice-btn", `Take ${warrior.name}`)).toBeUndefined();
+  });
+
+  it("takes the chosen Item, passing the correct target", () => {
+    const item = anItem();
+    const match = craftSteal([item]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    buttonByText(root, ".play-match__choice-btn", `Take ${item.name}`)!.click();
+
+    expect(match.state().players.player1.hand.map((c) => c.id)).toContain(item.id);
+    expect(match.state().players.player2.hand.map((c) => c.id)).not.toContain(item.id);
+    expect(match.state().players.player1.hand.some((c) => c.slug === "a-thiefs-pride")).toBe(false);
+    expect(match.state().events.map((e) => e.type)).toContain("cardStolenFromHand");
+  });
+
+  it("does not spend A Thief's Pride when canceled", () => {
+    const item = anItem();
+    const match = craftSteal([item]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    root.querySelector<HTMLButtonElement>(".play-match__choice-cancel")!.click();
+    expect(root.querySelector(".play-match__choice")).toBeNull();
+    expect(match.state().players.player1.hand.some((c) => c.slug === "a-thiefs-pride")).toBe(true);
+    expect(match.state().players.player2.hand.map((c) => c.id)).toContain(item.id);
+  });
+
+  it("lets the opponent's Item be inspected before stealing", () => {
+    const item = anItem();
+    const match = craftSteal([item]);
+    const onInspect = vi.fn();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop, onInspect });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    root.querySelector<HTMLButtonElement>(
+      ".play-match__choice .play-match__card-inspect",
+    )!.click();
+    expect(onInspect).toHaveBeenCalledTimes(1);
+    expect(onInspect.mock.calls[0]![0].id).toBe(item.id);
+  });
+});
