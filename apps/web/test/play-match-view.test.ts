@@ -7,10 +7,25 @@
  * summary (so the result/history/reward flow downstream still runs).
  */
 import { describe, expect, it, vi } from "vitest";
+import type { Card } from "@euphoria/card-data/schema";
+import type { WarriorInPlay } from "@euphoria/game-engine";
 import { cards } from "../src/cards";
 import { createPlayableMatch } from "../src/play-match";
 import { renderPlayableMatch } from "../src/play-match-view";
 import { createCardDetail } from "../src/detail";
+
+/** Minimal in-play Warrior for white-box board scenarios. */
+function wip(card: Card, instanceId: string): WarriorInPlay {
+  return {
+    instanceId,
+    card,
+    currentAttack: card.attack ?? 1000,
+    currentHealth: card.health ?? 2000,
+    maxHealth: card.health ?? 2000,
+    attacksRemaining: 1,
+    temporaryAttackBuffs: [],
+  };
+}
 
 const noop = (): void => {};
 
@@ -239,5 +254,210 @@ describe("shared card-detail modal (reused by Card Viewer / Deck Builder / match
     // Clicking the dialog backdrop (target === dialog) also closes it.
     detail.element.click();
     expect(closeFn).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("renderPlayableMatch — Totem's Creation revive (Bug A)", () => {
+  const totems = (): Card => {
+    const c = cards.find((card) => card.slug === "totems-creation");
+    if (c === undefined) throw new Error("totems-creation missing from pool");
+    return c;
+  };
+  const aWarrior = (): Card => cards.find((c) => c.type === "Warrior")!;
+
+  function craftRevive(outDeck: Card[]): ReturnType<typeof createPlayableMatch> {
+    const match = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed: 1,
+      opponentFaction: "Dwarf",
+    });
+    const s = match.state();
+    s.players.player1.spirit = 5;
+    s.players.player1.hand = [totems()];
+    s.players.player1.field = [];
+    s.players.player1.outDeck = outDeck;
+    return match;
+  }
+
+  it("disables Totem's Creation when no valid Out-Deck Warrior exists", () => {
+    const match = craftRevive([]); // empty Out Deck
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const btn = buttonByText(root, ".play-match__card-btn", "No Warrior to revive");
+    expect(btn).toBeDefined();
+    expect(btn!.disabled).toBe(true);
+  });
+
+  it("excludes non-Warrior Out-Deck cards as revive targets", () => {
+    const item = cards.find((c) => c.type === "Item" && c.slug !== "totems-creation")!;
+    const match = craftRevive([item]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(buttonByText(root, ".play-match__card-btn", "No Warrior to revive")).toBeDefined();
+  });
+
+  it("shows valid Out-Deck Warrior targets when Play is clicked", () => {
+    const fallen = aWarrior();
+    const match = craftRevive([fallen]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    const panel = root.querySelector(".play-match__choice");
+    expect(panel).not.toBeNull();
+    expect(panel!.textContent).toContain(fallen.name);
+  });
+
+  it("revives the chosen Warrior, passing the correct target", () => {
+    const fallen = aWarrior();
+    const match = craftRevive([fallen]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    buttonByText(root, ".play-match__choice-btn", `Revive ${fallen.name}`)!.click();
+
+    const p1 = match.state().players.player1;
+    expect(p1.field.map((w) => w.card.id)).toContain(fallen.id);
+    expect(p1.outDeck.map((c) => c.id)).not.toContain(fallen.id);
+    // Totem's Creation was spent.
+    expect(p1.hand.some((c) => c.slug === "totems-creation")).toBe(false);
+  });
+
+  it("cancels a revive choice without corrupting state", () => {
+    const fallen = aWarrior();
+    const match = craftRevive([fallen]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    root.querySelector<HTMLButtonElement>(".play-match__choice-cancel")!.click();
+    expect(root.querySelector(".play-match__choice")).toBeNull();
+    // Nothing played: card still in hand, Out Deck Warrior untouched.
+    expect(match.state().players.player1.hand.some((c) => c.slug === "totems-creation")).toBe(true);
+    expect(match.state().players.player1.outDeck.map((c) => c.id)).toContain(fallen.id);
+  });
+
+  it("shows 'Field is full' instead of reviving when the field is full", () => {
+    const fallen = aWarrior();
+    const match = craftRevive([fallen]);
+    const s = match.state();
+    s.players.player1.field = Array.from({ length: s.config.warriorSlots }, (_, i) =>
+      wip(aWarrior(), `full-${i}`),
+    );
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const btn = buttonByText(root, ".play-match__card-btn", "Field is full");
+    expect(btn).toBeDefined();
+    expect(btn!.disabled).toBe(true);
+  });
+});
+
+describe("renderPlayableMatch — Attack-card prompt (Bug B)", () => {
+  const anAttackCard = (): Card => {
+    const c = cards.find((card) => card.type === "Attack");
+    if (c === undefined) throw new Error("no Attack card in pool");
+    return c;
+  };
+  const warriorOfFaction = (faction: string): Card => {
+    const c = cards.find((card) => card.type === "Warrior" && card.faction === faction);
+    if (c === undefined) throw new Error(`no Warrior for faction ${faction}`);
+    return c;
+  };
+
+  /** Battle scenario: P1 has `friendly` on field and `hand` in hand vs one enemy. */
+  function craftBattle(
+    friendly: Card,
+    hand: Card[],
+    spirit: number,
+    opponentEmpty = false,
+  ): ReturnType<typeof createPlayableMatch> {
+    const match = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed: 1,
+      opponentFaction: "Dwarf",
+    });
+    const s = match.state();
+    s.phase = "battle";
+    s.turn = 3; // not turn 1, so attacks are allowed
+    s.activePlayer = "player1";
+    s.players.player1.spirit = spirit;
+    s.players.player1.hand = hand;
+    s.players.player1.field = [wip(friendly, "f1")];
+    s.players.player2.field = opponentEmpty ? [] : [wip(warriorOfFaction("Dwarf"), "e1")];
+    return match;
+  }
+
+  const declareAttack = (root: HTMLElement): void => {
+    buttonByText(root, ".play-match__warrior-btn", "Choose to attack")!.click();
+    buttonByText(root, ".play-match__warrior-btn", "Attack")!.click();
+  };
+
+  it("prompts to choose an Attack card when a compatible one is in hand", () => {
+    const atk = anAttackCard();
+    const friendly = warriorOfFaction(atk.faction);
+    const match = craftBattle(friendly, [atk], atk.cost + 1);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    declareAttack(root);
+    const panel = root.querySelector(".play-match__choice");
+    expect(panel).not.toBeNull();
+    expect(panel!.textContent).toContain("Use an Attack card?");
+    expect(panel!.textContent).toContain(atk.name);
+  });
+
+  it("resolves a normal attack when 'Regular attack' is chosen", () => {
+    const atk = anAttackCard();
+    const friendly = warriorOfFaction(atk.faction);
+    const match = craftBattle(friendly, [atk], atk.cost + 1);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    declareAttack(root);
+    buttonByText(root, ".play-match__choice-btn", "Regular attack (no card)")!.click();
+
+    const events = match.state().events.map((e) => e.type);
+    expect(events).toContain("warriorAttacked");
+    // The Attack card was not consumed.
+    expect(match.state().players.player1.hand.some((c) => c.id === atk.id)).toBe(true);
+  });
+
+  it("resolves through the Attack-card path when the card is chosen", () => {
+    const atk = anAttackCard();
+    const friendly = warriorOfFaction(atk.faction);
+    const match = craftBattle(friendly, [atk], atk.cost + 1);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    declareAttack(root);
+    buttonByText(root, ".play-match__choice-btn", `Use ${atk.name}`)!.click();
+
+    const events = match.state().events.map((e) => e.type);
+    expect(events).toContain("attackCardUsed");
+    // The Attack card was spent to the Out Deck.
+    expect(match.state().players.player1.hand.some((c) => c.id === atk.id)).toBe(false);
+    expect(match.state().players.player1.outDeck.some((c) => c.id === atk.id)).toBe(true);
+  });
+
+  it("does not prompt for an off-faction Attack card", () => {
+    const atk = anAttackCard();
+    const otherFaction = ["Monk", "Dwarf", "Sonic", "Surfer", "Shaman"].find(
+      (f) => f !== atk.faction,
+    )!;
+    const friendly = warriorOfFaction(otherFaction);
+    const match = craftBattle(friendly, [atk], atk.cost + 5);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    declareAttack(root);
+    // No choice prompt; the attack resolved straight away.
+    expect(root.querySelector(".play-match__choice")).toBeNull();
+    expect(match.state().players.player1.field[0]?.attacksRemaining).toBe(0);
+  });
+
+  it("does not offer the Attack card when Spirit is insufficient", () => {
+    const atk = anAttackCard();
+    const friendly = warriorOfFaction(atk.faction);
+    const match = craftBattle(friendly, [atk], Math.max(0, atk.cost - 1));
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    declareAttack(root);
+    expect(root.querySelector(".play-match__choice")).toBeNull();
+  });
+
+  it("does not prompt for Attack cards on a direct attack", () => {
+    const atk = anAttackCard();
+    const friendly = warriorOfFaction(atk.faction);
+    const match = craftBattle(friendly, [atk], atk.cost + 1, /* opponentEmpty */ true);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__warrior-btn", "Choose to attack")!.click();
+    root.querySelector<HTMLButtonElement>(".play-match__direct")!.click();
+    expect(root.querySelector(".play-match__choice")).toBeNull();
+    expect(match.state().events.map((e) => e.type)).toContain("directAttacked");
   });
 });
