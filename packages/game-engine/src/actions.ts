@@ -262,6 +262,43 @@ export function getReviveTargets(state: GameState, card: Card): Card[] {
   );
 }
 
+/**
+ * True for an Item that searches the controller's own deck for a card to add to
+ * hand (SEARCH_DECK, e.g. Lahkt Brand Family Products). Such Items need a chosen
+ * targetDeckCardId on the playItem action; without one the search handler fails
+ * safely and nothing is added. The auto-sim path is unchanged — getLegalActions
+ * still emits a bare playItem.
+ */
+export function isDeckSearchItem(card: Card): boolean {
+  return (
+    card.type === "Item" &&
+    card.effectCode !== undefined &&
+    normalizeEffectCode(card.effectCode) === "SEARCH_DECK"
+  );
+}
+
+/**
+ * The valid deck-search targets for `card` right now: cards in the active
+ * player's deck matching the effect's constraints (effectParams.targetTypes and
+ * optional targetFaction), mirroring requireDeckCard's validation. Empty when
+ * `card` is not a deck-search Item or no matching card is available.
+ */
+export function getDeckSearchTargets(state: GameState, card: Card): Card[] {
+  if (!isDeckSearchItem(card)) return [];
+  const params = card.effectParams ?? {};
+  const rawTypes = params["targetTypes"];
+  const types = Array.isArray(rawTypes)
+    ? rawTypes.filter((t): t is string => typeof t === "string")
+    : undefined;
+  const rawFaction = params["targetFaction"];
+  const faction = typeof rawFaction === "string" ? rawFaction : undefined;
+  return state.players[state.activePlayer].deck.filter(
+    (c) =>
+      (types === undefined || types.includes(c.type)) &&
+      (faction === undefined || c.faction === faction),
+  );
+}
+
 function attachedWeaponCode(warrior: WarriorInPlay): string | undefined {
   const code = warrior.attachedWeapon?.effectCode;
   return code === undefined ? undefined : normalizeEffectCode(code);

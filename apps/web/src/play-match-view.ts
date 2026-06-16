@@ -19,7 +19,12 @@ import type {
   PlayerState,
   WarriorInPlay,
 } from "@euphoria/game-engine";
-import { getReviveTargets, isOutDeckReviveItem } from "@euphoria/game-engine";
+import {
+  getDeckSearchTargets,
+  getReviveTargets,
+  isDeckSearchItem,
+  isOutDeckReviveItem,
+} from "@euphoria/game-engine";
 import type { MatchSummary } from "./match";
 import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "./play-match";
 
@@ -103,6 +108,8 @@ export function renderPlayableMatch(
   let pendingAttack: { attacker: string; defender: string } | null = null;
   // An open revive-target prompt for a chosen Out-Deck revive Item (card id).
   let pendingRevive: string | null = null;
+  // An open deck-search prompt for a chosen SEARCH_DECK Item (card id).
+  let pendingSearch: string | null = null;
   let error: string | null = null;
   let completed = false;
 
@@ -111,6 +118,7 @@ export function renderPlayableMatch(
     pendingWeapon = null;
     pendingAttack = null;
     pendingRevive = null;
+    pendingSearch = null;
   };
 
   const act = (action: GameAction): void => {
@@ -336,22 +344,22 @@ export function renderPlayableMatch(
     return panel;
   };
 
-  // "Choose a Warrior to revive" — shown after playing a revive Item (Totem's
-  // Creation). Lists the Out-Deck Warriors (inspectable), each resolving the
-  // engine's existing revive via playItem + targetOutDeckCardId.
-  const reviveChoicePanel = (state: GameState, me: PlayerState): HTMLElement | null => {
-    if (pendingRevive === null) return null;
-    const card = me.hand.find((c) => c.id === pendingRevive);
-    if (card === undefined) return null;
-    const targets = getReviveTargets(state, card);
-    if (targets.length === 0) return null;
-
+  // Shared "pick one card" prompt used by the revive (Totem's Creation) and
+  // deck-search (Lahkt) flows: a heading, one inspectable row per candidate with
+  // an action button, and Cancel. Each option maps to a legal action.
+  const targetChoicePanel = (
+    heading: string,
+    targets: readonly Card[],
+    optionLabel: (card: Card) => string,
+    toAction: (card: Card) => GameAction,
+    onCancel: () => void,
+  ): HTMLElement => {
     const panel = document.createElement("section");
     panel.className = "account__panel play-match__choice";
-    const heading = document.createElement("h3");
-    heading.className = "account__panel-heading";
-    heading.textContent = `Revive a Warrior with ${card.name}`;
-    panel.append(heading);
+    const h = document.createElement("h3");
+    h.className = "account__panel-heading";
+    h.textContent = heading;
+    panel.append(h);
 
     for (const target of targets) {
       const row = document.createElement("div");
@@ -363,27 +371,57 @@ export function renderPlayableMatch(
       look.innerHTML =
         `<span class="play-match__card-name">${escapeHtml(target.name)}</span>` +
         `<span class="play-match__card-meta">${escapeHtml(target.faction)} · ` +
-        `${target.attack ?? 0}/${target.health ?? 0}</span>`;
+        `${escapeHtml(target.type)}</span>`;
       look.addEventListener("click", () => inspect(target));
       row.append(look);
-      row.append(
-        choiceBtn(`Revive ${target.name}`, () =>
-          act({
-            kind: "playItem",
-            cardId: pendingRevive!,
-            targetOutDeckCardId: target.id,
-          }),
-        ),
-      );
+      row.append(choiceBtn(optionLabel(target), () => act(toAction(target))));
       panel.append(row);
     }
-    panel.append(
-      cancelRow(() => {
+    panel.append(cancelRow(onCancel));
+    return panel;
+  };
+
+  // "Choose a Warrior to revive" — shown after playing a revive Item (Totem's
+  // Creation), resolving via playItem + targetOutDeckCardId.
+  const reviveChoicePanel = (state: GameState, me: PlayerState): HTMLElement | null => {
+    if (pendingRevive === null) return null;
+    const card = me.hand.find((c) => c.id === pendingRevive);
+    if (card === undefined) return null;
+    const targets = getReviveTargets(state, card);
+    if (targets.length === 0) return null;
+    return targetChoicePanel(
+      `Revive a Warrior with ${card.name}`,
+      targets,
+      (t) => `Revive ${t.name}`,
+      (t) => ({ kind: "playItem", cardId: card.id, targetOutDeckCardId: t.id }),
+      () => {
         pendingRevive = null;
         paint();
-      }),
+      },
     );
-    return panel;
+  };
+
+  // "Add an Item/Weapon to hand" — shown after playing a deck-search Item (Lahkt
+  // Brand Family Products), resolving via playItem + targetDeckCardId.
+  const deckSearchChoicePanel = (
+    state: GameState,
+    me: PlayerState,
+  ): HTMLElement | null => {
+    if (pendingSearch === null) return null;
+    const card = me.hand.find((c) => c.id === pendingSearch);
+    if (card === undefined) return null;
+    const targets = getDeckSearchTargets(state, card);
+    if (targets.length === 0) return null;
+    return targetChoicePanel(
+      `Add a card to hand with ${card.name}`,
+      targets,
+      (t) => `Add ${t.name}`,
+      (t) => ({ kind: "playItem", cardId: card.id, targetDeckCardId: t.id }),
+      () => {
+        pendingSearch = null;
+        paint();
+      },
+    );
   };
 
   // --- the painter ----------------------------------------------------------
@@ -439,6 +477,8 @@ export function renderPlayableMatch(
     if (attackPanel !== null) frag.append(attackPanel);
     const revivePanel = reviveChoicePanel(state, me);
     if (revivePanel !== null) frag.append(revivePanel);
+    const searchPanel = deckSearchChoicePanel(state, me);
+    if (searchPanel !== null) frag.append(searchPanel);
 
     // Opponent: stats + field.
     frag.append(statBar("Opponent", opp));
@@ -644,6 +684,24 @@ export function renderPlayableMatch(
             },
           );
           if (pendingRevive === card.id) b.classList.add("play-match__card-btn--active");
+          controls.append(b);
+        }
+      } else if (playItem !== undefined && isDeckSearchItem(card)) {
+        // Deck-search Items (Lahkt) need a chosen deck card. Guard the no-target
+        // case with a clear, disabled message rather than wasting the card.
+        const targets = getDeckSearchTargets(match.state(), card);
+        if (targets.length === 0) {
+          controls.append(cardButton("No Item/Weapon in deck", undefined));
+        } else {
+          const b = cardButton(
+            pendingSearch === card.id ? "Pick a card…" : "Play",
+            () => {
+              pendingSearch = pendingSearch === card.id ? null : card.id;
+              error = null;
+              paint();
+            },
+          );
+          if (pendingSearch === card.id) b.classList.add("play-match__card-btn--active");
           controls.append(b);
         }
       } else if (playItem !== undefined) {

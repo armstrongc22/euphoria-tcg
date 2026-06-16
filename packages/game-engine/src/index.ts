@@ -52,9 +52,11 @@ export {
 export {
   applyAction,
   getCompatibleAttackCards,
+  getDeckSearchTargets,
   getLegalActions,
   getReviveTargets,
   isAttackCardCompatible,
+  isDeckSearchItem,
   isOutDeckReviveItem,
   type ActionResult,
   type EngineError,
