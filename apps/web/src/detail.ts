@@ -11,6 +11,9 @@ export interface DetailField {
   value: string;
 }
 
+/** Per-instance counter so each dialog's title id is unique on the page. */
+let detailInstanceCount = 0;
+
 /** The labelled stat rows for a card; ATK/HP appear only when the card has them. */
 export function cardDetailFields(card: Card): DetailField[] {
   const fields: DetailField[] = [
@@ -42,23 +45,31 @@ export function createCardDetail(base: string): {
 } {
   const dialog = document.createElement("dialog");
   dialog.className = "detail";
+  // Unique title id so multiple dialogs on one page (e.g. Card Viewer + Deck
+  // Builder) don't collide on a shared id.
+  const titleId = `detail-title-${(detailInstanceCount += 1)}`;
   // Associate the dialog with its card-name heading so screen readers announce
   // the card when the modal opens (the heading carries the matching id).
-  dialog.setAttribute("aria-labelledby", "detail-title");
+  dialog.setAttribute("aria-labelledby", titleId);
   // Close when the backdrop (the dialog element itself) is clicked.
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close();
   });
 
   const open = (card: Card): void => {
-    dialog.replaceChildren(buildContent(card, base, () => dialog.close()));
+    dialog.replaceChildren(buildContent(card, base, titleId, () => dialog.close()));
     dialog.showModal();
   };
 
   return { element: dialog, open };
 }
 
-function buildContent(card: Card, base: string, onClose: () => void): HTMLElement {
+function buildContent(
+  card: Card,
+  base: string,
+  titleId: string,
+  onClose: () => void,
+): HTMLElement {
   const root = document.createElement("div");
   root.className = "detail__body";
 
@@ -85,7 +96,7 @@ function buildContent(card: Card, base: string, onClose: () => void): HTMLElemen
 
   const title = document.createElement("h2");
   title.className = "detail__name";
-  title.id = "detail-title";
+  title.id = titleId;
   title.textContent = card.name;
 
   const stats = document.createElement("dl");
