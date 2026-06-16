@@ -55,35 +55,100 @@ export interface PlayableMatchActions {
   readonly onInspect?: (card: Card) => void;
 }
 
-/** A short, human-readable line for the battle log. */
-function describeEvent(state: GameState, ev: GameState["events"][number]): string | null {
-  const who = (p: "player1" | "player2"): string => (p === PLAYER_SEAT ? "You" : "Opponent");
+/**
+ * Builds the human-readable battle-log lines for the whole game so far, for both
+ * the player and the AI opponent. PURE (exported for testing). Card ids resolve
+ * to names from every zone (cards never leave the game — they end in the Out
+ * Deck), and Warrior instance ids resolve via a map accumulated from the
+ * events that introduced each Warrior (summon/revive/return/steal).
+ *
+ * Known limitations: lines come only from the engine's structured event log.
+ * Combat damage is reported from the single `warriorAttacked` event (one line,
+ * "attacked X for N HEALTH") rather than a separate "lost N HEALTH" line; an
+ * opponent's drawn card is hidden ("drew a card"); effect outcomes the engine
+ * does not event (e.g. an unimplemented handler) are not logged.
+ */
+export function battleLogLines(state: GameState): string[] {
+  const who = (p: "player1" | "player2"): string =>
+    p === PLAYER_SEAT ? "You" : "Opponent";
+  const possessive = (p: "player1" | "player2"): string =>
+    p === PLAYER_SEAT ? "your" : "the opponent's";
+
   const cardName = (id: string): string => {
-    const all = [
-      ...state.players.player1.hand,
-      ...state.players.player2.hand,
-      ...state.players.player1.outDeck,
-      ...state.players.player2.outDeck,
-      ...state.players.player1.field.map((w) => w.card),
-      ...state.players.player2.field.map((w) => w.card),
-    ];
-    return all.find((c) => c.id === id)?.name ?? id;
+    for (const seat of [state.players.player1, state.players.player2]) {
+      for (const c of [...seat.hand, ...seat.deck, ...seat.outDeck]) {
+        if (c.id === id) return c.name;
+      }
+      for (const w of seat.field) if (w.card.id === id) return w.card.name;
+    }
+    return id;
   };
+
+  // instanceId → cardId, accumulated from every event that introduced a Warrior,
+  // so attacker/defender ids resolve even after the Warrior has left the field.
+  const instanceToCard = new Map<string, string>();
+  for (const ev of state.events) {
+    if ("instanceId" in ev && "cardId" in ev) {
+      instanceToCard.set(ev.instanceId, ev.cardId);
+    }
+  }
+  const instanceName = (id: string): string => {
+    const cardId = instanceToCard.get(id);
+    return cardId !== undefined ? cardName(cardId) : id;
+  };
+
+  const lines: string[] = [];
+  for (const ev of state.events) {
+    const line = describeEvent(ev, who, possessive, cardName, instanceName);
+    if (line !== null) lines.push(line);
+  }
+  return lines;
+}
+
+/** A short, human-readable line for one battle-log event (null = not shown). */
+function describeEvent(
+  ev: GameState["events"][number],
+  who: (p: "player1" | "player2") => string,
+  possessive: (p: "player1" | "player2") => string,
+  cardName: (id: string) => string,
+  instanceName: (id: string) => string,
+): string | null {
   switch (ev.type) {
     case "turnStarted":
-      return `— ${who(ev.player)} turn ${ev.turn} —`;
+      return `— ${who(ev.player)} · turn ${ev.turn} —`;
+    case "cardDrawn":
+      // Don't reveal the opponent's drawn card (hidden information).
+      return ev.player === PLAYER_SEAT
+        ? `You drew ${cardName(ev.cardId)}.`
+        : "Opponent drew a card.";
     case "warriorSummoned":
       return `${who(ev.player)} summoned ${cardName(ev.cardId)}.`;
+    case "warriorRevived":
+      return `${who(ev.player)} revived ${cardName(ev.cardId)}.`;
     case "itemPlayed":
       return `${who(ev.player)} played ${cardName(ev.cardId)}.`;
     case "weaponEquipped":
       return `${who(ev.player)} equipped ${cardName(ev.cardId)}.`;
+    case "attackCardUsed":
+      return `${who(ev.player)} used ${cardName(ev.cardId)}.`;
+    case "deckSearched":
+      return `${who(ev.player)} searched their deck and added ${cardName(ev.cardId)} to hand.`;
+    case "cardStolenFromHand":
+      return `${who(ev.player)} took ${cardName(ev.cardId)} from ${possessive(ev.fromPlayer)} hand.`;
     case "warriorAttacked":
-      return `${who(ev.player)} attacked for ${ev.damage}.`;
+      return `${instanceName(ev.attackerInstanceId)} attacked ${instanceName(ev.defenderInstanceId)} for ${ev.damage} HEALTH.`;
+    case "warriorHealthModified":
+      return ev.amount < 0
+        ? `${instanceName(ev.instanceId)} lost ${-ev.amount} HEALTH.`
+        : `${instanceName(ev.instanceId)} gained ${ev.amount} HEALTH.`;
     case "warriorDestroyed":
-      return `${who(ev.player)}'s ${cardName(ev.cardId)} was destroyed.`;
+      return `${cardName(ev.cardId)} was destroyed.`;
+    case "weaponDestroyed":
+      return `${cardName(ev.cardId)} was destroyed.`;
     case "directAttacked":
-      return `${who(ev.player)} struck directly — ${ev.livesRemaining} lives left.`;
+      return ev.player === PLAYER_SEAT
+        ? `You landed a direct attack — opponent lives: ${ev.livesRemaining}.`
+        : `Opponent landed a direct attack — your lives: ${ev.livesRemaining}.`;
     case "gameWon":
       return `${who(ev.winner)} won the match.`;
     default:
@@ -809,17 +874,21 @@ export function renderPlayableMatch(
     panel.append(heading);
     const ul = document.createElement("ul");
     ul.className = "play-match__log-list";
-    const lines: string[] = [];
-    for (const ev of state.events) {
-      const line = describeEvent(state, ev);
-      if (line !== null) lines.push(line);
+    const lines = battleLogLines(state);
+    if (lines.length === 0) {
+      const li = document.createElement("li");
+      li.className = "play-match__log-empty";
+      li.textContent = "The match has begun.";
+      ul.append(li);
     }
-    for (const line of lines.slice(-12)) {
+    for (const line of lines) {
       const li = document.createElement("li");
       li.textContent = line;
       ul.append(li);
     }
     panel.append(ul);
+    // Most recent entries at the bottom; keep them in view as the log grows.
+    ul.scrollTop = ul.scrollHeight;
     return panel;
   };
 
