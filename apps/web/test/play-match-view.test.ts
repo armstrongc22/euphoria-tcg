@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import { cards } from "../src/cards";
 import { createPlayableMatch } from "../src/play-match";
 import { renderPlayableMatch } from "../src/play-match-view";
+import { createCardDetail } from "../src/detail";
 
 const noop = (): void => {};
 
@@ -94,5 +95,134 @@ describe("renderPlayableMatch — completion", () => {
     const summary = onComplete.mock.calls[0]![0];
     expect(summary.playerFaction).toBe("Sonic");
     expect(["win", "loss", "draw"]).toContain(summary.outcome);
+  });
+});
+
+/** Ends turns until the AI opponent has at least one Warrior on its field. */
+function matchWithOpponentWarrior(seed: number) {
+  const match = newMatch(seed);
+  let guard = 0;
+  while (
+    !match.isOver() &&
+    match.state().players.player2.field.length === 0 &&
+    guard < 50
+  ) {
+    const endTurn = match.legalActions().find((a) => a.kind === "endTurn");
+    if (endTurn === undefined) break;
+    match.apply(endTurn);
+    guard += 1;
+  }
+  return match;
+}
+
+describe("renderPlayableMatch — card inspection", () => {
+  it("opens the detail modal (onInspect) when a hand card body is tapped", () => {
+    const match = newMatch();
+    const onInspect = vi.fn();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop, onInspect });
+    const body = root.querySelector<HTMLButtonElement>(".play-match__card-inspect");
+    expect(body).not.toBeNull();
+    body!.click();
+    expect(onInspect).toHaveBeenCalledTimes(1);
+    // The inspected card is a real card with the displayed name.
+    const card = onInspect.mock.calls[0]![0];
+    expect(typeof card.name).toBe("string");
+    expect(body!.textContent).toContain(card.name);
+  });
+
+  it("does NOT inspect when a gameplay action button is clicked", () => {
+    const match = newMatch();
+    const onInspect = vi.fn();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop, onInspect });
+    const summon = buttonByText(root, ".play-match__card-btn", "Summon")!;
+    summon.click();
+    // Summon performed, modal never opened.
+    expect(match.state().players.player1.field.length).toBe(1);
+    expect(onInspect).not.toHaveBeenCalled();
+  });
+
+  it("lets the opponent's field cards be inspected", () => {
+    const match = matchWithOpponentWarrior(5);
+    expect(match.state().players.player2.field.length).toBeGreaterThan(0);
+    const onInspect = vi.fn();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop, onInspect });
+    const oppBody = root.querySelector<HTMLButtonElement>(
+      ".play-match__field--theirs .play-match__warrior-inspect",
+    );
+    expect(oppBody).not.toBeNull();
+    oppBody!.click();
+    expect(onInspect).toHaveBeenCalledTimes(1);
+    expect(typeof onInspect.mock.calls[0]![0].name).toBe("string");
+  });
+
+  it("lets your own field cards be inspected after summoning", () => {
+    const match = newMatch();
+    const onInspect = vi.fn();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop, onInspect });
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    const mineBody = root.querySelector<HTMLButtonElement>(
+      ".play-match__field--mine .play-match__warrior-inspect",
+    );
+    expect(mineBody).not.toBeNull();
+    mineBody!.click();
+    expect(onInspect).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the inspection affordance hint", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(root.querySelector(".play-match__hint")?.textContent?.toLowerCase()).toContain(
+      "details",
+    );
+  });
+});
+
+describe("shared card-detail modal (reused by Card Viewer / Deck Builder / match)", () => {
+  // showModal/close are not implemented in jsdom; stub them so the reused modal
+  // can be exercised through the DOM exactly as the app wires it.
+  function openableDetail() {
+    const detail = createCardDetail("/");
+    (detail.element as unknown as { showModal: () => void }).showModal = vi.fn();
+    document.body.append(detail.element);
+    return detail;
+  }
+
+  it("shows the card image, name, stats, and rules text", () => {
+    const warrior = cards.find((c) => c.type === "Warrior")!;
+    const detail = openableDetail();
+    detail.open(warrior);
+    const el = detail.element;
+    const art = el.querySelector<HTMLImageElement>(".detail__art")!;
+    expect(art.alt).toBe(warrior.name);
+    expect(art.getAttribute("src")).toBeTruthy();
+    expect(el.querySelector(".detail__name")?.textContent).toBe(warrior.name);
+    const stats = el.querySelector(".detail__stats")?.textContent ?? "";
+    expect(stats).toContain("Faction");
+    expect(stats).toContain(warrior.faction);
+    expect(stats).toContain("Cost");
+    expect(stats).toContain("Attack");
+    // Rules row is always present (real text or the empty-state fallback).
+    expect(el.querySelector(".detail__rules")).not.toBeNull();
+  });
+
+  it("uses the missing-art fallback when the image fails to load", () => {
+    const detail = openableDetail();
+    detail.open(cards[0]!);
+    const art = detail.element.querySelector<HTMLImageElement>(".detail__art")!;
+    art.dispatchEvent(new Event("error"));
+    expect(art.classList.contains("detail__art--missing")).toBe(true);
+    expect(art.hasAttribute("src")).toBe(false);
+  });
+
+  it("closes via the close button and via a backdrop click", () => {
+    const detail = openableDetail();
+    detail.open(cards[0]!);
+    const closeFn = vi.fn();
+    (detail.element as unknown as { close: () => void }).close = closeFn;
+    detail.element.querySelector<HTMLButtonElement>(".detail__close")!.click();
+    expect(closeFn).toHaveBeenCalledTimes(1);
+    // Clicking the dialog backdrop (target === dialog) also closes it.
+    detail.element.click();
+    expect(closeFn).toHaveBeenCalledTimes(2);
   });
 });

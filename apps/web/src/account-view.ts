@@ -15,6 +15,7 @@ import { renderMatchResult } from "./match-view";
 import { runTestMatch, type MatchSummary } from "./match";
 import { createPlayableMatch } from "./play-match";
 import { renderPlayableMatch } from "./play-match-view";
+import { createCardDetail } from "./detail";
 import {
   buildMatchHistoryInsert,
   computeAccountStats,
@@ -491,15 +492,23 @@ export async function mountAccount(
       pool,
       playerDeck: chosen.isCustom ? chosen.entries : undefined,
     });
+    // Reuse the shared card-detail modal (same as the Card Viewer / Deck
+    // Builder). It lives as a sibling of the board so the board's in-place
+    // re-renders never disturb the open dialog.
+    const detail = createCardDetail(assetBase);
     const board = renderPlayableMatch(match, {
       onComplete: (summary) =>
         void finishMatch(faction, summary, chosen, () =>
           void showPlayableMatch(faction),
         ),
       onQuit: () => void showAccount(),
+      onInspect: (card) => detail.open(card),
     });
     const note = deckNote(chosen);
-    container.replaceChildren(...(note ? [note, board] : [board]));
+    container.replaceChildren(
+      ...(note ? [note, board] : [board]),
+      detail.element,
+    );
   };
 
   const showAccount = async (): Promise<void> => {
