@@ -1383,20 +1383,12 @@ body {
 .play-match__warrior {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.3rem;
   min-width: 7rem;
   padding: 0.5rem;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.25);
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.play-match__warrior:disabled {
-  cursor: default;
-  opacity: 0.7;
 }
 
 .play-match__warrior--selected {
@@ -1407,6 +1399,54 @@ body {
 .play-match__warrior--target {
   border-color: var(--dwarf);
   box-shadow: 0 0 0 2px var(--dwarf);
+}
+
+/* The inspectable card body (warrior + hand) — looks like the card, taps open
+ * the detail modal. Affordance: pointer cursor + subtle hover. */
+.play-match__warrior-inspect,
+.play-match__card-inspect {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.15rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.play-match__warrior-inspect:hover,
+.play-match__card-inspect:hover,
+.play-match__weapon-inspect:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.play-match__weapon-inspect {
+  align-self: flex-start;
+  padding: 0.15rem 0.35rem;
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.play-match__warrior-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.play-match__warrior-btn {
+  padding: 0.25rem 0.45rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
 }
 
 .play-match__warrior-name {
@@ -1422,6 +1462,13 @@ body {
 .play-match__warrior-badge {
   font-size: 0.75rem;
   color: var(--text-dim);
+}
+
+.play-match__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-style: italic;
 }
 
 .play-match__hand {

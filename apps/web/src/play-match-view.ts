@@ -12,6 +12,7 @@
  * cards are auto-skipped (the engine's skip variant is used); per-Item targeting
  * beyond the engine defaults is a known later step.
  */
+import type { Card } from "@euphoria/card-data/schema";
 import type {
   GameAction,
   GameState,
@@ -33,6 +34,12 @@ export interface PlayableMatchActions {
   readonly onComplete: (summary: MatchSummary) => void;
   /** Fired when the player concedes / quits back out. */
   readonly onQuit: () => void;
+  /**
+   * Fired when the user taps a card's art/name/body to inspect it. Wired by the
+   * mount (account-view) to the shared card-detail modal, the same one the Card
+   * Viewer and Deck Builder use. Omitted in pure tests that only assert wiring.
+   */
+  readonly onInspect?: (card: Card) => void;
 }
 
 /** A short, human-readable line for the battle log. */
@@ -174,31 +181,67 @@ export function renderPlayableMatch(
     return el;
   };
 
+  // Opens the shared card-detail modal for `card`, when an inspector is wired.
+  const inspect = (card: Card): void => actions.onInspect?.(card);
+
+  // A Warrior tile: an inspectable body (art/name/stats — taps open the detail
+  // modal, never a gameplay action) plus zero or more explicit action buttons.
+  // The attached Weapon, if any, is its own inspectable chip.
   const warriorEl = (
     w: WarriorInPlay,
     opts: {
-      clickable?: boolean;
       highlighted?: boolean;
       selected?: boolean;
       badge?: string;
-      onClick?: () => void;
+      controls?: HTMLButtonElement[];
     },
   ): HTMLElement => {
-    const el = document.createElement("button");
-    el.type = "button";
+    const el = document.createElement("div");
     el.className =
       "play-match__warrior" +
       (opts.selected ? " play-match__warrior--selected" : "") +
       (opts.highlighted ? " play-match__warrior--target" : "");
-    el.disabled = opts.clickable !== true;
-    const weapon = w.attachedWeapon ? ` ⚔${escapeHtml(w.attachedWeapon.name)}` : "";
-    el.innerHTML =
+
+    const body = document.createElement("button");
+    body.type = "button";
+    body.className = "play-match__warrior-inspect";
+    body.title = "View card details";
+    body.innerHTML =
       `<span class="play-match__warrior-name">${escapeHtml(w.card.name)}</span>` +
       `<span class="play-match__warrior-stats">${w.currentAttack} / ${w.currentHealth}</span>` +
-      `<span class="play-match__warrior-meta">⚡${w.attacksRemaining}${weapon}</span>` +
+      `<span class="play-match__warrior-meta">⚡${w.attacksRemaining}</span>` +
       (opts.badge ? `<span class="play-match__warrior-badge">${escapeHtml(opts.badge)}</span>` : "");
-    if (opts.onClick) el.addEventListener("click", opts.onClick);
+    body.addEventListener("click", () => inspect(w.card));
+    el.append(body);
+
+    if (w.attachedWeapon !== undefined) {
+      const weapon = w.attachedWeapon;
+      const weaponBtn = document.createElement("button");
+      weaponBtn.type = "button";
+      weaponBtn.className = "play-match__weapon-inspect";
+      weaponBtn.title = "View Weapon details";
+      weaponBtn.textContent = `⚔ ${weapon.name}`;
+      weaponBtn.addEventListener("click", () => inspect(weapon));
+      el.append(weaponBtn);
+    }
+
+    if (opts.controls && opts.controls.length > 0) {
+      const controls = document.createElement("div");
+      controls.className = "play-match__warrior-controls";
+      controls.append(...opts.controls);
+      el.append(controls);
+    }
     return el;
+  };
+
+  // A small gameplay-action button shown on a Warrior tile.
+  const warriorBtn = (label: string, onClick: () => void): HTMLButtonElement => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "play-match__warrior-btn";
+    b.textContent = label;
+    b.addEventListener("click", onClick);
+    return b;
   };
 
   // --- the painter ----------------------------------------------------------
@@ -243,6 +286,11 @@ export function renderPlayableMatch(
       err.textContent = error;
       frag.append(err);
     }
+
+    const hint = document.createElement("p");
+    hint.className = "play-match__hint";
+    hint.textContent = "Tap any card to view its full details.";
+    frag.append(hint);
 
     // Opponent: stats + field.
     frag.append(statBar("Opponent", opp));
@@ -298,54 +346,63 @@ export function renderPlayableMatch(
     }
     for (const w of player.field) {
       if (mine) {
+        // While choosing a Weapon target, friendly Warriors that can take it get
+        // an "Equip here" control; an attack-capable Warrior gets a select/cancel
+        // toggle. The tile body always stays inspectable regardless.
+        const equipTarget =
+          pendingWeapon !== null
+            ? (idx.equip.get(pendingWeapon) ?? []).find(
+                (a) => a.kind === "equipWeapon" && a.warriorInstanceId === w.instanceId,
+              )
+            : undefined;
         const canAttack = idx.attack.has(w.instanceId) || idx.direct.has(w.instanceId);
+        const controls: HTMLButtonElement[] = [];
+        if (equipTarget !== undefined) {
+          controls.push(warriorBtn("Equip here", () => act(equipTarget)));
+        }
+        if (canAttack) {
+          controls.push(
+            selectedAttacker === w.instanceId
+              ? warriorBtn("✓ Attacking — cancel", () => {
+                  selectedAttacker = null;
+                  error = null;
+                  paint();
+                })
+              : warriorBtn("Choose to attack", () => {
+                  selectedAttacker = w.instanceId;
+                  error = null;
+                  paint();
+                }),
+          );
+        }
         row.append(
           warriorEl(w, {
-            clickable: canAttack,
             selected: selectedAttacker === w.instanceId,
-            // While choosing a weapon target, friendly warriors that can take it
-            // light up and become the click target.
-            highlighted:
-              pendingWeapon !== null &&
-              (idx.equip.get(pendingWeapon) ?? []).some(
-                (a) => a.kind === "equipWeapon" && a.warriorInstanceId === w.instanceId,
-              ),
-            onClick: () => {
-              if (pendingWeapon !== null) {
-                const equip = (idx.equip.get(pendingWeapon) ?? []).find(
-                  (a) => a.kind === "equipWeapon" && a.warriorInstanceId === w.instanceId,
-                );
-                if (equip !== undefined) {
-                  act(equip);
-                  return;
-                }
-              }
-              if (canAttack) {
-                selectedAttacker = selectedAttacker === w.instanceId ? null : w.instanceId;
-                error = null;
-                paint();
-              }
-            },
+            highlighted: equipTarget !== undefined,
+            controls,
           }),
         );
       } else {
-        // Enemy Warrior: a legal attack target while an attacker is selected,
-        // or a reclaim target if it is one of ours under foreign control.
+        // Enemy Warrior: an "Attack" control while an attacker is selected and
+        // this is a legal target, or "Reclaim" if it is one of ours under
+        // foreign control. Body stays inspectable either way.
         const attackAction =
           selectedAttacker !== null
             ? idx.attack.get(selectedAttacker)?.get(w.instanceId)
             : undefined;
         const reclaim = idx.reclaim.get(w.instanceId);
-        const badge = reclaim !== undefined ? "reclaim" : undefined;
+        const controls: HTMLButtonElement[] = [];
+        if (attackAction !== undefined) {
+          controls.push(warriorBtn("Attack", () => act(attackAction)));
+        }
+        if (reclaim !== undefined) {
+          controls.push(warriorBtn("Reclaim", () => act(reclaim)));
+        }
         row.append(
           warriorEl(w, {
-            clickable: attackAction !== undefined || reclaim !== undefined,
             highlighted: attackAction !== undefined,
-            badge,
-            onClick: () => {
-              if (attackAction !== undefined) act(attackAction);
-              else if (reclaim !== undefined) act(reclaim);
-            },
+            badge: reclaim !== undefined ? "reclaim" : undefined,
+            controls,
           }),
         );
       }
@@ -382,11 +439,20 @@ export function renderPlayableMatch(
 
       const el = document.createElement("div");
       el.className = "play-match__card";
-      el.innerHTML =
+
+      // The card body (name + type/cost) is an inspect button — tapping it opens
+      // the detail modal, never plays the card. Action buttons live separately.
+      const body = document.createElement("button");
+      body.type = "button";
+      body.className = "play-match__card-inspect";
+      body.title = "View card details";
+      body.innerHTML =
         `<span class="play-match__card-name">${escapeHtml(card.name)}` +
         `${copies > 1 ? ` ×${copies}` : ""}</span>` +
         `<span class="play-match__card-meta">${escapeHtml(card.type)} · ` +
         `◆${card.cost}</span>`;
+      body.addEventListener("click", () => inspect(card));
+      el.append(body);
 
       const controls = document.createElement("div");
       controls.className = "play-match__card-controls";
