@@ -21,9 +21,11 @@ import type {
 } from "@euphoria/game-engine";
 import {
   getDeckSearchTargets,
+  getFriendlyWarriorTargets,
   getReviveTargets,
   getStealTargets,
   isDeckSearchItem,
+  isFriendlyWarriorTargetItem,
   isOutDeckReviveItem,
   isStealHandItem,
 } from "@euphoria/game-engine";
@@ -100,6 +102,8 @@ export function renderPlayableMatch(
   let pendingSearch: string | null = null;
   // An open hand-steal prompt for a chosen STEAL_ITEM_FROM_HAND Item (card id).
   let pendingSteal: string | null = null;
+  // An Item awaiting a friendly-Warrior target on the field (card id), e.g. GILs Unit.
+  let pendingItemTarget: string | null = null;
   let error: string | null = null;
   let completed = false;
 
@@ -121,6 +125,7 @@ export function renderPlayableMatch(
     pendingRevive = null;
     pendingSearch = null;
     pendingSteal = null;
+    pendingItemTarget = null;
   };
 
   const startPlayback = (steps: PlaybackStep[]): void => {
@@ -677,9 +682,19 @@ export function renderPlayableMatch(
               )
             : undefined;
         const canAttack = idx.attack.has(w.instanceId) || idx.direct.has(w.instanceId);
+        // While an Item is awaiting a friendly-Warrior target (e.g. GILs Unit),
+        // every friendly Warrior is a valid pick.
+        const itemTarget = pendingItemTarget;
         const controls: HTMLButtonElement[] = [];
         if (equipTarget !== undefined) {
           controls.push(warriorBtn("Equip here", () => act(equipTarget)));
+        }
+        if (itemTarget !== null) {
+          controls.push(
+            warriorBtn("Use here", () =>
+              act({ kind: "playItem", cardId: itemTarget, targetInstanceId: w.instanceId }),
+            ),
+          );
         }
         if (canAttack) {
           controls.push(
@@ -699,7 +714,7 @@ export function renderPlayableMatch(
         row.append(
           warriorEl(w, {
             selected: selectedAttacker === w.instanceId,
-            highlighted: equipTarget !== undefined,
+            highlighted: equipTarget !== undefined || itemTarget !== null,
             controls,
           }),
         );
@@ -852,6 +867,24 @@ export function renderPlayableMatch(
             },
           );
           if (pendingSteal === card.id) b.classList.add("play-match__card-btn--active");
+          controls.append(b);
+        }
+      } else if (playItem !== undefined && isFriendlyWarriorTargetItem(card)) {
+        // Items that target a friendly Warrior on the field (GILs Unit) need a
+        // chosen Warrior. Disable clearly when the player controls none.
+        const targets = getFriendlyWarriorTargets(match.state(), card);
+        if (targets.length === 0) {
+          controls.append(cardButton("No Warrior to target", undefined));
+        } else {
+          const b = cardButton(
+            pendingItemTarget === card.id ? "Pick a Warrior…" : "Play",
+            () => {
+              pendingItemTarget = pendingItemTarget === card.id ? null : card.id;
+              error = null;
+              paint();
+            },
+          );
+          if (pendingItemTarget === card.id) b.classList.add("play-match__card-btn--active");
           controls.append(b);
         }
       } else if (playItem !== undefined) {
