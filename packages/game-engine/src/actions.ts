@@ -327,13 +327,24 @@ export function getStealTargets(state: GameState, card: Card): Card[] {
 }
 
 /** Item effect codes that need a chosen friendly Warrior on the field. */
-const FRIENDLY_WARRIOR_TARGET_ITEM_CODES = new Set(["TEMPORARY_OUT_OF_PLAY_RESTORE"]);
+const FRIENDLY_WARRIOR_TARGET_ITEM_CODES = new Set([
+  "TEMPORARY_OUT_OF_PLAY_RESTORE", // GILs Unit
+  "EXTRA_ATTACK_THIS_TURN", // Choir of Pyrois (Monk only)
+  "PROTECT_WARRIOR_THIS_TURN", // High Tea (needs 2+ Warriors)
+  "TANK_FORM", // XL-QR517 (not an already-tanked Warrior)
+  "HEAL_TARGET", // Gunder Love
+  "HEALTH_PER_ITEM_IN_OUT_DECK", // Vibrant Pastures
+  "DELAYED_ATTACK_BUFF", // Training Arc
+]);
+
+/** Warrior factions a target keyword can name (mirrors the engine's list). */
+const WARRIOR_FACTIONS = ["Monk", "Dwarf", "Sonic", "Surfer", "Shaman"];
 
 /**
  * True for an Item that targets one of the controller's own Warriors on the
- * field (e.g. GILs Unit's TEMPORARY_OUT_OF_PLAY_RESTORE). Such Items need a
- * chosen targetInstanceId on the playItem action; without one the handler fails
- * safely and nothing happens. The auto-sim path is unchanged.
+ * field (e.g. GILs Unit, Gunder Love, Choir of Pyrois). Such Items need a chosen
+ * targetInstanceId on the playItem action; without one the handler fails safely
+ * and nothing happens. The auto-sim path is unchanged.
  */
 export function isFriendlyWarriorTargetItem(card: Card): boolean {
   return (
@@ -344,16 +355,49 @@ export function isFriendlyWarriorTargetItem(card: Card): boolean {
 }
 
 /**
+ * The faction a friendly-target Item restricts its target to (e.g. Choir of
+ * Pyrois → Monk), mirroring the engine's factionConstraint: an explicit
+ * targetFaction/faction param, else a faction named in the `target` keyword
+ * (e.g. "friendly_monk_warrior"). Undefined = no faction restriction.
+ */
+function itemTargetFaction(card: Card): string | undefined {
+  const params = card.effectParams ?? {};
+  for (const key of ["targetFaction", "faction"]) {
+    const v = params[key];
+    if (typeof v === "string") return v;
+  }
+  const keyword = params["target"];
+  if (typeof keyword === "string") {
+    const normalized = normalizeEffectCode(keyword);
+    for (const faction of WARRIOR_FACTIONS) {
+      if (normalized.includes(faction.toUpperCase())) return faction;
+    }
+  }
+  return undefined;
+}
+
+/**
  * The valid targets for `card` right now: the active player's own Warriors on
- * the field (mirrors requireWarriorTarget's "friendly" rule). Empty when `card`
- * is not such an Item or the player controls no Warrior.
+ * the field that satisfy the effect's constraints — mirroring each handler's
+ * checks so the UI never offers a target the engine would reject (which would
+ * waste the card). Empty when `card` is not such an Item or none qualify.
  */
 export function getFriendlyWarriorTargets(
   state: GameState,
   card: Card,
 ): WarriorInPlay[] {
   if (!isFriendlyWarriorTargetItem(card)) return [];
-  return [...state.players[state.activePlayer].field];
+  const code = normalizeEffectCode(card.effectCode!);
+  const field = state.players[state.activePlayer].field;
+  // High Tea needs 2+ friendly Warriors on the field to do anything.
+  if (code === "PROTECT_WARRIOR_THIS_TURN" && field.length < 2) return [];
+  const faction = itemTargetFaction(card);
+  return field.filter(
+    (w) =>
+      (faction === undefined || w.card.faction === faction) &&
+      // TANK_FORM cannot re-tank a Warrior already piloting the tank.
+      !(code === "TANK_FORM" && w.tankForm !== undefined),
+  );
 }
 
 function attachedWeaponCode(warrior: WarriorInPlay): string | undefined {

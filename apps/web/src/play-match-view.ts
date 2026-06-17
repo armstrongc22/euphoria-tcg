@@ -682,17 +682,26 @@ export function renderPlayableMatch(
               )
             : undefined;
         const canAttack = idx.attack.has(w.instanceId) || idx.direct.has(w.instanceId);
-        // While an Item is awaiting a friendly-Warrior target (e.g. GILs Unit),
-        // every friendly Warrior is a valid pick.
-        const itemTarget = pendingItemTarget;
+        // While an Item is awaiting a friendly-Warrior target, only Warriors the
+        // engine would actually accept (faction/precondition-limited) get a pick.
+        const itemTargetCard =
+          pendingItemTarget !== null
+            ? player.hand.find((c) => c.id === pendingItemTarget)
+            : undefined;
+        const isItemTarget =
+          itemTargetCard !== undefined &&
+          getFriendlyWarriorTargets(match.state(), itemTargetCard).some(
+            (t) => t.instanceId === w.instanceId,
+          );
         const controls: HTMLButtonElement[] = [];
         if (equipTarget !== undefined) {
           controls.push(warriorBtn("Equip here", () => act(equipTarget)));
         }
-        if (itemTarget !== null) {
+        if (isItemTarget) {
+          const cardId = itemTargetCard!.id;
           controls.push(
             warriorBtn("Use here", () =>
-              act({ kind: "playItem", cardId: itemTarget, targetInstanceId: w.instanceId }),
+              act({ kind: "playItem", cardId, targetInstanceId: w.instanceId }),
             ),
           );
         }
@@ -714,7 +723,7 @@ export function renderPlayableMatch(
         row.append(
           warriorEl(w, {
             selected: selectedAttacker === w.instanceId,
-            highlighted: equipTarget !== undefined || itemTarget !== null,
+            highlighted: equipTarget !== undefined || isItemTarget,
             controls,
           }),
         );
