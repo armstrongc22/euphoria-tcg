@@ -21,10 +21,12 @@ import type {
 } from "@euphoria/game-engine";
 import {
   getDeckSearchTargets,
+  getEnemyWarriorTargets,
   getFriendlyWarriorTargets,
   getReviveTargets,
   getStealTargets,
   isDeckSearchItem,
+  isEnemyWarriorTargetItem,
   isFriendlyWarriorTargetItem,
   isOutDeckReviveItem,
   isStealHandItem,
@@ -736,6 +738,18 @@ export function renderPlayableMatch(
             ? idx.attack.get(selectedAttacker)?.get(w.instanceId)
             : undefined;
         const reclaim = idx.reclaim.get(w.instanceId);
+        // An Item awaiting an enemy-Warrior target (Coerced Loyalty, Primetime
+        // Interview): only Warriors the engine would accept get a pick.
+        const active = match.state();
+        const enemyItemCard =
+          pendingItemTarget !== null
+            ? active.players[active.activePlayer].hand.find((c) => c.id === pendingItemTarget)
+            : undefined;
+        const isEnemyItemTarget =
+          enemyItemCard !== undefined &&
+          getEnemyWarriorTargets(active, enemyItemCard).some(
+            (t) => t.instanceId === w.instanceId,
+          );
         const controls: HTMLButtonElement[] = [];
         if (variants !== undefined && variants.length > 0) {
           const attacker = selectedAttacker!;
@@ -753,12 +767,20 @@ export function renderPlayableMatch(
             }),
           );
         }
+        if (isEnemyItemTarget) {
+          const cardId = enemyItemCard!.id;
+          controls.push(
+            warriorBtn("Target", () =>
+              act({ kind: "playItem", cardId, targetInstanceId: w.instanceId }),
+            ),
+          );
+        }
         if (reclaim !== undefined) {
           controls.push(warriorBtn("Reclaim", () => act(reclaim)));
         }
         row.append(
           warriorEl(w, {
-            highlighted: variants !== undefined && variants.length > 0,
+            highlighted: (variants !== undefined && variants.length > 0) || isEnemyItemTarget,
             badge: reclaim !== undefined ? "reclaim" : undefined,
             controls,
           }),
@@ -887,6 +909,24 @@ export function renderPlayableMatch(
         } else {
           const b = cardButton(
             pendingItemTarget === card.id ? "Pick a Warrior…" : "Play",
+            () => {
+              pendingItemTarget = pendingItemTarget === card.id ? null : card.id;
+              error = null;
+              paint();
+            },
+          );
+          if (pendingItemTarget === card.id) b.classList.add("play-match__card-btn--active");
+          controls.append(b);
+        }
+      } else if (playItem !== undefined && isEnemyWarriorTargetItem(card)) {
+        // Items that target an enemy Warrior (Coerced Loyalty, Primetime
+        // Interview). Disable clearly when there is no valid enemy target.
+        const targets = getEnemyWarriorTargets(match.state(), card);
+        if (targets.length === 0) {
+          controls.append(cardButton("No enemy Warrior to target", undefined));
+        } else {
+          const b = cardButton(
+            pendingItemTarget === card.id ? "Pick an enemy…" : "Play",
             () => {
               pendingItemTarget = pendingItemTarget === card.id ? null : card.id;
               error = null;

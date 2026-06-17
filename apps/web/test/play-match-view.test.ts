@@ -1092,3 +1092,89 @@ describe("renderPlayableMatch — Batch A friendly-target Items", () => {
     expect(buttonByText(rootTwo, ".play-match__card-btn", "Play")).toBeDefined();
   });
 });
+
+describe("renderPlayableMatch — Batch B enemy-target Items", () => {
+  const bySlug = (slug: string): Card => {
+    const c = cards.find((card) => card.slug === slug);
+    if (c === undefined) throw new Error(`${slug} missing from pool`);
+    return c;
+  };
+  const aWarrior = (): Card => cards.find((c) => c.type === "Warrior")!;
+
+  function craftEnemyItem(
+    itemSlug: string,
+    enemyField: WarriorInPlay[],
+    myField: WarriorInPlay[] = [],
+  ) {
+    const match = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed: 1,
+      opponentFaction: "Dwarf",
+    });
+    const s = match.state();
+    s.players.player1.spirit = 5;
+    s.players.player1.hand = [bySlug(itemSlug)];
+    s.players.player1.field = myField;
+    s.players.player2.field = enemyField;
+    return match;
+  }
+
+  it("disables Coerced Loyalty when the opponent has no Warrior", () => {
+    const match = craftEnemyItem("coerced-loyalty", []);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(buttonByText(root, ".play-match__card-btn", "No enemy Warrior to target")?.disabled).toBe(true);
+  });
+
+  it("shows a 'Target' control on enemy Warriors after Play (Coerced Loyalty)", () => {
+    const match = craftEnemyItem("coerced-loyalty", [wip(aWarrior(), "e1")]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    expect(
+      root.querySelector('.play-match__field--theirs [data-instance="e1"] .play-match__warrior-btn')?.textContent,
+    ).toBe("Target");
+    // No friendly "Use here" appears for an enemy-target item.
+    expect(buttonByText(root, ".play-match__warrior-btn", "Use here")).toBeUndefined();
+  });
+
+  it("resolves Coerced Loyalty on the chosen enemy Warrior", () => {
+    const match = craftEnemyItem("coerced-loyalty", [wip(aWarrior(), "e1")]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    buttonByText(root, ".play-match__warrior-btn", "Target")!.click();
+
+    const s = match.state();
+    expect(s.players.player1.field.some((w) => w.instanceId === "e1")).toBe(true); // stolen to my side
+    expect(s.players.player2.field.some((w) => w.instanceId === "e1")).toBe(false);
+    expect(s.players.player1.hand.some((c) => c.slug === "coerced-loyalty")).toBe(false);
+    const events = s.events.map((e) => e.type);
+    expect(events).toContain("warriorControlStolen");
+    expect(events).not.toContain("effectNotImplemented");
+  });
+
+  it("resolves Primetime Interview on the chosen enemy Warrior", () => {
+    const match = craftEnemyItem("primetime-interview", [wip(aWarrior(), "e1")]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    buttonByText(root, ".play-match__warrior-btn", "Target")!.click();
+    const s = match.state();
+    expect(s.players.player1.hand.some((c) => c.slug === "primetime-interview")).toBe(false);
+    expect(s.events.map((e) => e.type)).not.toContain("effectNotImplemented");
+  });
+
+  it("does not spend the enemy-target Item when canceled", () => {
+    const match = craftEnemyItem("coerced-loyalty", [wip(aWarrior(), "e1")]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    buttonByText(root, ".play-match__card-btn", "Pick an enemy…")!.click(); // toggle off
+    expect(root.querySelector('[data-instance="e1"] .play-match__warrior-btn')).toBeNull();
+    expect(match.state().players.player1.hand.some((c) => c.slug === "coerced-loyalty")).toBe(true);
+  });
+
+  it("disables Coerced Loyalty when your field is full (no room)", () => {
+    const full = Array.from({ length: 5 }, (_, i) => wip(aWarrior(), `m${i}`));
+    const match = craftEnemyItem("coerced-loyalty", [wip(aWarrior(), "e1")], full);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(buttonByText(root, ".play-match__card-btn", "No enemy Warrior to target")?.disabled).toBe(true);
+  });
+});
