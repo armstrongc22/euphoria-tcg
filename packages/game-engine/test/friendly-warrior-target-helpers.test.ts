@@ -55,3 +55,60 @@ describe("getFriendlyWarriorTargets", () => {
     expect(getFriendlyWarriorTargets(game, makeItemCard())).toHaveLength(0);
   });
 });
+
+describe("getFriendlyWarriorTargets — Batch A effects", () => {
+  it("identifies the Batch A friendly-target Item codes", () => {
+    for (const code of [
+      "EXTRA_ATTACK_THIS_TURN",
+      "PROTECT_WARRIOR_THIS_TURN",
+      "TANK_FORM",
+      "HEAL_TARGET",
+      "HEALTH_PER_ITEM_IN_OUT_DECK",
+      "DELAYED_ATTACK_BUFF",
+    ]) {
+      expect(isFriendlyWarriorTargetItem(makeItemCard({ effectCode: code }))).toBe(true);
+    }
+  });
+
+  it("HEAL_TARGET offers every friendly Warrior", () => {
+    const game = newGame();
+    putWarriorOnField(game, "player1");
+    putWarriorOnField(game, "player1");
+    const card = makeItemCard({ effectCode: "HEAL_TARGET", effectParams: { target: "one_warrior" } });
+    expect(getFriendlyWarriorTargets(game, card)).toHaveLength(2);
+  });
+
+  it("EXTRA_ATTACK_THIS_TURN offers only Monk Warriors (faction from the keyword)", () => {
+    const game = newGame();
+    const monk = putWarriorOnField(game, "player1", { card: makeWarriorCard({ faction: "Monk" }) });
+    putWarriorOnField(game, "player1", { card: makeWarriorCard({ faction: "Dwarf" }) });
+    const card = makeItemCard({
+      effectCode: "EXTRA_ATTACK_THIS_TURN",
+      effectParams: { target: "friendly_monk_warrior" },
+    });
+    const ids = getFriendlyWarriorTargets(game, card).map((w) => w.instanceId);
+    expect(ids).toEqual([monk.instanceId]);
+  });
+
+  it("PROTECT_WARRIOR_THIS_TURN needs 2+ Warriors", () => {
+    const game = newGame();
+    const card = makeItemCard({
+      effectCode: "PROTECT_WARRIOR_THIS_TURN",
+      effectParams: { target: "friendly_warrior" },
+    });
+    putWarriorOnField(game, "player1");
+    expect(getFriendlyWarriorTargets(game, card)).toHaveLength(0); // only 1 Warrior
+    putWarriorOnField(game, "player1");
+    expect(getFriendlyWarriorTargets(game, card)).toHaveLength(2);
+  });
+
+  it("TANK_FORM excludes a Warrior already in the tank", () => {
+    const game = newGame();
+    const free = putWarriorOnField(game, "player1");
+    const tanked = putWarriorOnField(game, "player1");
+    (tanked as { tankForm?: unknown }).tankForm = { restoreAttack: 1, restoreHealth: 1, restoreMaxHealth: 1 };
+    const card = makeItemCard({ effectCode: "TANK_FORM", effectParams: { target: "one_warrior" } });
+    const ids = getFriendlyWarriorTargets(game, card).map((w) => w.instanceId);
+    expect(ids).toEqual([free.instanceId]);
+  });
+});

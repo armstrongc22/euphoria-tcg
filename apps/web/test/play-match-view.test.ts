@@ -1028,3 +1028,67 @@ describe("renderPlayableMatch — GILs Unit friendly-Warrior target", () => {
     expect(p1.field.some((w) => w.instanceId === "w1")).toBe(true);
   });
 });
+
+describe("renderPlayableMatch — Batch A friendly-target Items", () => {
+  const bySlug = (slug: string): Card => {
+    const c = cards.find((card) => card.slug === slug);
+    if (c === undefined) throw new Error(`${slug} missing from pool`);
+    return c;
+  };
+  const monkWarrior = (): Card => cards.find((c) => c.type === "Warrior" && c.faction === "Monk")!;
+  const nonMonkWarrior = (): Card =>
+    cards.find((c) => c.type === "Warrior" && c.faction !== "Monk" && c.faction !== "Neutral")!;
+
+  function craftItem(itemSlug: string, field: WarriorInPlay[]) {
+    const match = createPlayableMatch({
+      faction: "Monk",
+      pool: cards,
+      seed: 1,
+      opponentFaction: "Dwarf",
+    });
+    const s = match.state();
+    s.players.player1.spirit = 5;
+    s.players.player1.hand = [bySlug(itemSlug)];
+    s.players.player1.field = field;
+    return match;
+  }
+
+  it("resolves Gunder Love (heal) on the chosen friendly Warrior", () => {
+    const match = craftItem("gunder-love", [wip(monkWarrior(), "w1")]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    buttonByText(root, ".play-match__warrior-btn", "Use here")!.click();
+    const p1 = match.state().players.player1;
+    expect(p1.hand.some((c) => c.slug === "gunder-love")).toBe(false);
+    expect(match.state().events.map((e) => e.type)).not.toContain("effectNotImplemented");
+  });
+
+  it("offers Choir of Pyrois only on Monk Warriors", () => {
+    const match = craftItem("choir-of-pyrois", [
+      wip(monkWarrior(), "monk1"),
+      wip(nonMonkWarrior(), "other1"),
+    ]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Play")!.click();
+    expect(
+      root.querySelector('[data-instance="monk1"] .play-match__warrior-btn')?.textContent,
+    ).toBe("Use here");
+    expect(root.querySelector('[data-instance="other1"] .play-match__warrior-btn')).toBeNull();
+  });
+
+  it("disables Choir of Pyrois when no Monk Warrior is in play", () => {
+    const match = craftItem("choir-of-pyrois", [wip(nonMonkWarrior(), "other1")]);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(buttonByText(root, ".play-match__card-btn", "No Warrior to target")?.disabled).toBe(true);
+  });
+
+  it("disables High Tea with fewer than 2 Warriors, offers it with 2", () => {
+    const one = craftItem("high-tea", [wip(monkWarrior(), "w1")]);
+    const rootOne = renderPlayableMatch(one, { onComplete: noop, onQuit: noop });
+    expect(buttonByText(rootOne, ".play-match__card-btn", "No Warrior to target")?.disabled).toBe(true);
+
+    const two = craftItem("high-tea", [wip(monkWarrior(), "w1"), wip(monkWarrior(), "w2")]);
+    const rootTwo = renderPlayableMatch(two, { onComplete: noop, onQuit: noop });
+    expect(buttonByText(rootTwo, ".play-match__card-btn", "Play")).toBeDefined();
+  });
+});
