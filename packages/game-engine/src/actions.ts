@@ -400,6 +400,54 @@ export function getFriendlyWarriorTargets(
   );
 }
 
+/** Item effect codes that need a chosen enemy Warrior on the field. */
+const ENEMY_WARRIOR_TARGET_ITEM_CODES = new Set([
+  "CONTROL_STEAL", // Coerced Loyalty
+  "RESTRICT_OPPONENT_ATTACK_TARGET", // Primetime Interview
+]);
+
+/**
+ * True for an Item that targets one of the opponent's Warriors on the field
+ * (e.g. Coerced Loyalty, Primetime Interview). Such Items need a chosen
+ * targetInstanceId on the playItem action; without one the handler fails safely
+ * and nothing happens. The auto-sim path is unchanged.
+ */
+export function isEnemyWarriorTargetItem(card: Card): boolean {
+  return (
+    card.type === "Item" &&
+    card.effectCode !== undefined &&
+    ENEMY_WARRIOR_TARGET_ITEM_CODES.has(normalizeEffectCode(card.effectCode))
+  );
+}
+
+/**
+ * The valid targets for `card` right now: the opponent's Warriors on the field
+ * that satisfy the effect's constraints — mirroring each handler so the UI never
+ * offers a target the engine would reject. CONTROL_STEAL additionally needs room
+ * on the controller's own field and an uncontested target. Empty when `card` is
+ * not such an Item or none qualify.
+ */
+export function getEnemyWarriorTargets(
+  state: GameState,
+  card: Card,
+): WarriorInPlay[] {
+  if (!isEnemyWarriorTargetItem(card)) return [];
+  const code = normalizeEffectCode(card.effectCode!);
+  const me = state.players[state.activePlayer];
+  const enemy = state.players[opponentOf(state.activePlayer)];
+  // Coerced Loyalty has nowhere to put a stolen Warrior if your field is full.
+  if (code === "CONTROL_STEAL" && me.field.length >= state.config.warriorSlots) {
+    return [];
+  }
+  const faction = itemTargetFaction(card);
+  return enemy.field.filter(
+    (w) =>
+      (faction === undefined || w.card.faction === faction) &&
+      // CONTROL_STEAL can't take a Warrior whose control is already contested.
+      !(code === "CONTROL_STEAL" && w.stolenFrom !== undefined),
+  );
+}
+
 function attachedWeaponCode(warrior: WarriorInPlay): string | undefined {
   const code = warrior.attachedWeapon?.effectCode;
   return code === undefined ? undefined : normalizeEffectCode(code);
