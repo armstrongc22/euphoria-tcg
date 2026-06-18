@@ -119,6 +119,47 @@ describe("createLocalAuth (fallback)", () => {
     expect(await auth.getMatchHistory(SESSION, 1)).toHaveLength(1);
   });
 
+  it("aggregates match stats over the FULL history, not the recent cap", async () => {
+    const store = memoryStore();
+    const auth = createLocalAuth(store);
+    const base = {
+      user_id: LOCAL_USER_ID,
+      player_faction: "Sonic",
+      opponent_faction: "Dwarf",
+      winner: "Sonic",
+      result: "win",
+      turns: 12,
+      lives_left_player: 3,
+      lives_left_opponent: 0,
+      warriors_summoned_player: 5,
+      warriors_summoned_opponent: 4,
+      direct_attacks_player: 3,
+      direct_attacks_opponent: 0,
+    } as const;
+
+    // 60 matches (> the 50-row recent window): 40 wins, 20 losses.
+    for (let i = 0; i < 40; i++) await auth.saveMatch(SESSION, base);
+    for (let i = 0; i < 20; i++)
+      await auth.saveMatch(SESSION, { ...base, result: "loss", winner: "Dwarf" });
+
+    // The recent window is capped, but the stats span everything.
+    expect(await auth.getMatchHistory(SESSION, 50)).toHaveLength(50);
+    const stats = await auth.getMatchStats(SESSION);
+    expect(stats).toMatchObject({ total: 60, wins: 40, losses: 20, draws: 0 });
+    expect(stats.winRate).toBeCloseTo(40 / 60);
+  });
+
+  it("match stats degrade to empty with no store and never throw", async () => {
+    const auth = createLocalAuth(null);
+    expect(await auth.getMatchStats(SESSION)).toEqual({
+      total: 0,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      winRate: 0,
+    });
+  });
+
   it("match history degrades to [] with no store and never throws", async () => {
     const auth = createLocalAuth(null);
     await expect(
@@ -153,6 +194,7 @@ describe("signUpOrSignIn", () => {
       getProfile: vi.fn(),
       saveMatch: vi.fn(),
       getMatchHistory: vi.fn(),
+      getMatchStats: vi.fn(),
       saveReward: vi.fn(),
       getOwnedCards: vi.fn(),
       saveActiveDeck: vi.fn(),
@@ -175,6 +217,7 @@ describe("signUpOrSignIn", () => {
       getProfile: vi.fn(),
       saveMatch: vi.fn(),
       getMatchHistory: vi.fn(),
+      getMatchStats: vi.fn(),
       saveReward: vi.fn(),
       getOwnedCards: vi.fn(),
       saveActiveDeck: vi.fn(),
@@ -197,6 +240,7 @@ describe("signUpOrSignIn", () => {
       getProfile: vi.fn(),
       saveMatch: vi.fn(),
       getMatchHistory: vi.fn(),
+      getMatchStats: vi.fn(),
       saveReward: vi.fn(),
       getOwnedCards: vi.fn(),
       saveActiveDeck: vi.fn(),

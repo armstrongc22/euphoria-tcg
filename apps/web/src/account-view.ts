@@ -18,7 +18,6 @@ import { renderPlayableMatch, type PlayableMatchBoard } from "./play-match-view"
 import { createCardDetail } from "./detail";
 import {
   buildMatchHistoryInsert,
-  computeAccountStats,
   EMPTY_STATS,
   formatWinRate,
   recentMatches,
@@ -372,13 +371,24 @@ export async function mountAccount(
     }
   };
 
-  // Match history powers the stats panel. If it can't load (Supabase down or
-  // not configured), fall back to empty stats rather than crashing the page.
+  // Recent matches for the stats list (capped). If it can't load (Supabase down
+  // or not configured), fall back to empty rather than crashing the page.
   const loadHistory = async (): Promise<MatchRecord[]> => {
     try {
       return await auth.getMatchHistory(session, 50);
     } catch {
       return [];
+    }
+  };
+
+  // Aggregate win/loss/draw totals over the FULL history — the win counter and
+  // reward progress derive from this, not from the 50-row recent window, so they
+  // keep climbing once a player has played more than 50 matches. Same fallback.
+  const loadStats = async (): Promise<AccountStats> => {
+    try {
+      return await auth.getMatchStats(session);
+    } catch {
+      return EMPTY_STATS;
     }
   };
 
@@ -466,13 +476,16 @@ export async function mountAccount(
     chosen: ChosenActiveDeck,
     onPlayAgain: () => void,
   ): Promise<void> => {
+    let saveFailed = false;
     try {
       await auth.saveMatch(
         session,
         buildMatchHistoryInsert(session.userId, summary),
       );
     } catch {
-      /* persistence is best-effort; never block the result screen */
+      // Persistence is best-effort; never block the result screen. We surface a
+      // clear warning below so the player knows their stats may not have updated.
+      saveFailed = true;
     }
     const result = renderMatchResult(summary, {
       onPlayAgain,
@@ -480,7 +493,18 @@ export async function mountAccount(
     });
     const note = deckNote(chosen);
     swapMain(...(note ? [note, result] : [result]));
-    const wins = computeAccountStats(await loadHistory()).wins;
+    if (saveFailed) {
+      const warn = document.createElement("p");
+      warn.className = "account__panel-body match-result__save-warning";
+      warn.setAttribute("role", "alert");
+      warn.textContent =
+        "Couldn't save this match — your stats may not have updated. " +
+        "Check your connection and try again.";
+      result.append(warn);
+    }
+    // Reward progress reads the FULL saved history (via getMatchStats), not the
+    // capped recent window, so milestones fire on the true lifetime win count.
+    const wins = (await loadStats()).wins;
     const milestone = rewardForMatch(summary.playerWon, wins);
     if (milestone !== null) {
       showReward(faction, summary.seed, milestone);
@@ -534,7 +558,11 @@ export async function mountAccount(
   };
 
   const showAccount = async (): Promise<void> => {
-    const [records, owned] = await Promise.all([loadHistory(), loadOwned()]);
+    const [records, owned, stats] = await Promise.all([
+      loadHistory(),
+      loadOwned(),
+      loadStats(),
+    ]);
     // Reflect which deck is active (and any fallback) when a faction is chosen.
     const chosen =
       info0.faction !== null
@@ -542,7 +570,7 @@ export async function mountAccount(
         : null;
     const info: AccountInfo = {
       ...info0,
-      stats: computeAccountStats(records),
+      stats,
       recent: recentMatches(records, 5),
       inventory: computeInventoryStats(owned),
       owned: groupOwnedBySlug(owned),
