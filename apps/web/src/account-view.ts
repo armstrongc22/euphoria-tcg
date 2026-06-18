@@ -14,7 +14,7 @@ import type { Auth } from "./auth";
 import { renderMatchResult } from "./match-view";
 import { runTestMatch, type MatchSummary } from "./match";
 import { createPlayableMatch } from "./play-match";
-import { renderPlayableMatch } from "./play-match-view";
+import { renderPlayableMatch, type PlayableMatchBoard } from "./play-match-view";
 import { createCardDetail } from "./detail";
 import {
   buildMatchHistoryInsert,
@@ -355,6 +355,15 @@ export async function mountAccount(
     isRemote: auth.isRemote,
   } satisfies Omit<AccountInfo, "stats" | "recent" | "inventory" | "owned">;
 
+  // The live match board, when one is mounted. Swapping the main view disposes
+  // it first so its opponent-playback timer can't fire into a detached board.
+  let activeBoard: PlayableMatchBoard | null = null;
+  const swapMain = (...nodes: Node[]): void => {
+    activeBoard?.dispose();
+    activeBoard = null;
+    container.replaceChildren(...nodes);
+  };
+
   const handleSignOut = async (): Promise<void> => {
     try {
       await auth.signOut();
@@ -470,7 +479,7 @@ export async function mountAccount(
       onBack: () => void showAccount(),
     });
     const note = deckNote(chosen);
-    container.replaceChildren(...(note ? [note, result] : [result]));
+    swapMain(...(note ? [note, result] : [result]));
     const wins = computeAccountStats(await loadHistory()).wins;
     const milestone = rewardForMatch(summary.playerWon, wins);
     if (milestone !== null) {
@@ -520,10 +529,8 @@ export async function mountAccount(
       onInspect: (card) => detail.open(card),
     });
     const note = deckNote(chosen);
-    container.replaceChildren(
-      ...(note ? [note, board] : [board]),
-      detail.element,
-    );
+    swapMain(...(note ? [note, board] : [board]), detail.element);
+    activeBoard = board;
   };
 
   const showAccount = async (): Promise<void> => {
@@ -542,7 +549,7 @@ export async function mountAccount(
       deckMode: chosen?.isCustom ? "Custom Deck" : "Starter Deck",
       deckNote: chosen?.usedFallback ? chosen.message : undefined,
     };
-    container.replaceChildren(
+    swapMain(
       renderAccount(
         info,
         pool,
