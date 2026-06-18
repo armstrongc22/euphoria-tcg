@@ -1354,6 +1354,11 @@ body {
  * prototype board, not the final game UI.
  * ------------------------------------------------------------------------- */
 .play-match {
+  /* Card width drives every tile (hand + field) so the board scales as one unit;
+     overridden per breakpoint below. */
+  --card-w: 7rem;
+  /* Break out of the narrow .account column — this is a battlefield, not a form. */
+  width: min(1400px, 100%);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -1793,29 +1798,52 @@ body {
   border-color: rgba(255, 255, 255, 0.12);
 }
 
-/* Fields look like inset battlefield strips. */
+/* Fields look like felt battlefield rows; cards centre and breathe (Feature B/C). */
 .play-match__field {
-  min-height: 6.5rem;
-  background: rgba(0, 0, 0, 0.22);
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-height: calc(var(--card-w) * 1.4);
+  padding: 0.6rem;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(54, 198, 168, 0.06), transparent 60%),
+    rgba(0, 0, 0, 0.28);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
-
-/* Larger, art-led tiles (Feature B). */
-.play-match__warrior {
-  min-width: 8.5rem;
-  max-width: 9.5rem;
+.play-match__field--theirs {
+  background:
+    radial-gradient(120% 90% at 50% 100%, rgba(220, 90, 90, 0.07), transparent 60%),
+    rgba(0, 0, 0, 0.28);
 }
 
+/* Art-led, portrait card tiles — the image is the card (Feature A). The whole
+   app shows full card art at 3/4; the live board now matches instead of cropping
+   to a small landscape thumbnail. */
+.play-match__warrior,
 .play-match__card {
-  min-width: 8.5rem;
-  max-width: 9.5rem;
+  width: var(--card-w);
+  min-width: var(--card-w);
+  max-width: var(--card-w);
+  gap: 0.25rem;
+  padding: 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.3));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+/* Hand cards lift on hover so the hand feels interactive (Feature C). */
+.play-match__card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.45);
 }
 
 .play-match__art {
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 3 / 4;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 7px;
   background: rgba(255, 255, 255, 0.06);
   display: block;
 }
@@ -1831,12 +1859,38 @@ body {
   );
 }
 
+/* The card face fills the tile so the art reads as the whole card (Feature A). */
+.play-match__warrior-inspect,
+.play-match__card-inspect {
+  padding: 0;
+  gap: 0;
+}
+
 .play-match__warrior-info,
 .play-match__card-info {
   display: flex;
   flex-direction: column;
   gap: 0.12rem;
   margin-top: 0.25rem;
+  padding: 0 0.1rem;
+}
+
+/* Card name: legible but never pushes the art around — clamp to two lines. */
+.play-match__warrior-name,
+.play-match__card-name {
+  font-size: 0.8rem;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ATK / HEALTH read as a prominent stat line on field cards (Feature C). */
+.play-match__warrior-stats {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
 .play-match__warrior-statuses {
@@ -1871,6 +1925,70 @@ body {
   font-size: 0.85rem;
 }
 
+/* Action buttons sit in a tidy column under the card so the art stays dominant
+   and the controls never crowd it (Feature A.8 / D — deferred panel). */
+.play-match__warrior-controls,
+.play-match__card-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+}
+.play-match__warrior-btn,
+.play-match__card-btn {
+  width: 100%;
+  font-weight: 700;
+}
+/* Enabled gameplay buttons get an accent so the available action is obvious. */
+.play-match__warrior-btn:not(:disabled),
+.play-match__card-btn:not(:disabled) {
+  background: var(--surfer);
+  color: #06231d;
+}
+
+/* The hand reads as a centred row of cards (Feature C); scrolls if it overflows
+   rather than wrapping into a tall block. */
+.play-match__hand {
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * Wide desktop battlefield (Feature B). Mobile-first: below ~1024px the board is
+ * a single tight column (Feature B.5). At desktop widths the board widens to a
+ * full battlefield (see .play-match width above) and cards grow so the opponent
+ * field, player field, and hand spread across the horizontal space rather than
+ * being penned into a phone-width column. Zones stay vertically separated
+ * (opponent → callout → player → hand → log) and the log caps its height so the
+ * battlefield stays the focus. No DOM change — purely card sizing + spacing.
+ * ------------------------------------------------------------------------- */
+@media (min-width: 1024px) {
+  .play-match {
+    --card-w: 8.5rem;
+    gap: 0.9rem;
+  }
+  /* Roomier battlefield rows now that there's space. */
+  .play-match__field {
+    min-height: calc(var(--card-w) * 1.5);
+    gap: 0.85rem;
+  }
+  /* The hand spreads wider; the battle log caps its height beneath it. */
+  .play-match__hand {
+    gap: 0.8rem;
+  }
+  .play-match__log-list {
+    max-height: 13rem;
+  }
+}
+
+/* Extra-wide screens: a touch larger so cards feel substantial. */
+@media (min-width: 1440px) {
+  .play-match {
+    --card-w: 9.25rem;
+  }
+}
+
 /* Battle log: turn dividers + player/opponent tone (Feature F). */
 .play-match__log-turn {
   margin-top: 0.4rem;
@@ -1901,14 +2019,11 @@ body {
   color: var(--text-dim);
 }
 
-/* Mobile: tiles shrink a little and zones tighten so normal play fits without
- * excessive scrolling (Feature A). */
+/* Mobile (Feature B.3/C): the board stays a single stacked column; cards shrink
+ * so a row of hand cards and both fields fit without excessive scrolling. */
 @media (max-width: 640px) {
-  .play-match__warrior,
-  .play-match__card {
-    min-width: 7rem;
-    max-width: none;
-    flex: 1 1 7rem;
+  .play-match {
+    --card-w: 5.75rem;
   }
   .play-match__phase-state {
     font-size: 0.95rem;
