@@ -6,6 +6,8 @@
  * flow via a button click, and that a finished match fires onComplete with the
  * summary (so the result/history/reward flow downstream still runs).
  */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { Card } from "@euphoria/card-data/schema";
 import type { GameState, WarriorInPlay } from "@euphoria/game-engine";
@@ -1544,5 +1546,90 @@ describe("renderPlayableMatch — playback timer cleanup (CI teardown safety)", 
       root.dispose();
       root.dispose();
     }).not.toThrow();
+  });
+});
+
+describe("renderPlayableMatch — battlefield card visuals (milestone)", () => {
+  it("renders hand cards as actual card images with a source", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const handCards = root.querySelectorAll(".play-match__card");
+    expect(handCards.length).toBeGreaterThan(0);
+    // Every hand card carries a real card-art image with a resolved src.
+    for (const card of handCards) {
+      const art = card.querySelector<HTMLImageElement>(".play-match__art");
+      expect(art).not.toBeNull();
+      expect(art!.getAttribute("src")).toBeTruthy();
+    }
+  });
+
+  it("renders field Warriors as card-like cards with an image", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    const warrior = root.querySelector(".play-match__field--mine .play-match__warrior");
+    expect(warrior).not.toBeNull();
+    const art = warrior!.querySelector<HTMLImageElement>(".play-match__art");
+    expect(art).not.toBeNull();
+    expect(art!.getAttribute("src")).toBeTruthy();
+    // Card-like: it shows the name and current ATK/HEALTH stats.
+    expect(warrior!.querySelector(".play-match__warrior-name")?.textContent).toBeTruthy();
+    expect(warrior!.querySelector(".play-match__warrior-stats")?.textContent).toBeTruthy();
+  });
+
+  it("falls back to the missing-art placeholder when a card image fails", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const art = root.querySelector<HTMLImageElement>(".play-match__card .play-match__art")!;
+    expect(art.classList.contains("play-match__art--missing")).toBe(false);
+    art.dispatchEvent(new Event("error"));
+    expect(art.classList.contains("play-match__art--missing")).toBe(true);
+    // No broken-image icon: the src is dropped on failure.
+    expect(art.hasAttribute("src")).toBe(false);
+  });
+
+  it("keeps cards inspectable via their card image (detail modal)", () => {
+    const match = newMatch();
+    const onInspect = vi.fn();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop, onInspect });
+    // Tapping the card face (which contains the art) opens the detail modal.
+    root.querySelector<HTMLButtonElement>(".play-match__card-inspect")!.click();
+    expect(onInspect).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("live match battlefield layout (CSS, milestone)", () => {
+  // The layout is driven entirely by CSS (jsdom computes no layout), so we assert
+  // the stylesheet carries the wide-desktop battlefield + responsive intent.
+  // jsdom makes import.meta.url an http URL, so resolve from the run cwd instead.
+  const css = ((): string => {
+    for (const p of ["apps/web/src/styles.css", "src/styles.css"]) {
+      try {
+        return readFileSync(resolve(process.cwd(), p), "utf8");
+      } catch {
+        /* try next candidate */
+      }
+    }
+    throw new Error("styles.css not found from cwd " + process.cwd());
+  })();
+
+  it("widens the desktop battlefield beyond the narrow account column", () => {
+    // The board breaks out of .account's min(640px) form width.
+    expect(css).toMatch(/\.play-match\s*\{[^}]*width:\s*min\(1400px/);
+  });
+
+  it("scales cards up on desktop so the battlefield uses the width", () => {
+    expect(css).toMatch(/@media \(min-width: 1024px\)/);
+    // Cards grow at desktop widths (card-size variable is bumped).
+    expect(css).toMatch(/@media \(min-width: 1024px\)[\s\S]*--card-w:\s*8\.5rem/);
+  });
+
+  it("still stacks into a single column on mobile with smaller cards", () => {
+    expect(css).toMatch(/@media \(max-width: 640px\)/);
+    expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*--card-w:/);
+  });
+
+  it("shows cards as portrait card art (3 / 4), not landscape thumbnails", () => {
+    expect(css).toMatch(/\.play-match__art\s*\{[^}]*aspect-ratio:\s*3 \/ 4/);
   });
 });
