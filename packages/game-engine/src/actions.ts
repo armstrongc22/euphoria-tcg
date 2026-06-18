@@ -484,6 +484,87 @@ export function getForcedDuelEnemyTargets(
   );
 }
 
+/**
+ * True for the Gylippus Attack card (GYLIPPUS). Besides the flat damage it
+ * deals to the attacked defender, it may deal `secondaryDamage` to one other
+ * enemy Warrior chosen via the attack's effectTargetInstanceId. The auto-sim
+ * path is unchanged: getLegalActions never sets effectTargetInstanceId, so the
+ * second hit is simply skipped there.
+ */
+export function isGylippusAttackCard(card: Card): boolean {
+  return (
+    card.type === "Attack" &&
+    card.effectCode !== undefined &&
+    normalizeEffectCode(card.effectCode) === "GYLIPPUS"
+  );
+}
+
+/**
+ * Valid second targets for Gylippus: the opponent's Warriors other than the
+ * attacked defender (the defender already takes the flat primary hit, and the
+ * handler ignores a second target equal to the defender). Empty when `card`
+ * is not Gylippus or no other enemy Warrior is on the field.
+ */
+export function getGylippusSecondaryTargets(
+  state: GameState,
+  card: Card,
+  defenderInstanceId: string,
+): WarriorInPlay[] {
+  if (!isGylippusAttackCard(card)) return [];
+  return state.players[opponentOf(state.activePlayer)].field.filter(
+    (w) => w.instanceId !== defenderInstanceId,
+  );
+}
+
+/**
+ * Valid splash targets for a Warrior equipped with Scythe Cycle
+ * (WEAPON_ATTACK_BONUS_SPLASH): the opponent's Warriors other than the attacked
+ * defender, chosen via the attack's effectTargetInstanceId. The engine only
+ * applies the splash when the opponent has more than one Warrior, so excluding
+ * the defender makes "targets exist" exactly that gate. Empty when the attacker
+ * is not equipped with Scythe Cycle or no other enemy Warrior is on the field.
+ */
+export function getScytheCycleSplashTargets(
+  state: GameState,
+  attackerInstanceId: string,
+  defenderInstanceId: string,
+): WarriorInPlay[] {
+  const attacker = state.players[state.activePlayer].field.find(
+    (w) => w.instanceId === attackerInstanceId,
+  );
+  if (
+    attacker === undefined ||
+    attachedWeaponCode(attacker) !== "WEAPON_ATTACK_BONUS_SPLASH"
+  ) {
+    return [];
+  }
+  return state.players[opponentOf(state.activePlayer)].field.filter(
+    (w) => w.instanceId !== defenderInstanceId,
+  );
+}
+
+/**
+ * Valid extra-attack targets for a Warrior equipped with Moirai
+ * (WEAPON_GRANT_OTHER_EXTRA_ATTACK): the active player's other Warriors — a
+ * Warrior cannot grant the extra attack to itself — chosen via the attack's
+ * effectTargetInstanceId. Empty when the attacker is not equipped with Moirai
+ * or controls no other Warrior.
+ */
+export function getMoiraiExtraAttackTargets(
+  state: GameState,
+  attackerInstanceId: string,
+): WarriorInPlay[] {
+  const field = state.players[state.activePlayer].field;
+  const attacker = field.find((w) => w.instanceId === attackerInstanceId);
+  if (
+    attacker === undefined ||
+    attachedWeaponCode(attacker) !== "WEAPON_GRANT_OTHER_EXTRA_ATTACK"
+  ) {
+    return [];
+  }
+  return field.filter((w) => w.instanceId !== attackerInstanceId);
+}
+
 function attachedWeaponCode(warrior: WarriorInPlay): string | undefined {
   const code = warrior.attachedWeapon?.effectCode;
   return code === undefined ? undefined : normalizeEffectCode(code);

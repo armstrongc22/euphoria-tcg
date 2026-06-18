@@ -1178,3 +1178,200 @@ describe("renderPlayableMatch — Batch B enemy-target Items", () => {
     expect(buttonByText(root, ".play-match__card-btn", "No enemy Warrior to target")?.disabled).toBe(true);
   });
 });
+
+describe("renderPlayableMatch — attack-time secondary target (Gylippus/Scythe/Moirai)", () => {
+  const bySlug = (slug: string): Card => {
+    const c = cards.find((card) => card.slug === slug);
+    if (c === undefined) throw new Error(`no card with slug ${slug}`);
+    return c;
+  };
+  const warriorOfFaction = (faction: string): Card => {
+    const c = cards.find((card) => card.type === "Warrior" && card.faction === faction);
+    if (c === undefined) throw new Error(`no Warrior for faction ${faction}`);
+    return c;
+  };
+  /** Two distinct Warrior cards (so their names differ in the picker). */
+  const twoWarriors = (): [Card, Card] => {
+    const ws = cards.filter((c) => c.type === "Warrior");
+    if (ws.length < 2) throw new Error("need 2 distinct Warriors");
+    return [ws[0]!, ws[1]!];
+  };
+
+  function craft(opts: {
+    attacker: WarriorInPlay;
+    allies?: WarriorInPlay[];
+    enemies: WarriorInPlay[];
+    hand?: Card[];
+    spirit?: number;
+  }): ReturnType<typeof createPlayableMatch> {
+    const match = createPlayableMatch({
+      faction: "Monk",
+      pool: cards,
+      seed: 1,
+      opponentFaction: "Dwarf",
+    });
+    const s = match.state();
+    s.phase = "battle";
+    s.turn = 3; // attacks allowed
+    s.activePlayer = "player1";
+    s.players.player1.spirit = opts.spirit ?? 5;
+    s.players.player1.hand = opts.hand ?? [];
+    s.players.player1.field = [opts.attacker, ...(opts.allies ?? [])];
+    s.players.player2.field = opts.enemies;
+    return match;
+  }
+
+  // Select the first friendly attacker, then attack the first enemy (the defender).
+  const declareAttackOnFirst = (root: HTMLElement): void => {
+    buttonByText(root, ".play-match__warrior-btn", "Choose to attack")!.click();
+    buttonByText(root, ".play-match__warrior-btn", "Attack")!.click();
+  };
+
+  const withWeapon = (card: Card, id: string, weapon: Card): WarriorInPlay => {
+    const w = wip(card, id);
+    w.attachedWeapon = weapon;
+    return w;
+  };
+
+  it("offers a second enemy target after choosing Gylippus, excluding the defender", () => {
+    const gylippus = bySlug("gylippus");
+    const [eA, eB] = twoWarriors();
+    const match = craft({
+      attacker: wip(warriorOfFaction("Monk"), "a1"),
+      enemies: [wip(eA, "e1"), wip(eB, "e2")],
+      hand: [gylippus],
+      spirit: gylippus.cost + 1,
+    });
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    declareAttackOnFirst(root); // attacks e1 (the defender)
+    buttonByText(root, ".play-match__choice-btn", `Use ${gylippus.name}`)!.click();
+
+    const panel = root.querySelector(".play-match__choice");
+    expect(panel!.textContent).toContain("deal extra damage to a second enemy");
+    // Only the non-defender enemy (e2 / eB) is offered.
+    expect(buttonByText(root, ".play-match__choice-btn", `Target ${eB.name}`)).toBeDefined();
+    expect(buttonByText(root, ".play-match__choice-btn", `Target ${eA.name}`)).toBeUndefined();
+  });
+
+  it("resolves Gylippus against the chosen second enemy (effectTargetInstanceId)", () => {
+    const gylippus = bySlug("gylippus");
+    const [eA, eB] = twoWarriors();
+    const match = craft({
+      attacker: wip(warriorOfFaction("Monk"), "a1"),
+      enemies: [wip(eA, "e1"), wip(eB, "e2")],
+      hand: [gylippus],
+      spirit: gylippus.cost + 1,
+    });
+    const before = match.state().players.player2.field.find((w) => w.instanceId === "e2")!
+      .currentHealth;
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    declareAttackOnFirst(root);
+    buttonByText(root, ".play-match__choice-btn", `Use ${gylippus.name}`)!.click();
+    buttonByText(root, ".play-match__choice-btn", `Target ${eB.name}`)!.click();
+
+    const after = match.state().players.player2.field.find((w) => w.instanceId === "e2")
+      ?.currentHealth;
+    expect(after).toBe(before - 1000); // secondary 1000 landed
+    expect(match.state().players.player1.outDeck.some((c) => c.id === gylippus.id)).toBe(true);
+  });
+
+  it("skips the secondary hit (Gylippus still resolves) and leaves the other enemy untouched", () => {
+    const gylippus = bySlug("gylippus");
+    const [eA, eB] = twoWarriors();
+    const match = craft({
+      attacker: wip(warriorOfFaction("Monk"), "a1"),
+      enemies: [wip(eA, "e1"), wip(eB, "e2")],
+      hand: [gylippus],
+      spirit: gylippus.cost + 1,
+    });
+    const before = match.state().players.player2.field.find((w) => w.instanceId === "e2")!
+      .currentHealth;
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    declareAttackOnFirst(root);
+    buttonByText(root, ".play-match__choice-btn", `Use ${gylippus.name}`)!.click();
+    buttonByText(root, ".play-match__choice-btn", "Skip (attack without it)")!.click();
+
+    const after = match.state().players.player2.field.find((w) => w.instanceId === "e2")
+      ?.currentHealth;
+    expect(after).toBe(before); // untouched
+    expect(match.state().players.player1.outDeck.some((c) => c.id === gylippus.id)).toBe(true);
+  });
+
+  it("cancel/back does not resolve the attack or spend the Attack card", () => {
+    const gylippus = bySlug("gylippus");
+    const [eA, eB] = twoWarriors();
+    const match = craft({
+      attacker: wip(warriorOfFaction("Monk"), "a1"),
+      enemies: [wip(eA, "e1"), wip(eB, "e2")],
+      hand: [gylippus],
+      spirit: gylippus.cost + 1,
+    });
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    declareAttackOnFirst(root);
+    buttonByText(root, ".play-match__choice-btn", `Use ${gylippus.name}`)!.click();
+    buttonByText(root, ".play-match__choice-cancel", "Cancel")!.click();
+
+    const s = match.state();
+    expect(s.events.map((e) => e.type)).not.toContain("attackCardUsed");
+    expect(s.events.map((e) => e.type)).not.toContain("warriorAttacked");
+    expect(s.players.player1.hand.some((c) => c.id === gylippus.id)).toBe(true);
+    expect(s.players.player1.field.find((w) => w.instanceId === "a1")?.attacksRemaining).toBe(1);
+    expect(root.querySelector(".play-match__choice")).toBeNull();
+  });
+
+  it("Scythe Cycle offers no splash picker when the opponent has a single Warrior", () => {
+    const scythe = bySlug("scythe-cycle");
+    const [eA] = twoWarriors();
+    const match = craft({
+      attacker: withWeapon(warriorOfFaction("Dwarf"), "a1", scythe),
+      enemies: [wip(eA, "e1")],
+      hand: [],
+    });
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    declareAttackOnFirst(root);
+    // No secondary picker; the attack resolved straight away.
+    expect(root.querySelector(".play-match__choice")).toBeNull();
+    expect(match.state().events.map((e) => e.type)).toContain("warriorAttacked");
+  });
+
+  it("Scythe Cycle splashes the chosen enemy (effectTargetInstanceId)", () => {
+    const scythe = bySlug("scythe-cycle");
+    const [eA, eB] = twoWarriors();
+    const match = craft({
+      attacker: withWeapon(warriorOfFaction("Dwarf"), "a1", scythe),
+      enemies: [wip(eA, "e1"), wip(eB, "e2")],
+      hand: [],
+    });
+    const before = match.state().players.player2.field.find((w) => w.instanceId === "e2")!
+      .currentHealth;
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    declareAttackOnFirst(root);
+    const panel = root.querySelector(".play-match__choice");
+    expect(panel!.textContent).toContain("Scythe Cycle");
+    buttonByText(root, ".play-match__choice-btn", `Target ${eB.name}`)!.click();
+
+    const after = match.state().players.player2.field.find((w) => w.instanceId === "e2")
+      ?.currentHealth;
+    expect(after).toBe(before - 500); // 500 splash landed
+  });
+
+  it("Moirai offers another friendly Warrior and grants it an extra attack", () => {
+    const moirai = bySlug("moirai");
+    const [eA] = twoWarriors();
+    const ally = warriorOfFaction("Surfer");
+    const match = craft({
+      attacker: withWeapon(warriorOfFaction("Dwarf"), "a1", moirai),
+      allies: [wip(ally, "al1")],
+      enemies: [wip(eA, "e1")],
+      hand: [],
+    });
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    declareAttackOnFirst(root);
+    const panel = root.querySelector(".play-match__choice");
+    expect(panel!.textContent).toContain("Moirai");
+    buttonByText(root, ".play-match__choice-btn", `Target ${ally.name}`)!.click();
+
+    expect(match.state().players.player1.field.find((w) => w.instanceId === "al1")
+      ?.attacksRemaining).toBe(2); // 1 + the Moirai grant
+  });
+});

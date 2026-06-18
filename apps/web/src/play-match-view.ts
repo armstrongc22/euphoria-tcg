@@ -25,12 +25,16 @@ import {
   getForcedDuelEnemyTargets,
   getForcedDuelFriendlyTargets,
   getFriendlyWarriorTargets,
+  getGylippusSecondaryTargets,
+  getMoiraiExtraAttackTargets,
   getReviveTargets,
+  getScytheCycleSplashTargets,
   getStealTargets,
   isDeckSearchItem,
   isEnemyWarriorTargetItem,
   isForcedDuelItem,
   isFriendlyWarriorTargetItem,
+  isGylippusAttackCard,
   isOutDeckReviveItem,
   isStealHandItem,
 } from "@euphoria/game-engine";
@@ -54,6 +58,50 @@ function escapeHtml(text: string): string {
 /** True when an attack action resolves through a chosen Attack card. */
 function hasAttackCard(action: GameAction): boolean {
   return action.kind === "attack" && action.selectedAttackCardId !== undefined;
+}
+
+/** The `attack` member of GameAction (the only kind carrying effectTargetInstanceId). */
+type AttackAction = Extract<GameAction, { kind: "attack" }>;
+
+/**
+ * An optional secondary target a declared attack offers at declaration time,
+ * carried on the attack's effectTargetInstanceId: Gylippus's extra enemy, Scythe
+ * Cycle's splash enemy, or Moirai's other friendly Warrior. Returns the prompt
+ * heading and the valid Warriors, or null when this attack needs no such pick.
+ *
+ * The single effectTargetInstanceId field can serve only one effect, so when
+ * more than one applies (e.g. Scythe Cycle equipped while playing Gylippus —
+ * both want a second enemy) the chosen Warrior is shared, and the rare
+ * enemy-vs-friendly clash (Moirai + Gylippus) resolves to the first match.
+ */
+function secondaryAttackRequirement(
+  state: GameState,
+  variant: AttackAction,
+): { heading: string; targets: WarriorInPlay[] } | null {
+  const me = state.players[state.activePlayer];
+  const card =
+    variant.selectedAttackCardId !== undefined
+      ? me.hand.find((c) => c.id === variant.selectedAttackCardId)
+      : undefined;
+  if (card !== undefined && isGylippusAttackCard(card)) {
+    const targets = getGylippusSecondaryTargets(state, card, variant.defenderInstanceId);
+    if (targets.length > 0) {
+      return { heading: `${card.name}: deal extra damage to a second enemy Warrior`, targets };
+    }
+  }
+  const splash = getScytheCycleSplashTargets(
+    state,
+    variant.attackerInstanceId,
+    variant.defenderInstanceId,
+  );
+  if (splash.length > 0) {
+    return { heading: "Scythe Cycle: splash an additional enemy Warrior", targets: splash };
+  }
+  const moirai = getMoiraiExtraAttackTargets(state, variant.attackerInstanceId);
+  if (moirai.length > 0) {
+    return { heading: "Moirai: grant another friendly Warrior an extra attack", targets: moirai };
+  }
+  return null;
 }
 
 /** How playback delays are scheduled; injectable so tests can step manually. */
@@ -111,6 +159,9 @@ export function renderPlayableMatch(
   let pendingItemTarget: string | null = null;
   // A two-target duel Item (Trial of Gia) mid-selection: friendly first, then enemy.
   let pendingDuel: { cardId: string; friendly: string | null } | null = null;
+  // A declared attack whose attacker/Attack card offers an optional secondary
+  // target (Gylippus, Scythe Cycle, Moirai), awaiting the player's choice.
+  let pendingSecondary: { variant: AttackAction } | null = null;
   let error: string | null = null;
   let completed = false;
 
@@ -134,6 +185,7 @@ export function renderPlayableMatch(
     pendingSteal = null;
     pendingItemTarget = null;
     pendingDuel = null;
+    pendingSecondary = null;
   };
 
   const startPlayback = (steps: PlaybackStep[]): void => {
@@ -349,6 +401,23 @@ export function renderPlayableMatch(
     return b;
   };
 
+  // Dispatch a chosen attack variant. If it offers an optional secondary target
+  // (Gylippus / Scythe Cycle / Moirai), open the secondary-target picker first;
+  // otherwise resolve the attack immediately. Used by every attack entry point.
+  const dispatchAttack = (variant: GameAction): void => {
+    if (
+      variant.kind === "attack" &&
+      secondaryAttackRequirement(match.state(), variant) !== null
+    ) {
+      pendingSecondary = { variant };
+      pendingAttack = null;
+      error = null;
+      paint();
+      return;
+    }
+    act(variant);
+  };
+
   // "Use an Attack card?" — shown after declaring an attack whose attacker has
   // compatible Attack cards in hand. Offers a regular attack, each Attack-card
   // option, and Cancel. Every option maps to a legal action from the engine.
@@ -368,7 +437,7 @@ export function renderPlayableMatch(
       variants.find((a) => a.kind === "attack" && a.skipAttackCard === true) ??
       variants.find((a) => a.kind === "attack" && a.selectedAttackCardId === undefined);
     if (regular !== undefined) {
-      panel.append(choiceBtn("Regular attack (no card)", () => act(regular)));
+      panel.append(choiceBtn("Regular attack (no card)", () => dispatchAttack(regular)));
     }
     for (const variant of variants) {
       if (variant.kind !== "attack" || variant.selectedAttackCardId === undefined) continue;
@@ -389,7 +458,7 @@ export function renderPlayableMatch(
       row.append(
         choiceBtn(
           card !== undefined ? `Use ${card.name}` : "Use Attack card",
-          () => act(variant),
+          () => dispatchAttack(variant),
         ),
       );
       panel.append(row);
@@ -397,6 +466,55 @@ export function renderPlayableMatch(
     panel.append(
       cancelRow(() => {
         pendingAttack = null;
+        paint();
+      }),
+    );
+    return panel;
+  };
+
+  // Optional secondary-target picker for a declared attack (Gylippus extra
+  // enemy, Scythe Cycle splash, Moirai's other friendly Warrior). Lists each
+  // valid Warrior (inspectable) plus a Skip option that attacks with no
+  // secondary target, and Cancel that aborts without attacking.
+  const secondaryTargetPanel = (): HTMLElement | null => {
+    if (pendingSecondary === null) return null;
+    const variant = pendingSecondary.variant;
+    const req = secondaryAttackRequirement(match.state(), variant);
+    if (req === null) return null; // state moved on; nothing to pick
+
+    const panel = document.createElement("section");
+    panel.className = "account__panel play-match__choice";
+    const h = document.createElement("h3");
+    h.className = "account__panel-heading";
+    h.textContent = req.heading;
+    panel.append(h);
+
+    for (const target of req.targets) {
+      const row = document.createElement("div");
+      row.className = "play-match__choice-option";
+      const look = document.createElement("button");
+      look.type = "button";
+      look.className = "play-match__card-inspect";
+      look.title = "View card details";
+      look.innerHTML =
+        `<span class="play-match__card-name">${escapeHtml(target.card.name)}</span>` +
+        `<span class="play-match__card-meta">${escapeHtml(target.card.faction)} · ` +
+        `${escapeHtml(target.card.type)}</span>`;
+      look.addEventListener("click", () => inspect(target.card));
+      row.append(look);
+      row.append(
+        choiceBtn(`Target ${target.card.name}`, () =>
+          act({ ...variant, effectTargetInstanceId: target.instanceId }),
+        ),
+      );
+      panel.append(row);
+    }
+    panel.append(choiceBtn("Skip (attack without it)", () => act(variant)));
+    panel.append(
+      cancelRow(() => {
+        // Back out without attacking: keep the attacker selected so the player
+        // can re-declare. No Attack card is spent and no attack resolves.
+        pendingSecondary = null;
         paint();
       }),
     );
@@ -584,6 +702,8 @@ export function renderPlayableMatch(
     if (!playing) {
       const attackPanel = attackChoicePanel(idx, me);
       if (attackPanel !== null) frag.append(attackPanel);
+      const secondaryPanel = secondaryTargetPanel();
+      if (secondaryPanel !== null) frag.append(secondaryPanel);
       const revivePanel = reviveChoicePanel(state, me);
       if (revivePanel !== null) frag.append(revivePanel);
       const searchPanel = deckSearchChoicePanel(state, me);
@@ -790,13 +910,14 @@ export function renderPlayableMatch(
           controls.push(
             warriorBtn("Attack", () => {
               // If any variant uses an Attack card, prompt to choose; otherwise
-              // resolve the single regular attack immediately.
+              // resolve the single regular attack (which may still open the
+              // secondary-target picker, e.g. a Scythe Cycle / Moirai attacker).
               if (variants.some((a) => hasAttackCard(a))) {
                 pendingAttack = { attacker, defender: w.instanceId };
                 error = null;
                 paint();
               } else {
-                act(variants[0]!);
+                dispatchAttack(variants[0]!);
               }
             }),
           );
