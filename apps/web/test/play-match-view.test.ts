@@ -764,6 +764,9 @@ describe("renderPlayableMatch — live battle log shows both sides", () => {
       // After the opponent's turn the log carries at least one Opponent line.
       expect(logText).toContain("Opponent");
     }
+    // Default scheduler queued a real playback timer; dispose so it can't fire
+    // after this test (and the jsdom document) is torn down.
+    root.dispose();
   });
 });
 
@@ -1471,5 +1474,75 @@ describe("renderPlayableMatch — battlefield UX polish (Feature A–F)", () => 
     buttonByText(root, ".play-match__card-btn", "Summon")!.click();
     expect(root.querySelector(".play-match__log-turn")).not.toBeNull();
     expect(root.querySelector(".play-match__log-entry--you")).not.toBeNull();
+  });
+});
+
+describe("renderPlayableMatch — playback timer cleanup (CI teardown safety)", () => {
+  it("cancels the pending real playback timer on dispose (default scheduler)", () => {
+    vi.useFakeTimers();
+    try {
+      const match = newMatch(5);
+      const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+      buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+      root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+      // Opponent playback queued a real setTimeout.
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+      root.dispose();
+      // dispose() cleared it — nothing can fire after teardown.
+      expect(vi.getTimerCount()).toBe(0);
+      expect(() => vi.runAllTimers()).not.toThrow();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a queued playback step is a safe no-op after dispose (no DOM access)", () => {
+    let queued: (() => void) | null = null;
+    const scheduler = (cb: () => void): void => {
+      queued = cb;
+    };
+    const match = newMatch(5);
+    const root = renderPlayableMatch(
+      match,
+      { onComplete: noop, onQuit: noop },
+      { scheduler },
+    );
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+    expect(queued).not.toBeNull(); // a playback step is queued
+
+    root.dispose();
+    const snapshot = root.innerHTML;
+    // Firing the stale callback must not re-render (it would otherwise paint()).
+    expect(() => queued!()).not.toThrow();
+    expect(root.innerHTML).toBe(snapshot);
+  });
+
+  it("completes opponent playback normally and leaves no dangling timer", () => {
+    vi.useFakeTimers();
+    try {
+      const match = newMatch(5);
+      const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+      buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+      root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+      vi.runAllTimers(); // drain the whole opponent turn
+      expect(root.querySelector(".play-match__playback-banner")).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+      if (!match.isOver()) {
+        // Control returned to the player after playback.
+        expect(root.querySelector<HTMLButtonElement>(".play-match__end")).not.toBeNull();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("dispose is idempotent", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(() => {
+      root.dispose();
+      root.dispose();
+    }).not.toThrow();
   });
 });

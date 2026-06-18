@@ -134,6 +134,16 @@ export interface PlayableMatchActions {
 }
 
 /**
+ * The board element with a cleanup hook. Callers MUST call `dispose()` when the
+ * board is unmounted or replaced, so a queued opponent-playback timer can't fire
+ * after teardown and touch a gone document.
+ */
+export interface PlayableMatchBoard extends HTMLElement {
+  /** Cancels any pending playback timer and stops further re-renders. Idempotent. */
+  dispose(): void;
+}
+
+/**
  * Renders the board for `match` into a fresh element and returns it. The element
  * re-renders itself in place after every action, and plays the opponent's turn
  * back step by step (floating combat text + a current-action callout) instead of
@@ -144,8 +154,8 @@ export function renderPlayableMatch(
   match: PlayableMatch,
   actions: PlayableMatchActions,
   options: PlayableMatchViewOptions = {},
-): HTMLElement {
-  const root = document.createElement("section");
+): PlayableMatchBoard {
+  const root = document.createElement("section") as PlayableMatchBoard;
   root.className = "account play-match";
 
   // Transient UI selection state, reset on every successful action.
@@ -170,8 +180,17 @@ export function renderPlayableMatch(
   let completed = false;
 
   // --- playback (opponent turn) + floating-text state ----------------------
+  // True once the board is disposed (unmounted/replaced): every delayed callback
+  // and paint bails, so nothing touches the DOM after teardown.
+  let disposed = false;
+  // Handle for the pending default-scheduler timer, so dispose() can cancel it.
+  // (An injected scheduler manages its own timing; nothing real is left here.)
+  let pendingTimer: ReturnType<typeof setTimeout> | undefined;
   const schedule: PlaybackScheduler =
-    options.scheduler ?? ((cb, ms) => void setTimeout(cb, ms));
+    options.scheduler ??
+    ((cb, ms) => {
+      pendingTimer = setTimeout(cb, ms);
+    });
   // Set while the opponent's turn is animating: input is locked and the board
   // renders the step's snapshot instead of the live state.
   let playback: { steps: PlaybackStep[]; index: number } | null = null;
@@ -199,10 +218,11 @@ export function renderPlayableMatch(
   };
 
   const scheduleNext = (): void => {
-    if (playback === null) return;
+    if (playback === null || disposed) return;
     const step = playback.steps[playback.index]!;
     schedule(() => {
-      if (playback === null) return;
+      // The board may have been disposed (unmounted) while this was queued.
+      if (disposed || playback === null) return;
       playback.index += 1;
       if (playback.index >= playback.steps.length) {
         playback = null;
@@ -214,6 +234,17 @@ export function renderPlayableMatch(
         scheduleNext();
       }
     }, options.stepDelayMs ?? step.durationMs);
+  };
+
+  // Cleanup hook: cancel the pending playback timer and stop further re-renders.
+  // Idempotent — safe to call more than once, e.g. quit then navigate away.
+  const dispose = (): void => {
+    disposed = true;
+    playback = null;
+    if (pendingTimer !== undefined) {
+      clearTimeout(pendingTimer);
+      pendingTimer = undefined;
+    }
   };
 
   const act = (action: GameAction): void => {
@@ -674,6 +705,8 @@ export function renderPlayableMatch(
 
   // --- the painter ----------------------------------------------------------
   function paint(): void {
+    // Disposed: the board is unmounted; never build DOM (the document may be gone).
+    if (disposed) return;
     const playing = playback !== null;
     // onComplete fires only once playback (if any) has finished.
     if (!playing && match.isOver()) {
@@ -1356,6 +1389,7 @@ export function renderPlayableMatch(
     return panel;
   };
 
+  root.dispose = dispose;
   paint();
   return root;
 }
