@@ -448,6 +448,42 @@ export function getEnemyWarriorTargets(
   );
 }
 
+/**
+ * True for an Item that locks one friendly and one enemy Warrior into a duel
+ * (FORCED_DUEL, Trial of Gia). It needs BOTH targetInstanceId (friendly) and
+ * secondaryTargetInstanceId (enemy) on the playItem action. The auto-sim path
+ * is unchanged.
+ */
+export function isForcedDuelItem(card: Card): boolean {
+  return (
+    card.type === "Item" &&
+    card.effectCode !== undefined &&
+    normalizeEffectCode(card.effectCode) === "FORCED_DUEL"
+  );
+}
+
+/** Valid friendly duel targets: the active player's Warriors not already dueling. */
+export function getForcedDuelFriendlyTargets(
+  state: GameState,
+  card: Card,
+): WarriorInPlay[] {
+  if (!isForcedDuelItem(card)) return [];
+  return state.players[state.activePlayer].field.filter(
+    (w) => findDuelPartner(state, w.instanceId) === undefined,
+  );
+}
+
+/** Valid enemy duel targets: the opponent's Warriors not already dueling. */
+export function getForcedDuelEnemyTargets(
+  state: GameState,
+  card: Card,
+): WarriorInPlay[] {
+  if (!isForcedDuelItem(card)) return [];
+  return state.players[opponentOf(state.activePlayer)].field.filter(
+    (w) => findDuelPartner(state, w.instanceId) === undefined,
+  );
+}
+
 function attachedWeaponCode(warrior: WarriorInPlay): string | undefined {
   const code = warrior.attachedWeapon?.effectCode;
   return code === undefined ? undefined : normalizeEffectCode(code);
