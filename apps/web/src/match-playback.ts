@@ -149,6 +149,50 @@ export function battleLogLines(state: GameState): string[] {
   return lines;
 }
 
+/** One readable battle-log row, tagged for turn grouping and player/opponent tone. */
+export interface BattleLogEntry {
+  /** The turn this row belongs to (null before the first turnStarted). */
+  turn: number | null;
+  /** Who the row is about: the local player, the opponent, or neutral combat. */
+  actor: "you" | "opponent" | "system";
+  /** The readable text (same wording as battleLogLines). */
+  text: string;
+  /** True for a "— You · turn N —" turn divider. */
+  isTurnHeader: boolean;
+}
+
+/**
+ * Like {@link battleLogLines} but structured, so the UI can group rows by turn
+ * and tint player vs opponent. Pure; reuses describeMatchEvent for wording so
+ * the two never drift.
+ */
+export function battleLogEntries(state: GameState): BattleLogEntry[] {
+  const r = makeResolvers(state);
+  const entries: BattleLogEntry[] = [];
+  let turn: number | null = null;
+  for (const ev of state.events) {
+    const text = describeMatchEvent(ev, r);
+    if (text === null) continue;
+    if (ev.type === "turnStarted") {
+      turn = ev.turn;
+      entries.push({
+        turn,
+        actor: ev.player === PLAYER_SEAT ? "you" : "opponent",
+        text,
+        isTurnHeader: true,
+      });
+      continue;
+    }
+    // Events with a `player` field attribute to that seat; combat events
+    // (attacked/destroyed/health) carry none and read as neutral.
+    const owner = (ev as { player?: PlayerId }).player;
+    const actor =
+      owner === undefined ? "system" : owner === PLAYER_SEAT ? "you" : "opponent";
+    entries.push({ turn, actor, text, isTurnHeader: false });
+  }
+  return entries;
+}
+
 /** Durations per tone (ms). Snappy by design; reduced-motion ignores animation. */
 const DURATION: Record<PlaybackTone, number> = {
   damage: 750,

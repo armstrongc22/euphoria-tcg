@@ -38,13 +38,17 @@ import {
   isOutDeckReviveItem,
   isStealHandItem,
 } from "@euphoria/game-engine";
+import { cardImageUrl } from "./cards";
 import type { MatchSummary } from "./match";
 import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "./play-match";
 import {
-  battleLogLines,
+  battleLogEntries,
   toPlaybackSteps,
   type PlaybackStep,
 } from "./match-playback";
+
+/** Base path Vite serves card art from (see cardImageUrl). */
+const LIVE_ART_BASE = import.meta.env.BASE_URL;
 
 /** Re-exported so existing callers keep importing it from the view. */
 export { battleLogLines } from "./match-playback";
@@ -308,18 +312,53 @@ export function renderPlayableMatch(
     const el = document.createElement("div");
     el.className = "play-match__stats";
     el.dataset.seat = p.id; // anchor for "-1 LIFE" floats on direct attacks
+    // A labelled stat chip; the aria-label spells the value out for screen readers.
+    const chip = (
+      cls: string,
+      glyph: string,
+      value: number,
+      noun: string,
+    ): string =>
+      `<span class="play-match__stat ${cls}" title="${escapeHtml(noun)}" ` +
+      `aria-label="${value} ${escapeHtml(noun)}">${glyph} ${value}</span>`;
     el.innerHTML =
       `<span class="play-match__seat">${escapeHtml(label)}</span>` +
-      `<span class="play-match__stat play-match__stat--lives" title="Lives">` +
-      `♥ ${p.lives}</span>` +
-      `<span class="play-match__stat play-match__stat--spirit" title="Spirit">` +
-      `◆ ${p.spirit}</span>` +
-      `<span class="play-match__stat" title="Cards in hand">✋ ${p.hand.length}</span>`;
+      chip("play-match__stat--lives", "♥", p.lives, "Lives") +
+      chip("play-match__stat--spirit", "◆", p.spirit, "Spirit") +
+      chip("play-match__stat--hand", "✋", p.hand.length, "cards in hand") +
+      chip("play-match__stat--deck", "🂠", p.deck.length, "cards in deck") +
+      chip("play-match__stat--out", "⚰", p.outDeck.length, "cards in Out Deck");
     return el;
   };
 
   // Opens the shared card-detail modal for `card`, when an inspector is wired.
   const inspect = (card: Card): void => actions.onInspect?.(card);
+
+  // A cropped art thumbnail for a live tile. Decorative (the tile name/stats
+  // carry the meaning); on load failure it flips to a flat placeholder rather
+  // than a broken-image icon, mirroring the Card Viewer's fallback.
+  const cardArt = (card: Card): HTMLImageElement => {
+    const img = document.createElement("img");
+    img.className = "play-match__art";
+    img.alt = "";
+    img.loading = "lazy";
+    img.src = cardImageUrl(card, LIVE_ART_BASE);
+    img.addEventListener("error", () => {
+      img.removeAttribute("src");
+      img.classList.add("play-match__art--missing");
+    });
+    return img;
+  };
+
+  // Short status chips for a live Warrior (tank form, foreign control, a
+  // temporary ATK buff). Pure read of the WarriorInPlay; empty when none apply.
+  const warriorStatusChips = (w: WarriorInPlay): string[] => {
+    const chips: string[] = [];
+    if (w.tankForm !== undefined) chips.push("🛡 Tank");
+    if (w.stolenFrom !== undefined) chips.push("⤴ Stolen");
+    if (w.temporaryAttackBuffs.length > 0) chips.push("▲ Buffed");
+    return chips;
+  };
 
   // A Warrior tile: an inspectable body (art/name/stats — taps open the detail
   // modal, never a gameplay action) plus zero or more explicit action buttons.
@@ -344,11 +383,20 @@ export function renderPlayableMatch(
     body.type = "button";
     body.className = "play-match__warrior-inspect";
     body.title = "View card details";
-    body.innerHTML =
+    body.append(cardArt(w.card));
+    const statusChips = warriorStatusChips(w)
+      .map((c) => `<span class="play-match__warrior-status">${escapeHtml(c)}</span>`)
+      .join("");
+    const info = document.createElement("span");
+    info.className = "play-match__warrior-info";
+    info.innerHTML =
       `<span class="play-match__warrior-name">${escapeHtml(w.card.name)}</span>` +
-      `<span class="play-match__warrior-stats">${w.currentAttack} / ${w.currentHealth}</span>` +
-      `<span class="play-match__warrior-meta">⚡${w.attacksRemaining}</span>` +
+      `<span class="play-match__warrior-stats" title="Attack / Health">` +
+      `⚔${w.currentAttack} · ♥${w.currentHealth}</span>` +
+      `<span class="play-match__warrior-meta" title="Attacks remaining">⚡${w.attacksRemaining}</span>` +
+      (statusChips ? `<span class="play-match__warrior-statuses">${statusChips}</span>` : "") +
       (opts.badge ? `<span class="play-match__warrior-badge">${escapeHtml(opts.badge)}</span>` : "");
+    body.append(info);
     body.addEventListener("click", () => inspect(w.card));
     el.append(body);
 
@@ -649,7 +697,28 @@ export function renderPlayableMatch(
 
     const frag = document.createDocumentFragment();
 
-    // Header: turn / phase / whose turn + concede.
+    // Locked while the opponent's turn animates: dims the board (CSS) so the
+    // input-lock is unmistakable (Feature E).
+    root.classList.toggle("play-match--locked", playing);
+
+    // A labelled battlefield/hand zone (Feature A): a caption plus its children,
+    // so opponent / player / hand read as distinct areas.
+    const zone = (
+      label: string,
+      modifier: string,
+      ...kids: (HTMLElement | null)[]
+    ): HTMLElement => {
+      const z = document.createElement("section");
+      z.className = `play-match__zone play-match__zone--${modifier}`;
+      const cap = document.createElement("p");
+      cap.className = "play-match__zone-label";
+      cap.textContent = label;
+      z.append(cap);
+      for (const k of kids) if (k !== null) z.append(k);
+      return z;
+    };
+
+    // Header: title + concede.
     const header = document.createElement("div");
     header.className = "account__header play-match__header";
     const mode = playing
@@ -671,6 +740,46 @@ export function renderPlayableMatch(
     header.append(concede);
     frag.append(header);
 
+    // Prominent turn/phase banner (Feature E): names what's expected of the
+    // player — their move, opponent acting, or a specific choice in progress.
+    const choosing =
+      pendingRevive !== null ||
+      pendingSearch !== null ||
+      pendingSteal !== null ||
+      pendingItemTarget !== null ||
+      pendingDuel !== null ||
+      pendingWeapon !== null;
+    let phaseState: string;
+    let phaseTone: string;
+    if (playing) {
+      phaseState = "Opponent is acting";
+      phaseTone = "playback";
+    } else if (pendingAttack !== null) {
+      phaseState = "Choose an Attack card";
+      phaseTone = "choose";
+    } else if (pendingSecondary !== null) {
+      phaseState = "Choose a secondary target";
+      phaseTone = "choose";
+    } else if (choosing) {
+      phaseState = "Choose a target";
+      phaseTone = "choose";
+    } else if (!yourTurn) {
+      phaseState = "Opponent's turn";
+      phaseTone = "opponent";
+    } else {
+      phaseState = "Your move";
+      phaseTone = "you";
+    }
+    const phaseName = state.phase === "battle" ? "Battle" : "Main";
+    const phaseBanner = document.createElement("div");
+    phaseBanner.className = `play-match__phase play-match__phase--${phaseTone}`;
+    phaseBanner.setAttribute("role", "status");
+    phaseBanner.setAttribute("aria-live", "polite");
+    phaseBanner.innerHTML =
+      `<span class="play-match__phase-state">${escapeHtml(phaseState)}</span>` +
+      `<span class="play-match__phase-sub">Turn ${state.turn} — ${phaseName} phase</span>`;
+    frag.append(phaseBanner);
+
     // "Opponent is acting…" banner during playback.
     if (playing) {
       const banner = document.createElement("p");
@@ -684,7 +793,7 @@ export function renderPlayableMatch(
     const calloutEl = document.createElement("p");
     calloutEl.className = "play-match__callout";
     calloutEl.textContent = calloutText && calloutText.length > 0 ? calloutText : " ";
-    frag.append(calloutEl);
+    // calloutEl is appended between the two fields below (Feature A/E).
 
     if (error !== null) {
       const err = document.createElement("p");
@@ -697,6 +806,19 @@ export function renderPlayableMatch(
     hint.className = "play-match__hint";
     hint.textContent = "Tap any card to view its full details.";
     frag.append(hint);
+
+    // Opponent zone: their stats + field (Feature A/C).
+    frag.append(
+      zone("Opponent", "opponent", statBar("Opponent", opp), fieldRow(opp, false, idx)),
+    );
+
+    // Current-action callout, between the two fields where the eye lands.
+    frag.append(calloutEl);
+
+    // Player zone: your field + stats.
+    frag.append(
+      zone("You", "mine", fieldRow(me, true, idx), statBar("You", me)),
+    );
 
     // Pending choice prompts (player-only; never during playback).
     if (!playing) {
@@ -712,23 +834,14 @@ export function renderPlayableMatch(
       if (stealPanel !== null) frag.append(stealPanel);
     }
 
-    // Opponent: stats + field.
-    frag.append(statBar("Opponent", opp));
-    frag.append(fieldRow(opp, /* mine */ false, idx));
-
-    // Player: field + stats + hand.
-    frag.append(fieldRow(me, /* mine */ true, idx));
-    frag.append(statBar("You", me));
-    frag.append(handRow(me, idx));
-
-    // Action bar: enter battle / end turn (disabled during playback).
+    // Hand zone (visually distinct from the field) + the action bar.
     const bar = document.createElement("div");
     bar.className = "play-match__actionbar";
     bar.append(
       barButton("Enter Battle", idx.enterBattle, "play-match__enter"),
       barButton("End Turn", idx.endTurn, "play-match__end"),
     );
-    frag.append(bar);
+    frag.append(zone("Your hand", "hand", handRow(me, idx), bar));
 
     // Battle log (full history).
     frag.append(logPanel(state));
@@ -780,7 +893,18 @@ export function renderPlayableMatch(
     b.className = `account__play ${cls}`;
     b.textContent = label;
     b.disabled = action === undefined;
-    if (action !== undefined) b.addEventListener("click", () => act(action));
+    if (action !== undefined) {
+      b.addEventListener("click", () => act(action));
+    } else {
+      // Disabled: Enter Battle is Main-phase only; End Turn needs your turn.
+      const reason = cls.includes("enter")
+        ? "Enter Battle — available in the Main phase"
+        : cls.includes("end")
+          ? "End Turn — available on your turn"
+          : `${label} unavailable`;
+      b.title = reason;
+      b.setAttribute("aria-label", reason);
+    }
     return b;
   };
 
@@ -1006,11 +1130,15 @@ export function renderPlayableMatch(
       body.type = "button";
       body.className = "play-match__card-inspect";
       body.title = "View card details";
-      body.innerHTML =
+      body.append(cardArt(card));
+      const info = document.createElement("span");
+      info.className = "play-match__card-info";
+      info.innerHTML =
         `<span class="play-match__card-name">${escapeHtml(card.name)}` +
         `${copies > 1 ? ` ×${copies}` : ""}</span>` +
         `<span class="play-match__card-meta">${escapeHtml(card.type)} · ` +
         `◆${card.cost}</span>`;
+      body.append(info);
       body.addEventListener("click", () => inspect(card));
       el.append(body);
 
@@ -1186,7 +1314,14 @@ export function renderPlayableMatch(
     b.className = "play-match__card-btn";
     b.textContent = label;
     b.disabled = onClick === undefined;
-    if (onClick !== undefined) b.addEventListener("click", onClick);
+    if (onClick !== undefined) {
+      b.addEventListener("click", onClick);
+    } else {
+      // Disabled: the label is the reason — expose it as a tooltip and to
+      // screen readers so "why can't I?" is answerable on desktop and mobile.
+      b.title = label;
+      b.setAttribute("aria-label", `Unavailable: ${label}`);
+    }
     return b;
   };
 
@@ -1199,16 +1334,20 @@ export function renderPlayableMatch(
     panel.append(heading);
     const ul = document.createElement("ul");
     ul.className = "play-match__log-list";
-    const lines = battleLogLines(state);
-    if (lines.length === 0) {
+    const entries = battleLogEntries(state);
+    if (entries.length === 0) {
       const li = document.createElement("li");
       li.className = "play-match__log-empty";
       li.textContent = "The match has begun.";
       ul.append(li);
     }
-    for (const line of lines) {
+    for (const entry of entries) {
       const li = document.createElement("li");
-      li.textContent = line;
+      // Turn dividers head each turn's block; action rows tint by who acted.
+      li.className = entry.isTurnHeader
+        ? "play-match__log-turn"
+        : `play-match__log-entry play-match__log-entry--${entry.actor}`;
+      li.textContent = entry.text;
       ul.append(li);
     }
     panel.append(ul);

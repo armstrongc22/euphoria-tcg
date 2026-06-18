@@ -1375,3 +1375,101 @@ describe("renderPlayableMatch — attack-time secondary target (Gylippus/Scythe/
       ?.attacksRemaining).toBe(2); // 1 + the Moirai grant
   });
 });
+
+describe("renderPlayableMatch — battlefield UX polish (Feature A–F)", () => {
+  it("renders labelled opponent, player, and hand zones", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const labels = Array.from(root.querySelectorAll(".play-match__zone-label")).map(
+      (e) => e.textContent,
+    );
+    expect(labels).toContain("Opponent");
+    expect(labels).toContain("You");
+    expect(labels).toContain("Your hand");
+    expect(root.querySelector(".play-match__zone--opponent")).not.toBeNull();
+    expect(root.querySelector(".play-match__zone--mine")).not.toBeNull();
+    expect(root.querySelector(".play-match__zone--hand")).not.toBeNull();
+  });
+
+  it("shows deck, hand, and Out Deck counts for both players", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(root.querySelectorAll(".play-match__stat--deck").length).toBe(2);
+    expect(root.querySelectorAll(".play-match__stat--hand").length).toBe(2);
+    expect(root.querySelectorAll(".play-match__stat--out").length).toBe(2);
+    const s = match.state();
+    const mine = root.querySelector(".play-match__zone--mine")!;
+    expect(mine.querySelector(".play-match__stat--deck")!.textContent).toContain(
+      String(s.players.player1.deck.length),
+    );
+    expect(mine.querySelector(".play-match__stat--hand")!.textContent).toContain(
+      String(s.players.player1.hand.length),
+    );
+  });
+
+  it("does not reveal opponent hand card names (count only)", () => {
+    const match = matchWithOpponentWarrior(5);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const oppZone = root.querySelector(".play-match__zone--opponent")!;
+    // The opponent zone shows a hand count chip but no hand card tiles.
+    expect(oppZone.querySelector(".play-match__stat--hand")).not.toBeNull();
+    expect(oppZone.querySelectorAll(".play-match__card").length).toBe(0);
+  });
+
+  it("keeps live cards inspectable and shows an art thumbnail", () => {
+    const onInspect = vi.fn();
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop, onInspect });
+    const body = root.querySelector<HTMLButtonElement>(".play-match__card-inspect")!;
+    expect(body.querySelector("img.play-match__art")).not.toBeNull();
+    body.click();
+    expect(onInspect).toHaveBeenCalledTimes(1);
+  });
+
+  it("exposes a disabled action's reason as a tooltip and aria-label", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    root.querySelector<HTMLButtonElement>(".play-match__enter")!.click();
+    const blocked = buttonByText(root, ".play-match__card-btn", "Not during Battle")!;
+    expect(blocked.disabled).toBe(true);
+    expect(blocked.title).toBe("Not during Battle");
+    expect(blocked.getAttribute("aria-label")).toContain("Not during Battle");
+  });
+
+  it("explains the one-summon-per-turn limit with a tooltip", () => {
+    const match = newMatch();
+    match.state().players.player1.spirit = 99;
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    const limited = buttonByText(root, ".play-match__card-btn", "One summon per turn")!;
+    expect(limited.disabled).toBe(true);
+    expect(limited.title).toBe("One summon per turn");
+  });
+
+  it("explains insufficient Spirit on an unaffordable card", () => {
+    const match = newMatch();
+    match.state().players.player1.spirit = 0;
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const broke = buttonByText(root, ".play-match__card-btn", "Not enough Spirit")!;
+    expect(broke.disabled).toBe(true);
+    expect(broke.title).toBe("Not enough Spirit");
+    expect(broke.getAttribute("aria-label")).toContain("Not enough Spirit");
+  });
+
+  it("shows a prominent phase banner reflecting your move and phase", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const banner = root.querySelector(".play-match__phase")!;
+    expect(banner.textContent).toContain("Your move");
+    expect(banner.textContent).toContain("Main phase");
+    expect(banner.classList.contains("play-match__phase--you")).toBe(true);
+  });
+
+  it("groups the battle log by turn and tints player rows", () => {
+    const match = newMatch(5);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    expect(root.querySelector(".play-match__log-turn")).not.toBeNull();
+    expect(root.querySelector(".play-match__log-entry--you")).not.toBeNull();
+  });
+});
