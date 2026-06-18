@@ -15,7 +15,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "./supabase-client";
 import {
   appendLocalMatch,
+  computeAccountStats,
+  EMPTY_STATS,
   loadLocalMatches,
+  type AccountStats,
   type MatchHistoryInsert,
   type MatchRecord,
 } from "./match-history";
@@ -103,6 +106,12 @@ export interface Auth {
   saveMatch(session: AuthSession, match: MatchHistoryInsert): Promise<void>;
   /** The user's match rows, newest first (default cap, never the whole table). */
   getMatchHistory(session: AuthSession, limit?: number): Promise<MatchRecord[]>;
+  /**
+   * Aggregate win/loss/draw stats over the user's ENTIRE match history — not the
+   * capped window getMatchHistory returns. The account win counter and reward
+   * progress derive from this, so they keep climbing past 50 lifetime matches.
+   */
+  getMatchStats(session: AuthSession): Promise<AccountStats>;
   /**
    * Save one chosen reward card: writes both the ownership row (owned_cards)
    * and the choice record (reward_events) for the signed-in user.
@@ -288,6 +297,30 @@ export function createSupabaseAuth(client: SupabaseClient): Auth {
       return rows.map(rowToMatchRecord);
     },
 
+    async getMatchStats(session) {
+      // Count rows per result with head-only queries: no rows are fetched and no
+      // PostgREST row cap applies, so the totals span the whole history rather
+      // than a truncated page (the bug that froze the win counter past 50 games).
+      const countByResult = async (
+        result: MatchRecord["result"],
+      ): Promise<number> => {
+        const { count, error } = await client
+          .from("match_history")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", session.userId)
+          .eq("result", result);
+        if (error) throw error;
+        return count ?? 0;
+      };
+      const [wins, losses, draws] = await Promise.all([
+        countByResult("win"),
+        countByResult("loss"),
+        countByResult("draw"),
+      ]);
+      const total = wins + losses + draws;
+      return { total, wins, losses, draws, winRate: total > 0 ? wins / total : 0 };
+    },
+
     async saveReward(_session, owned, event) {
       // created_at is omitted on both: the table defaults set it on insert.
       const ownedResult = await client.from("owned_cards").insert(owned);
@@ -392,6 +425,13 @@ export function createLocalAuth(store: KeyValueStore | null): Auth {
         b.created_at.localeCompare(a.created_at),
       );
       return limit === undefined ? all : all.slice(0, limit);
+    },
+
+    async getMatchStats(_session) {
+      // Computed over EVERY stored match (no cap), mirroring the Supabase counts
+      // so the two backends never diverge on the win counter / reward progress.
+      if (store === null) return EMPTY_STATS;
+      return computeAccountStats(loadLocalMatches(store));
     },
 
     async saveReward(_session, owned, event) {

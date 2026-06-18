@@ -8,7 +8,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { cards } from "../src/cards";
 import { renderAccount, mountAccount, type AccountInfo } from "../src/account-view";
-import { createLocalAuth } from "../src/auth";
+import { createLocalAuth, type Auth, type AuthSession } from "../src/auth";
+import type { MatchHistoryInsert } from "../src/match-history";
 import { deckCardCount, getRecipe } from "../src/starter";
 import type { KeyValueStore } from "../src/signup";
 
@@ -181,5 +182,85 @@ describe("mountAccount match stats", () => {
     const { container } = await signedInAccount();
     expect(container.querySelector(".account__rewards")?.textContent?.toLowerCase())
       .toContain("no reward cards yet");
+  });
+
+  /** Reads a stat field's value (the <dd>) by its label text. */
+  function statValue(container: HTMLElement, label: string): string | null {
+    const fields = container.querySelectorAll(".account__stats .account__field");
+    for (const f of fields) {
+      if (f.querySelector(".account__label")?.textContent === label) {
+        return f.querySelector(".account__value")?.textContent ?? null;
+      }
+    }
+    return null;
+  }
+
+  it("counts wins over the FULL history, not just the recent 50", async () => {
+    const store = memoryStore();
+    const auth = createLocalAuth(store);
+    await auth.signUp("player@example.com", "pw");
+    await auth.saveFaction(
+      { userId: "local-demo", email: "player@example.com" },
+      "Dwarf",
+    );
+    const base: MatchHistoryInsert = {
+      user_id: "local-demo",
+      player_faction: "Dwarf",
+      opponent_faction: "Sonic",
+      winner: "Dwarf",
+      result: "win",
+      turns: 10,
+      lives_left_player: 3,
+      lives_left_opponent: 0,
+      warriors_summoned_player: 4,
+      warriors_summoned_opponent: 4,
+      direct_attacks_player: 3,
+      direct_attacks_opponent: 0,
+    };
+    const session: AuthSession = { userId: "local-demo", email: "player@example.com" };
+    // 60 lifetime matches (> the 50-row recent window): 40 wins, 20 losses. If
+    // stats were computed from the capped window the win count would be wrong.
+    for (let i = 0; i < 40; i++) await auth.saveMatch(session, base);
+    for (let i = 0; i < 20; i++)
+      await auth.saveMatch(session, { ...base, result: "loss", winner: "Sonic" });
+
+    const container = document.createElement("div");
+    await mountAccount(container, { auth, pool: cards, onSignOut: () => {} });
+
+    expect(statValue(container, "Total matches")).toBe("60");
+    expect(statValue(container, "Wins")).toBe("40");
+    expect(statValue(container, "Losses")).toBe("20");
+    // Recent list is still capped at 5, while the win counter spans everything —
+    // both read the same saved history.
+    expect(container.querySelectorAll(".account__recent-row")).toHaveLength(5);
+  });
+
+  it("warns (without crashing) when a completed match fails to save", async () => {
+    const store = memoryStore();
+    const base = createLocalAuth(store);
+    await base.signUp("player@example.com", "pw");
+    await base.saveFaction(
+      { userId: "local-demo", email: "player@example.com" },
+      "Dwarf",
+    );
+    // Same backend, but saving a match always fails (e.g. Supabase insert error).
+    const auth: Auth = {
+      ...base,
+      saveMatch: async () => {
+        throw new Error("insert failed");
+      },
+    };
+
+    const container = document.createElement("div");
+    await mountAccount(container, { auth, pool: cards, onSignOut: () => {} });
+
+    container.querySelector<HTMLButtonElement>(".account__play--sim")!.click();
+    await flush();
+
+    // The result screen still renders, with a clear, non-crashing warning.
+    expect(container.querySelector(".match-result")).not.toBeNull();
+    const warning = container.querySelector(".match-result__save-warning");
+    expect(warning).not.toBeNull();
+    expect(warning?.textContent?.toLowerCase()).toContain("couldn't save");
   });
 });
