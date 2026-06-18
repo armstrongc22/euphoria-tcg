@@ -22,11 +22,14 @@ import type {
 import {
   getDeckSearchTargets,
   getEnemyWarriorTargets,
+  getForcedDuelEnemyTargets,
+  getForcedDuelFriendlyTargets,
   getFriendlyWarriorTargets,
   getReviveTargets,
   getStealTargets,
   isDeckSearchItem,
   isEnemyWarriorTargetItem,
+  isForcedDuelItem,
   isFriendlyWarriorTargetItem,
   isOutDeckReviveItem,
   isStealHandItem,
@@ -106,6 +109,8 @@ export function renderPlayableMatch(
   let pendingSteal: string | null = null;
   // An Item awaiting a friendly-Warrior target on the field (card id), e.g. GILs Unit.
   let pendingItemTarget: string | null = null;
+  // A two-target duel Item (Trial of Gia) mid-selection: friendly first, then enemy.
+  let pendingDuel: { cardId: string; friendly: string | null } | null = null;
   let error: string | null = null;
   let completed = false;
 
@@ -128,6 +133,7 @@ export function renderPlayableMatch(
     pendingSearch = null;
     pendingSteal = null;
     pendingItemTarget = null;
+    pendingDuel = null;
   };
 
   const startPlayback = (steps: PlaybackStep[]): void => {
@@ -707,6 +713,34 @@ export function renderPlayableMatch(
             ),
           );
         }
+        // Trial of Gia, step 1: pick a friendly Warrior (before the enemy).
+        const duelCard =
+          pendingDuel !== null
+            ? player.hand.find((c) => c.id === pendingDuel!.cardId)
+            : undefined;
+        const isDuelAlly =
+          duelCard !== undefined &&
+          getForcedDuelFriendlyTargets(match.state(), duelCard).some(
+            (t) => t.instanceId === w.instanceId,
+          );
+        const duelAllyChosen = pendingDuel?.friendly === w.instanceId;
+        if (isDuelAlly && pendingDuel!.friendly === null) {
+          controls.push(
+            warriorBtn("Choose ally", () => {
+              pendingDuel = { cardId: pendingDuel!.cardId, friendly: w.instanceId };
+              error = null;
+              paint();
+            }),
+          );
+        } else if (duelAllyChosen) {
+          controls.push(
+            warriorBtn("✓ Ally — cancel", () => {
+              pendingDuel = { cardId: pendingDuel!.cardId, friendly: null };
+              error = null;
+              paint();
+            }),
+          );
+        }
         if (canAttack) {
           controls.push(
             selectedAttacker === w.instanceId
@@ -724,8 +758,8 @@ export function renderPlayableMatch(
         }
         row.append(
           warriorEl(w, {
-            selected: selectedAttacker === w.instanceId,
-            highlighted: equipTarget !== undefined || isItemTarget,
+            selected: selectedAttacker === w.instanceId || duelAllyChosen,
+            highlighted: equipTarget !== undefined || isItemTarget || isDuelAlly,
             controls,
           }),
         );
@@ -775,12 +809,37 @@ export function renderPlayableMatch(
             ),
           );
         }
+        // Trial of Gia, step 2: after an ally is chosen, pick the enemy duelist.
+        const duelCard =
+          pendingDuel !== null && pendingDuel.friendly !== null
+            ? active.players[active.activePlayer].hand.find((c) => c.id === pendingDuel!.cardId)
+            : undefined;
+        const isDuelEnemy =
+          duelCard !== undefined &&
+          getForcedDuelEnemyTargets(active, duelCard).some(
+            (t) => t.instanceId === w.instanceId,
+          );
+        if (isDuelEnemy) {
+          const cardId = pendingDuel!.cardId;
+          const friendly = pendingDuel!.friendly!;
+          controls.push(
+            warriorBtn("Duel here", () =>
+              act({
+                kind: "playItem",
+                cardId,
+                targetInstanceId: friendly,
+                secondaryTargetInstanceId: w.instanceId,
+              }),
+            ),
+          );
+        }
         if (reclaim !== undefined) {
           controls.push(warriorBtn("Reclaim", () => act(reclaim)));
         }
         row.append(
           warriorEl(w, {
-            highlighted: (variants !== undefined && variants.length > 0) || isEnemyItemTarget,
+            highlighted:
+              (variants !== undefined && variants.length > 0) || isEnemyItemTarget || isDuelEnemy,
             badge: reclaim !== undefined ? "reclaim" : undefined,
             controls,
           }),
@@ -934,6 +993,31 @@ export function renderPlayableMatch(
             },
           );
           if (pendingItemTarget === card.id) b.classList.add("play-match__card-btn--active");
+          controls.append(b);
+        }
+      } else if (playItem !== undefined && isForcedDuelItem(card)) {
+        // Trial of Gia needs a friendly AND an enemy Warrior (two-step pick).
+        // Disabled unless at least one valid Warrior exists on each side.
+        const allies = getForcedDuelFriendlyTargets(match.state(), card);
+        const enemies = getForcedDuelEnemyTargets(match.state(), card);
+        if (allies.length === 0 || enemies.length === 0) {
+          controls.append(cardButton("Needs an ally and an enemy", undefined));
+        } else {
+          const active = pendingDuel?.cardId === card.id;
+          const b = cardButton(
+            active
+              ? pendingDuel!.friendly === null
+                ? "Choose your ally…"
+                : "Choose an enemy…"
+              : "Play",
+            () => {
+              pendingDuel = active ? null : { cardId: card.id, friendly: null };
+              pendingItemTarget = null;
+              error = null;
+              paint();
+            },
+          );
+          if (active) b.classList.add("play-match__card-btn--active");
           controls.append(b);
         }
       } else if (playItem !== undefined) {
