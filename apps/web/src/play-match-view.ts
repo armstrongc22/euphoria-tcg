@@ -173,6 +173,13 @@ export interface PlayableMatchActions {
    * Viewer and Deck Builder use. Omitted in pure tests that only assert wiring.
    */
   readonly onInspect?: (card: Card) => void;
+  /**
+   * Fired after every successful human action (once per action, before any
+   * opponent playback animates). The mount uses it to persist the match's
+   * action history for crash/refresh recovery. Omitted where recovery isn't
+   * wired (e.g. pure tests).
+   */
+  readonly onAction?: () => void;
 }
 
 /**
@@ -465,6 +472,8 @@ export function renderPlayableMatch(
       return;
     }
     error = null;
+    // Persist the move for crash/refresh recovery before any playback animates.
+    actions.onAction?.();
     const steps = toPlaybackSteps(res.frames);
     const passedTurn = res.frames.some((f) => f.actor === "opponent");
     if (passedTurn && steps.length > 0) {

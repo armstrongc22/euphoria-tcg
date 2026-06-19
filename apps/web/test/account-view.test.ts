@@ -5,11 +5,12 @@
  * faction, starter deck, progression + rewards placeholders, sign out) and the
  * mountAccount loader against the localStorage demo backend.
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cards } from "../src/cards";
 import { renderAccount, mountAccount, type AccountInfo } from "../src/account-view";
 import { createLocalAuth, type Auth, type AuthSession } from "../src/auth";
 import type { MatchHistoryInsert } from "../src/match-history";
+import { ACTIVE_MATCH_KEY, saveActiveMatch } from "../src/match-recovery";
 import { deckCardCount, getRecipe } from "../src/starter";
 import type { KeyValueStore } from "../src/signup";
 
@@ -262,5 +263,85 @@ describe("mountAccount match stats", () => {
     const warning = container.querySelector(".match-result__save-warning");
     expect(warning).not.toBeNull();
     expect(warning?.textContent?.toLowerCase()).toContain("couldn't save");
+  });
+});
+
+describe("mountAccount — interrupted-match recovery", () => {
+  async function flush(): Promise<void> {
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+  }
+
+  async function mountDemo(): Promise<HTMLElement> {
+    const auth = createLocalAuth(memoryStore());
+    await auth.signUp("player@example.com", "pw");
+    await auth.saveFaction(
+      { userId: "local-demo", email: "player@example.com" },
+      "Dwarf",
+    );
+    const container = document.createElement("div");
+    await mountAccount(container, { auth, pool: cards, onSignOut: () => {} });
+    return container;
+  }
+
+  function seedSavedMatch(): void {
+    saveActiveMatch(window.sessionStorage, {
+      userId: "local-demo",
+      faction: "Dwarf",
+      opponentFaction: "Sonic",
+      seed: 5,
+      playerDeck: null,
+      actions: [], // replays to a fresh match → resume always succeeds
+      turn: 4,
+    });
+  }
+
+  beforeEach(() => {
+    window.sessionStorage.clear();
+  });
+
+  it("shows a Resume banner when a live match was interrupted", async () => {
+    seedSavedMatch();
+    const container = await mountDemo();
+    const banner = container.querySelector(".account__resume");
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain("Dwarf");
+    expect(banner?.textContent).toContain("turn 4");
+    expect(banner?.querySelector(".account__resume-btn")).not.toBeNull();
+    expect(banner?.querySelector(".account__resume-discard")).not.toBeNull();
+  });
+
+  it("does not show a Resume banner with no saved match", async () => {
+    const container = await mountDemo();
+    expect(container.querySelector(".account__resume")).toBeNull();
+  });
+
+  it("Resume mounts the live match board", async () => {
+    seedSavedMatch();
+    const container = await mountDemo();
+    container.querySelector<HTMLButtonElement>(".account__resume-btn")!.click();
+    expect(container.querySelector(".play-match")).not.toBeNull();
+  });
+
+  it("Discard clears the saved match and removes the banner", async () => {
+    seedSavedMatch();
+    const container = await mountDemo();
+    container.querySelector<HTMLButtonElement>(".account__resume-discard")!.click();
+    await flush();
+    expect(window.sessionStorage.getItem(ACTIVE_MATCH_KEY)).toBeNull();
+    expect(container.querySelector(".account__resume")).toBeNull();
+  });
+
+  it("persists a live match on start and clears it on concede", async () => {
+    const container = await mountDemo();
+    // Start a live match from the account's Play button.
+    container.querySelector<HTMLButtonElement>(".account__play--live")!.click();
+    await flush();
+    expect(container.querySelector(".play-match")).not.toBeNull();
+    // The in-progress match is checkpointed for recovery.
+    expect(window.sessionStorage.getItem(ACTIVE_MATCH_KEY)).not.toBeNull();
+    // Conceding abandons the match and clears the saved state.
+    container.querySelector<HTMLButtonElement>(".play-match__quit")!.click();
+    await flush();
+    expect(window.sessionStorage.getItem(ACTIVE_MATCH_KEY)).toBeNull();
   });
 });

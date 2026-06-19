@@ -5,8 +5,10 @@
  * MatchSummary the existing history/result flow can consume.
  */
 import { describe, expect, it } from "vitest";
+import type { GameAction } from "@euphoria/game-engine";
+import { smartAgent } from "@euphoria/simulator";
 import { cards } from "../src/cards";
-import { createPlayableMatch } from "../src/play-match";
+import { createPlayableMatch, ReplayError } from "../src/play-match";
 import { buildMatchHistoryInsert } from "../src/match-history";
 import { starterActiveDeck } from "../src/deck-builder";
 import { STARTER_DECK_SIZE } from "../src/starter";
@@ -170,3 +172,70 @@ function playToCompletion(
   }
   return match;
 }
+
+describe("createPlayableMatch — resume via deterministic action replay", () => {
+  function fingerprint(match: ReturnType<typeof createPlayableMatch>) {
+    const s = match.state();
+    return {
+      turn: s.turn,
+      activePlayer: s.activePlayer,
+      winner: s.winner,
+      events: s.events.length,
+      p1Field: s.players.player1.field.map((w) => w.instanceId).join(","),
+      p2Field: s.players.player2.field.map((w) => w.instanceId).join(","),
+      p1Hand: s.players.player1.hand.map((c) => c.id).join(","),
+      p1Lives: s.players.player1.lives,
+      p2Lives: s.players.player2.lives,
+    };
+  }
+
+  it("records human actions and replays them to the exact same state", () => {
+    const agent = smartAgent();
+    const live = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed: 11,
+      opponentFaction: "Dwarf",
+    });
+    // Play partway (stop before the game ends) so there is a state to resume.
+    let guard = 0;
+    while (!live.isOver() && live.state().events.length < 120 && guard < 400) {
+      const legal = live.legalActions();
+      if (legal.length === 0) break;
+      live.apply(agent(live.state(), legal));
+      guard++;
+    }
+    expect(live.isOver()).toBe(false);
+    const history = live.history();
+    expect(history.length).toBeGreaterThan(0);
+
+    // Rebuild from the same seed/opponent/deck and replay the recorded actions.
+    const resumed = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed: 11,
+      opponentFaction: "Dwarf",
+      replay: history,
+    });
+    // The opponent is deterministic, so the resumed state matches exactly.
+    expect(fingerprint(resumed)).toEqual(fingerprint(live));
+    // It continues as a normal live match and keeps recording.
+    expect(resumed.legalActions().length).toBeGreaterThan(0);
+    expect(resumed.history()).toEqual(history);
+  });
+
+  it("throws ReplayError when a saved action no longer applies", () => {
+    const bad = [
+      { kind: "attack", attackerInstanceId: "nope", defenderInstanceId: "nope" },
+    ] as unknown as GameAction[];
+    expect(() =>
+      createPlayableMatch({
+        faction: "Sonic",
+        pool: cards,
+        seed: 1,
+        opponentFaction: "Dwarf",
+        replay: bad,
+      }),
+    ).toThrow(ReplayError);
+  });
+});
