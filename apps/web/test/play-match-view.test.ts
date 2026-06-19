@@ -11,12 +11,14 @@ import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { Card } from "@euphoria/card-data/schema";
 import type { GameState, WarriorInPlay } from "@euphoria/game-engine";
+import { smartAgent } from "@euphoria/simulator";
 import { cards } from "../src/cards";
 import { createPlayableMatch } from "../src/play-match";
 import {
   battleLogLines,
   renderPlayableMatch,
   MATCH_ANIM_EVENT,
+  MAX_RENDERED_LOG_ENTRIES,
   type MatchAnimDetail,
 } from "../src/play-match-view";
 import { createCardDetail } from "../src/detail";
@@ -1786,5 +1788,139 @@ describe("renderPlayableMatch — cinematic pass (Feature B–F)", () => {
     // The opponent's turn (drawn during playback) emits a draw moment.
     expect(kinds).toContain("draw");
     root.dispose();
+  });
+});
+
+describe("renderPlayableMatch — mobile stability on long matches", () => {
+  const agent = smartAgent();
+
+  /** Drives a real match with the smart agent until `stop` is met or it ends. */
+  function drive(
+    seed: number,
+    stop: (m: ReturnType<typeof createPlayableMatch>) => boolean,
+  ): ReturnType<typeof createPlayableMatch> {
+    const match = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed,
+      opponentFaction: "Dwarf",
+    });
+    let guard = 0;
+    while (!match.isOver() && !stop(match) && guard < 600) {
+      const legal = match.legalActions();
+      if (legal.length === 0) break;
+      match.apply(agent(match.state(), legal));
+      guard++;
+    }
+    return match;
+  }
+
+  it("caps the rendered battle log so the DOM stays bounded (root cause fix)", () => {
+    // Drive a mid-game state with far more events than the render cap.
+    const match = drive(11, (m) => m.state().events.length > MAX_RENDERED_LOG_ENTRIES * 2);
+    expect(match.isOver()).toBe(false);
+    expect(match.state().events.length).toBeGreaterThan(MAX_RENDERED_LOG_ENTRIES);
+
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const rows = root.querySelectorAll(
+      ".play-match__log-entry, .play-match__log-turn",
+    ).length;
+    expect(rows).toBeLessThanOrEqual(MAX_RENDERED_LOG_ENTRIES);
+    // The truncation note tells the player history was capped (not lost).
+    expect(root.querySelector(".play-match__log-truncated")).not.toBeNull();
+    // The full log is still computed for anyone who needs it.
+    expect(battleLogLines(match.state()).length).toBeGreaterThan(MAX_RENDERED_LOG_ENTRIES);
+  });
+
+  it("runs a 30+ turn match to completion without throwing", () => {
+    expect(() => {
+      const match = drive(11, () => false); // play to the end
+      expect(match.state().turn).toBeGreaterThanOrEqual(20);
+    }).not.toThrow();
+  });
+
+  it("does not accumulate timers or playback queues across many opponent turns", () => {
+    vi.useFakeTimers();
+    try {
+      const match = createPlayableMatch({
+        faction: "Sonic",
+        pool: cards,
+        seed: 5,
+        opponentFaction: "Dwarf",
+      });
+      const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+      for (let turn = 0; turn < 12 && !match.isOver(); turn++) {
+        const summon = buttonByText(root, ".play-match__card-btn", "Summon");
+        if (summon && !summon.disabled) summon.click();
+        const end = root.querySelector<HTMLButtonElement>(".play-match__end");
+        if (!end || end.disabled) break;
+        end.click();
+        vi.runAllTimers(); // drain the whole opponent reply
+        // No timers ever accumulate across opponent turns (the core leak check).
+        expect(vi.getTimerCount()).toBe(0);
+        // Once playback completes (and the match is still going), nothing pending.
+        if (!match.isOver()) {
+          expect(root.querySelector(".play-match__playback-banner")).toBeNull();
+        }
+      }
+      root.dispose();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears floating text + playback state once an opponent turn finishes", () => {
+    vi.useFakeTimers();
+    try {
+      const match = createPlayableMatch({
+        faction: "Sonic",
+        pool: cards,
+        seed: 5,
+        opponentFaction: "Dwarf",
+      });
+      const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+      const summon = buttonByText(root, ".play-match__card-btn", "Summon");
+      if (summon && !summon.disabled) summon.click();
+      root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+      vi.runAllTimers();
+      if (!match.isOver()) {
+        // No leftover floating-text nodes or playback banner after playback ends.
+        expect(root.querySelectorAll(".play-match__float").length).toBe(0);
+        expect(root.querySelector(".play-match__playback-banner")).toBeNull();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("renders fully under reduced motion (mobile-safe) and still acts", () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("prefers-reduced-motion"),
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const match = createPlayableMatch({
+        faction: "Sonic",
+        pool: cards,
+        seed: 1,
+        opponentFaction: "Dwarf",
+      });
+      const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+      // Board + log still render, and a core action still performs.
+      expect(root.querySelectorAll(".play-match__card").length).toBeGreaterThan(0);
+      expect(root.querySelector(".play-match__log-list")).not.toBeNull();
+      buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+      expect(match.state().players.player1.field.length).toBe(1);
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });

@@ -1991,6 +1991,17 @@ body {
 }
 
 /* Battle log: turn dividers + player/opponent tone (Feature F). */
+/* Note shown when the live log is capped to its most recent rows (the full
+ * history is still recorded — this only bounds the rendered DOM). */
+.play-match__log-truncated {
+  margin-bottom: 0.3rem;
+  padding-bottom: 0.2rem;
+  font-size: 0.7rem;
+  font-style: italic;
+  color: var(--text-dim);
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
 .play-match__log-turn {
   margin-top: 0.4rem;
   padding: 0.1rem 0;

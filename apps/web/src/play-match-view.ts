@@ -54,6 +54,15 @@ const LIVE_ART_BASE = import.meta.env.BASE_URL;
 
 /** Re-exported so existing callers keep importing it from the view. */
 export { battleLogLines } from "./match-playback";
+
+/**
+ * How many battle-log rows the live board keeps in the DOM. The full history is
+ * still computed (and the simulator/log stay complete) — but rendering every row
+ * on every repaint is what made long mobile matches grow an unbounded DOM and
+ * forced the tab to reload after ~12–15 turns. Capping the *rendered* tail keeps
+ * the live container's node count and per-repaint cost bounded at any length.
+ */
+export const MAX_RENDERED_LOG_ENTRIES = 60;
 /** Re-exported so callers (and later, a sound layer) can subscribe to moments. */
 export { MATCH_ANIM_EVENT, type MatchAnimDetail } from "./match-playback";
 
@@ -304,6 +313,8 @@ export function renderPlayableMatch(
     const len = Math.hypot(x2 - x1, y2 - y1);
     if (!Number.isFinite(len) || len === 0) return;
     const angle = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
+    // Never let beams pile up: only one is ever on the board at a time.
+    root.querySelectorAll(".play-match__beam").forEach((b) => b.remove());
     const beam = document.createElement("div");
     beam.className = "play-match__beam";
     beam.style.left = `${x1}px`;
@@ -433,10 +444,14 @@ export function renderPlayableMatch(
   const dispose = (): void => {
     disposed = true;
     playback = null;
+    floaters = [];
     if (pendingTimer !== undefined) {
       clearTimeout(pendingTimer);
       pendingTimer = undefined;
     }
+    // Drop any transient overlay nodes (e.g. an in-flight attack beam) so nothing
+    // is left animating against a detached board.
+    root.querySelectorAll(".play-match__beam").forEach((b) => b.remove());
   };
 
   const act = (action: GameAction): void => {
@@ -1694,12 +1709,24 @@ export function renderPlayableMatch(
     panel.append(heading);
     const ul = document.createElement("ul");
     ul.className = "play-match__log-list";
-    const entries = battleLogEntries(state);
-    if (entries.length === 0) {
+    const all = battleLogEntries(state);
+    // Render only the most recent rows so the DOM stays bounded on long matches
+    // (the full log is still available via battleLogLines / the saved history).
+    const entries =
+      all.length > MAX_RENDERED_LOG_ENTRIES
+        ? all.slice(-MAX_RENDERED_LOG_ENTRIES)
+        : all;
+    if (all.length === 0) {
       const li = document.createElement("li");
       li.className = "play-match__log-empty";
       li.textContent = "The match has begun.";
       ul.append(li);
+    }
+    if (all.length > entries.length) {
+      const note = document.createElement("li");
+      note.className = "play-match__log-truncated";
+      note.textContent = `Showing the latest ${entries.length} of ${all.length} events.`;
+      ul.append(note);
     }
     for (const entry of entries) {
       const li = document.createElement("li");
