@@ -54,6 +54,24 @@ export interface PlayableMatchOptions {
    * a pathological AI loop that never ends its turn. Default 200.
    */
   readonly maxOpponentActionsPerTurn?: number;
+  /**
+   * Player actions to re-apply on construction, fast-forwarding the match to a
+   * previously-saved point (see {@link PlayableMatch.history}). The match is
+   * deterministic for a fixed seed/deck and the opponent (smartAgent) is a pure
+   * function of state, so replaying the human's actions reproduces the exact
+   * same game — this is how an interrupted match is resumed. Throws
+   * {@link ReplayError} if any action no longer applies (e.g. data changed), so
+   * the caller can discard the stale save and start fresh instead of crashing.
+   */
+  readonly replay?: readonly GameAction[];
+}
+
+/** Thrown when {@link PlayableMatchOptions.replay} can't be re-applied cleanly. */
+export class ReplayError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ReplayError";
+  }
 }
 
 /**
@@ -95,6 +113,12 @@ export interface PlayableMatch {
    * the caller can play them back rather than jumping straight to the result.
    */
   apply(action: GameAction): ApplyResult;
+  /**
+   * The ordered list of human actions applied so far. Combined with the match's
+   * seed/faction/deck this fully determines the game, so it's what gets persisted
+   * for resume (replayed via {@link PlayableMatchOptions.replay}).
+   */
+  history(): GameAction[];
   /** The display-ready summary; only meaningful once {@link isOver} is true. */
   summary(): MatchSummary;
 }
@@ -128,6 +152,8 @@ export function createPlayableMatch(
 
   const agent = smartAgent();
   let actions = 0;
+  // The human actions applied so far, in order — the resume/replay record.
+  const playerActions: GameAction[] = [];
   // Set when an opponent turn hits the per-turn cap without ending — recorded so
   // the summary's reason reflects the stall rather than claiming a clean finish.
   let stalled = false;
@@ -167,6 +193,44 @@ export function createPlayableMatch(
     }
   };
 
+  // Core human-action application, shared by the public apply() and by replay.
+  // Records the action (for resume) and runs the opponent if the turn passed.
+  const applyPlayerAction = (action: GameAction): ApplyResult => {
+    if (state.winner !== null) {
+      return { ok: false, message: "The match is already over." };
+    }
+    if (state.activePlayer !== PLAYER_SEAT) {
+      return { ok: false, message: "It is not your turn." };
+    }
+    const before = state.events.length;
+    const result = applyAction(state, action);
+    if (!result.ok) {
+      return { ok: false, message: result.error.message };
+    }
+    state = result.state;
+    actions += 1;
+    playerActions.push(action);
+    const frames: MatchFrame[] = [
+      { state, events: state.events.slice(before), actor: "player" },
+    ];
+    // If that action ended the human's turn, play out the opponent's reply,
+    // capturing each of its actions as its own frame for progressive playback.
+    if (state.activePlayer === OPPONENT_SEAT) runOpponent(frames);
+    return { ok: true, frames };
+  };
+
+  // Resume: fast-forward through previously-saved actions. A failure means the
+  // save no longer fits this build (e.g. data changed) — surface it so the caller
+  // can discard it rather than resume into a corrupt state.
+  if (options.replay !== undefined) {
+    for (const action of options.replay) {
+      const res = applyPlayerAction(action);
+      if (!res.ok) {
+        throw new ReplayError(`Could not resume match: ${res.message}`);
+      }
+    }
+  }
+
   return {
     playerFaction: options.faction,
     opponentFaction,
@@ -177,28 +241,8 @@ export function createPlayableMatch(
       state.winner === null && state.activePlayer === PLAYER_SEAT
         ? getLegalActions(state)
         : [],
-    apply: (action) => {
-      if (state.winner !== null) {
-        return { ok: false, message: "The match is already over." };
-      }
-      if (state.activePlayer !== PLAYER_SEAT) {
-        return { ok: false, message: "It is not your turn." };
-      }
-      const before = state.events.length;
-      const result = applyAction(state, action);
-      if (!result.ok) {
-        return { ok: false, message: result.error.message };
-      }
-      state = result.state;
-      actions += 1;
-      const frames: MatchFrame[] = [
-        { state, events: state.events.slice(before), actor: "player" },
-      ];
-      // If that action ended the human's turn, play out the opponent's reply,
-      // capturing each of its actions as its own frame for progressive playback.
-      if (state.activePlayer === OPPONENT_SEAT) runOpponent(frames);
-      return { ok: true, frames };
-    },
+    apply: applyPlayerAction,
+    history: () => [...playerActions],
     summary: () => {
       const reason: EndReason = stalled ? "maxActions" : "win";
       const result = buildGameResult(state, { reason, actions });

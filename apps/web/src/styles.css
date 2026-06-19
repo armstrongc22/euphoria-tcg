@@ -2040,6 +2040,32 @@ body {
   margin-top: 0.5rem;
 }
 
+/* "Resume match?" banner shown above the account card after an interrupted live
+ * match (e.g. a mobile tab reload). */
+.account__resume {
+  border: 1px solid var(--surfer);
+  border-left: 4px solid var(--surfer);
+  background: linear-gradient(180deg, rgba(54, 198, 168, 0.12), rgba(0, 0, 0, 0.15));
+}
+
+.account__resume-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.account__resume-btn,
+.account__resume-discard {
+  width: auto;
+  margin: 0;
+  padding: 0.5rem 1rem;
+}
+
+.account__resume-discard {
+  background: transparent;
+}
+
 /* ----------------------------------------------------------------------------
  * Static content pages (Rules, Lore). A centred dark panel matching .account,
  * with readable section cards. Mobile-first: the panel is full width with

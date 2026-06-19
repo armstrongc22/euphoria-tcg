@@ -13,9 +13,16 @@ import type { Card } from "@euphoria/card-data/schema";
 import type { Auth } from "./auth";
 import { renderMatchResult } from "./match-view";
 import { runTestMatch, type MatchSummary } from "./match";
-import { createPlayableMatch } from "./play-match";
+import { createPlayableMatch, ReplayError, type PlayableMatch } from "./play-match";
 import { renderPlayableMatch, type PlayableMatchBoard } from "./play-match-view";
 import { createCardDetail } from "./detail";
+import {
+  clearActiveMatch,
+  getSessionStore,
+  loadActiveMatch,
+  saveActiveMatch,
+  type SavedMatch,
+} from "./match-recovery";
 import {
   buildMatchHistoryInsert,
   EMPTY_STATS,
@@ -363,6 +370,26 @@ export async function mountAccount(
     container.replaceChildren(...nodes);
   };
 
+  // Crash/refresh recovery: persist the in-progress live match (seed + deck +
+  // action history) to sessionStorage after each move, so a mobile tab reload
+  // mid-match can offer "Resume". Best-effort — null when storage is unavailable.
+  const recoveryStore = getSessionStore();
+  const persistMatch = (match: PlayableMatch, chosen: ChosenActiveDeck): void => {
+    if (recoveryStore === null) return;
+    saveActiveMatch(recoveryStore, {
+      userId: session.userId,
+      faction: match.playerFaction,
+      opponentFaction: match.opponentFaction,
+      seed: match.seed,
+      playerDeck: chosen.isCustom ? [...chosen.entries] : null,
+      actions: match.history(),
+      turn: match.state().turn,
+    });
+  };
+  const clearRecovery = (): void => {
+    if (recoveryStore !== null) clearActiveMatch(recoveryStore);
+  };
+
   const handleSignOut = async (): Promise<void> => {
     try {
       await auth.signOut();
@@ -530,6 +557,35 @@ export async function mountAccount(
     await finishMatch(faction, summary, chosen, () => void showResult(faction));
   };
 
+  // Mounts the live board for an already-built match and wires recovery: persist
+  // after every move, clear when the match ends or is conceded. Shared by a fresh
+  // start (showPlayableMatch) and a resumed one (resumeMatch).
+  const launchMatch = (match: PlayableMatch, chosen: ChosenActiveDeck): void => {
+    const faction = match.playerFaction;
+    persistMatch(match, chosen); // checkpoint the starting/resumed state
+    // Reuse the shared card-detail modal (same as the Card Viewer / Deck
+    // Builder). It lives as a sibling of the board so the board's in-place
+    // re-renders never disturb the open dialog.
+    const detail = createCardDetail(assetBase);
+    const board = renderPlayableMatch(match, {
+      onComplete: (summary) => {
+        clearRecovery(); // the match is finished — nothing to resume
+        void finishMatch(faction, summary, chosen, () =>
+          void showPlayableMatch(faction),
+        );
+      },
+      onQuit: () => {
+        clearRecovery(); // conceding abandons the in-progress match
+        void showAccount();
+      },
+      onInspect: (card) => detail.open(card),
+      onAction: () => persistMatch(match, chosen),
+    });
+    const note = deckNote(chosen);
+    swapMain(...(note ? [note, board] : [board]), detail.element);
+    activeBoard = board;
+  };
+
   // Interactive match: mounts the live board. The same active-deck resolution as
   // the sim feeds the human's deck; on game over the board hands back the summary
   // and we route into the shared finishMatch flow (history + reward intact).
@@ -540,21 +596,72 @@ export async function mountAccount(
       pool,
       playerDeck: chosen.isCustom ? chosen.entries : undefined,
     });
-    // Reuse the shared card-detail modal (same as the Card Viewer / Deck
-    // Builder). It lives as a sibling of the board so the board's in-place
-    // re-renders never disturb the open dialog.
-    const detail = createCardDetail(assetBase);
-    const board = renderPlayableMatch(match, {
-      onComplete: (summary) =>
-        void finishMatch(faction, summary, chosen, () =>
-          void showPlayableMatch(faction),
-        ),
-      onQuit: () => void showAccount(),
-      onInspect: (card) => detail.open(card),
+    launchMatch(match, chosen);
+  };
+
+  // Resume an interrupted match from its saved descriptor by replaying the saved
+  // actions onto a fresh match with the exact same seed/opponent/deck. If the
+  // save no longer fits this build (ReplayError) we discard it and return to the
+  // account rather than crash.
+  const resumeMatch = (saved: SavedMatch): void => {
+    let match: PlayableMatch;
+    try {
+      match = createPlayableMatch({
+        faction: saved.faction,
+        pool,
+        seed: saved.seed,
+        opponentFaction: saved.opponentFaction,
+        playerDeck: saved.playerDeck ?? undefined,
+        replay: saved.actions,
+      });
+    } catch (error) {
+      clearRecovery();
+      if (error instanceof ReplayError) {
+        void showAccount();
+        return;
+      }
+      throw error;
+    }
+    const chosen: ChosenActiveDeck =
+      saved.playerDeck !== null
+        ? { entries: [...saved.playerDeck], isCustom: true, usedFallback: false }
+        : { entries: [], isCustom: false, usedFallback: false };
+    launchMatch(match, chosen);
+  };
+
+  // A "Resume match?" banner shown above the account card when a live match was
+  // interrupted (e.g. a mobile tab reload). Offers Resume or Discard.
+  const renderResumeBanner = (saved: SavedMatch): HTMLElement => {
+    const banner = document.createElement("section");
+    banner.className = "account__panel account__resume";
+    const heading = document.createElement("h3");
+    heading.className = "account__panel-heading";
+    heading.textContent = "Match in progress";
+    banner.append(heading);
+    const body = document.createElement("p");
+    body.className = "account__panel-body";
+    body.textContent =
+      `You have a live ${saved.faction} match in progress (turn ${saved.turn}). ` +
+      "Resume where you left off?";
+    banner.append(body);
+    const row = document.createElement("div");
+    row.className = "account__resume-actions";
+    const resume = document.createElement("button");
+    resume.type = "button";
+    resume.className = "account__play account__resume-btn";
+    resume.textContent = "Resume match";
+    resume.addEventListener("click", () => resumeMatch(saved));
+    const discard = document.createElement("button");
+    discard.type = "button";
+    discard.className = "account__signout account__resume-discard";
+    discard.textContent = "Discard";
+    discard.addEventListener("click", () => {
+      clearRecovery();
+      void showAccount();
     });
-    const note = deckNote(chosen);
-    swapMain(...(note ? [note, board] : [board]), detail.element);
-    activeBoard = board;
+    row.append(resume, discard);
+    banner.append(row);
+    return banner;
   };
 
   const showAccount = async (): Promise<void> => {
@@ -577,15 +684,21 @@ export async function mountAccount(
       deckMode: chosen?.isCustom ? "Custom Deck" : "Starter Deck",
       deckNote: chosen?.usedFallback ? chosen.message : undefined,
     };
-    swapMain(
-      renderAccount(
-        info,
-        pool,
-        handleSignOut,
-        showResult,
-        (faction) => void showPlayableMatch(faction),
-      ),
+    const accountEl = renderAccount(
+      info,
+      pool,
+      handleSignOut,
+      showResult,
+      (faction) => void showPlayableMatch(faction),
     );
+    // Surface a resume prompt if a live match was interrupted (scoped to user).
+    const saved =
+      recoveryStore !== null ? loadActiveMatch(recoveryStore, session.userId) : null;
+    if (saved !== null) {
+      swapMain(renderResumeBanner(saved), accountEl);
+    } else {
+      swapMain(accountEl);
+    }
   };
 
   // When asked (e.g. coming from the Deck Builder's "Play match"), jump straight
