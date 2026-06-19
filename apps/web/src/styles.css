@@ -327,6 +327,7 @@ body {
 /* Tab navigation */
 .site-nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0 clamp(1rem, 4vw, 3rem);
   border-bottom: 1px solid var(--border);
@@ -2037,4 +2038,115 @@ body {
 .account__play--sim,
 .deck-builder__playbar {
   margin-top: 0.5rem;
+}
+
+/* ----------------------------------------------------------------------------
+ * Static content pages (Rules, Lore). A centred dark panel matching .account,
+ * with readable section cards. Mobile-first: the panel is full width with
+ * comfortable padding and the nav wraps, so it stays usable on small screens.
+ * ------------------------------------------------------------------------- */
+.page {
+  width: min(880px, 100%);
+  margin: clamp(1.5rem, 5vw, 3.5rem) auto;
+  padding: clamp(1.25rem, 4vw, 2.25rem);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--sonic);
+  border-radius: 14px;
+}
+/* A distinct, mythic accent for the Lore page. */
+.page--lore {
+  border-top-color: var(--shaman);
+}
+
+.page__header {
+  margin-bottom: 1.25rem;
+}
+
+.page__eyebrow {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.page__title {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.6rem, 5vw, 2.3rem);
+  letter-spacing: 0.01em;
+}
+
+.page__subtitle {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--text-dim);
+  font-size: 1.02rem;
+  line-height: 1.55;
+}
+
+.page__section {
+  margin-top: 1rem;
+  padding: 1rem 1.15rem 1.1rem;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+}
+
+.page__section-heading {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  color: var(--sonic);
+}
+.page--lore .page__section-heading {
+  color: var(--shaman);
+}
+
+.page__text {
+  margin: 0 0 0.7rem;
+  line-height: 1.65;
+  color: var(--text);
+}
+.page__text:last-child {
+  margin-bottom: 0;
+}
+
+.page__list {
+  margin: 0.3rem 0 0;
+  padding-left: 1.3rem;
+  line-height: 1.6;
+}
+.page__list li {
+  margin: 0.2rem 0;
+}
+
+/* Lore subsections (e.g. each of the Five Races) read as nested blocks. */
+.page__subsection {
+  margin-top: 1rem;
+  padding-left: 0.85rem;
+  border-left: 3px solid rgba(160, 106, 217, 0.5);
+}
+
+.page__subheading {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+/* An aside (e.g. the Shaman starter-deck clarification). */
+.page__note {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+@media (max-width: 560px) {
+  .page__section {
+    padding: 0.85rem 0.9rem;
+  }
 }

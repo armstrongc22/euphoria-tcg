@@ -22,12 +22,21 @@ import { mountSignup } from "./signup-view";
 import { sortCards } from "./sort";
 import { mountStarterDecks } from "./starter-view";
 import { mountDeckBuilder } from "./deck-builder-view";
+import { mountRules } from "./rules-view";
+import { mountLore } from "./lore-view";
 import type { StarterFaction } from "./starter";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (app === null) throw new Error("#app mount point missing from index.html");
 
-type ViewId = "signup" | "starter" | "deckbuilder" | "account" | "viewer";
+type ViewId =
+  | "signup"
+  | "starter"
+  | "deckbuilder"
+  | "account"
+  | "viewer"
+  | "rules"
+  | "lore";
 
 app.innerHTML = `
   <header class="site-header">
@@ -40,12 +49,16 @@ app.innerHTML = `
     <button type="button" class="site-nav__tab" data-view="deckbuilder">Deck Builder</button>
     <button type="button" class="site-nav__tab" data-view="account">Account</button>
     <button type="button" class="site-nav__tab" data-view="viewer">Card Viewer</button>
+    <button type="button" class="site-nav__tab" data-view="rules">Rules</button>
+    <button type="button" class="site-nav__tab" data-view="lore">Lore</button>
   </nav>
   <div id="view-signup" class="view"></div>
   <div id="view-starter" class="view" hidden></div>
   <div id="view-deckbuilder" class="view" hidden></div>
   <div id="view-account" class="view" hidden></div>
   <div id="view-viewer" class="view" hidden></div>
+  <div id="view-rules" class="view" hidden></div>
+  <div id="view-lore" class="view" hidden></div>
   <footer class="site-footer">Euphoria TCG · beta</footer>
 `;
 
@@ -54,6 +67,8 @@ const starterEl = document.querySelector<HTMLElement>("#view-starter")!;
 const deckBuilderEl = document.querySelector<HTMLElement>("#view-deckbuilder")!;
 const accountEl = document.querySelector<HTMLElement>("#view-account")!;
 const viewerEl = document.querySelector<HTMLElement>("#view-viewer")!;
+const rulesEl = document.querySelector<HTMLElement>("#view-rules")!;
+const loreEl = document.querySelector<HTMLElement>("#view-lore")!;
 const tabs = Array.from(
   document.querySelectorAll<HTMLButtonElement>(".site-nav__tab"),
 );
@@ -64,6 +79,8 @@ function showView(view: ViewId): void {
   deckBuilderEl.hidden = view !== "deckbuilder";
   accountEl.hidden = view !== "account";
   viewerEl.hidden = view !== "viewer";
+  rulesEl.hidden = view !== "rules";
+  loreEl.hidden = view !== "lore";
   for (const tab of tabs) {
     const active = tab.dataset.view === view;
     tab.classList.toggle("site-nav__tab--active", active);
@@ -146,6 +163,10 @@ function mountStarter(initialFaction: StarterFaction | null): void {
 }
 
 mountCardViewer(viewerEl);
+
+// Rules and Lore are static content — mount once at boot (no session/profile).
+mountRules(rulesEl);
+mountLore(loreEl);
 
 // Boot: restore any existing session, then render signup + starter accordingly.
 void (async () => {
