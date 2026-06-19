@@ -26,6 +26,40 @@ export type PlaybackTone =
   | "revive"
   | "info";
 
+/**
+ * The kind of game-feel moment a step represents. Drives both the board's
+ * lightweight animations (Feature C/D/E) and the sound-ready event hook
+ * (Feature F): the board dispatches a {@link MATCH_ANIM_EVENT} carrying this
+ * kind, so audio can be layered on later without touching this mapping.
+ */
+export type AnimationKind =
+  | "draw"
+  | "summon"
+  | "play"
+  | "equip"
+  | "attack"
+  | "damage"
+  | "heal"
+  | "buff"
+  | "debuff"
+  | "destroy"
+  | "revive"
+  | "directAttack"
+  | "info";
+
+/** The DOM CustomEvent name the board fires for each animated moment. */
+export const MATCH_ANIM_EVENT = "euphoria:match-anim";
+
+/** Detail payload of a {@link MATCH_ANIM_EVENT}. Sound hooks read this. */
+export interface MatchAnimDetail {
+  readonly kind: AnimationKind;
+  readonly actor: "player" | "opponent";
+  /** The Warrior the moment centers on, when known (attacker or target). */
+  readonly targetInstanceId?: string;
+  /** The player whose life area is hit (direct attacks). */
+  readonly targetPlayer?: PlayerId;
+}
+
 /** One step of match playback: a callout + optional floating text + snapshot. */
 export interface PlaybackStep {
   /** The callout line, e.g. "Opponent summoned Kit." */
@@ -41,6 +75,10 @@ export interface PlaybackStep {
   readonly targetPlayer?: PlayerId;
   /** Milliseconds to show this step before advancing. */
   readonly durationMs: number;
+  /** The game-feel moment this step represents (drives animation + sound hook). */
+  readonly anim: AnimationKind;
+  /** The attacker, for attack steps — lets the board animate a lunge/beam. */
+  readonly attackerInstanceId?: string;
   /** Board snapshot to render while this step is shown. */
   readonly state: GameState;
 }
@@ -240,6 +278,41 @@ function floatFor(
 }
 
 /**
+ * The animation kind for one event — the game-feel moment it represents. Pure;
+ * mirrors the event log so the board (and later, sound) reacts consistently.
+ */
+function animFor(ev: GameEvent): AnimationKind {
+  switch (ev.type) {
+    case "cardDrawn":
+      return "draw";
+    case "warriorSummoned":
+      return "summon";
+    case "warriorRevived":
+      return "revive";
+    case "itemPlayed":
+    case "attackCardUsed":
+    case "deckSearched":
+    case "cardStolenFromHand":
+      return "play";
+    case "weaponEquipped":
+      return "equip";
+    case "warriorAttacked":
+      return "attack";
+    case "warriorHealthModified":
+      return ev.amount < 0 ? "damage" : "heal";
+    case "warriorAttackModified":
+      return ev.amount < 0 ? "debuff" : "buff";
+    case "warriorDestroyed":
+    case "weaponDestroyed":
+      return "destroy";
+    case "directAttacked":
+      return "directAttack";
+    default:
+      return "info";
+  }
+}
+
+/**
  * Converts resolved frames into ordered playback steps. Each event that has a
  * callout and/or a floating overlay becomes one step carrying that frame's
  * post-action board snapshot. Events with neither (e.g. spirit gain) are
@@ -254,6 +327,8 @@ export function toPlaybackSteps(frames: readonly MatchFrame[]): PlaybackStep[] {
       const float = floatFor(ev);
       if (message === null && float === null) continue;
       const tone = float?.tone ?? "info";
+      const attackerInstanceId =
+        ev.type === "warriorAttacked" ? ev.attackerInstanceId : undefined;
       steps.push({
         message: message ?? "",
         actor: frame.actor,
@@ -262,6 +337,8 @@ export function toPlaybackSteps(frames: readonly MatchFrame[]): PlaybackStep[] {
         targetInstanceId: float?.targetInstanceId,
         targetPlayer: float?.targetPlayer,
         durationMs: DURATION[tone],
+        anim: animFor(ev),
+        attackerInstanceId,
         state: frame.state,
       });
     }
