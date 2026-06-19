@@ -11,11 +11,13 @@
     "test": "vitest run",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "validate:cards": "tsx packages/card-data/src/validate.ts",
+    "validate": "npm run validate:cards",
     "sim:balance": "tsx apps/simulator/src/balance-main.ts",
     "sim:trace": "tsx apps/simulator/src/trace-main.ts",
     "sim:monk-compare": "tsx apps/simulator/src/monk-compare-main.ts",
     "web:dev": "npm run dev --workspace @euphoria/web",
-    "web:build": "npm run build --workspace @euphoria/web"
+    "web:build": "npm run build --workspace @euphoria/web",
+    "web": "npm run web:build"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
