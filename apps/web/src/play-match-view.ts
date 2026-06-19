@@ -44,6 +44,8 @@ import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "./play-match";
 import {
   battleLogEntries,
   toPlaybackSteps,
+  MATCH_ANIM_EVENT,
+  type MatchAnimDetail,
   type PlaybackStep,
 } from "./match-playback";
 
@@ -52,6 +54,37 @@ const LIVE_ART_BASE = import.meta.env.BASE_URL;
 
 /** Re-exported so existing callers keep importing it from the view. */
 export { battleLogLines } from "./match-playback";
+/** Re-exported so callers (and later, a sound layer) can subscribe to moments. */
+export { MATCH_ANIM_EVENT, type MatchAnimDetail } from "./match-playback";
+
+/**
+ * Runs a Web Animations API keyframe effect when supported, and never throws
+ * where it isn't (jsdom has no Element.animate). Returns the Animation or null.
+ * All board animations go through here so tests (and reduced-motion) stay safe.
+ */
+function playAnim(
+  el: Element | null | undefined,
+  keyframes: Keyframe[],
+  options: KeyframeAnimationOptions,
+): Animation | null {
+  if (el === null || el === undefined) return null;
+  const animate = (el as HTMLElement).animate;
+  if (typeof animate !== "function") return null;
+  try {
+    return animate.call(el, keyframes, options);
+  } catch {
+    return null;
+  }
+}
+
+/** True when the user asked for reduced motion (animations become no-ops). */
+function prefersReducedMotion(): boolean {
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+}
 
 function escapeHtml(text: string): string {
   const div = document.createElement("div");
@@ -176,6 +209,15 @@ export function renderPlayableMatch(
   // A declared attack whose attacker/Attack card offers an optional secondary
   // target (Gylippus, Scythe Cycle, Moirai), awaiting the player's choice.
   let pendingSecondary: { variant: AttackAction } | null = null;
+  // Feature B: the card/Warrior the player has tapped to inspect-and-act. Its
+  // actions surface in a dedicated selected-card panel (see paint()); per-card
+  // buttons are otherwise de-cluttered (hidden via CSS). Cleared on every action.
+  let selected:
+    | { readonly kind: "hand"; readonly id: string }
+    | { readonly kind: "field"; readonly id: string }
+    | null = null;
+  // Subject of the selected-card panel, captured while painting tiles each frame.
+  let panelInfo: { title: string; sub: string; card: Card } | null = null;
   let error: string | null = null;
   let completed = false;
 
@@ -209,11 +251,160 @@ export function renderPlayableMatch(
     pendingItemTarget = null;
     pendingDuel = null;
     pendingSecondary = null;
+    selected = null;
+  };
+
+  // Feature B: tap a hand card / field Warrior to select it (toggles off when
+  // tapping the same one). Ignored while the opponent's turn is playing back.
+  const selectThing = (sel: { kind: "hand" | "field"; id: string }): void => {
+    if (playback !== null) return;
+    selected =
+      selected !== null && selected.kind === sel.kind && selected.id === sel.id
+        ? null
+        : sel;
+    error = null;
+    paint();
+  };
+
+  // --- game-feel: animation events (Feature C/D/E/F) ------------------------
+  // Fire a named moment so a sound layer can subscribe later (Feature F). The
+  // event is dispatched on the board root; tests assert these are queued.
+  const emitAnim = (detail: MatchAnimDetail): void => {
+    root.dispatchEvent(new CustomEvent<MatchAnimDetail>(MATCH_ANIM_EVENT, { detail }));
+  };
+
+  // Find a Warrior tile / a player's life area in the freshly-painted board.
+  const tileOf = (instanceId: string | undefined): HTMLElement | null =>
+    instanceId === undefined
+      ? null
+      : root.querySelector<HTMLElement>(`[data-instance="${instanceId}"]`);
+  const seatOf = (player: string | undefined): HTMLElement | null =>
+    player === undefined
+      ? null
+      : root.querySelector<HTMLElement>(`[data-seat="${player}"]`);
+
+  // Translate-from-A-to-B vector for a lunge, in the board's coordinate space.
+  const lungeVector = (from: Element, to: Element): { x: number; y: number } => {
+    const a = from.getBoundingClientRect();
+    const b = to.getBoundingClientRect();
+    return { x: (b.left - a.left) * 0.4, y: (b.top - a.top) * 0.4 };
+  };
+
+  // Draw a short-lived beam from attacker to target (Feature D.2). DOM + WAAPI,
+  // guarded; a no-op without layout (jsdom) or under reduced motion.
+  const drawBeam = (from: Element, to: Element): void => {
+    if (prefersReducedMotion()) return;
+    const a = from.getBoundingClientRect();
+    const b = to.getBoundingClientRect();
+    const rootBox = root.getBoundingClientRect();
+    const x1 = a.left + a.width / 2 - rootBox.left;
+    const y1 = a.top + a.height / 2 - rootBox.top;
+    const x2 = b.left + b.width / 2 - rootBox.left;
+    const y2 = b.top + b.height / 2 - rootBox.top;
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (!Number.isFinite(len) || len === 0) return;
+    const angle = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
+    const beam = document.createElement("div");
+    beam.className = "play-match__beam";
+    beam.style.left = `${x1}px`;
+    beam.style.top = `${y1}px`;
+    beam.style.width = `${len}px`;
+    beam.style.transform = `rotate(${angle}deg)`;
+    root.append(beam);
+    const anim = playAnim(beam, [{ opacity: 0.9 }, { opacity: 0 }], {
+      duration: 360,
+      easing: "ease-out",
+    });
+    if (anim) anim.addEventListener("finish", () => beam.remove());
+    else beam.remove();
+  };
+
+  // Apply the visual effect + sound-ready event for one playback step. Called
+  // after the board is painted for that step so anchors exist. Reduced-motion
+  // and jsdom degrade gracefully (the event still fires; the motion is skipped).
+  const applyStepEffects = (step: PlaybackStep): void => {
+    emitAnim({
+      kind: step.anim,
+      actor: step.actor,
+      targetInstanceId: step.targetInstanceId,
+      targetPlayer: step.targetPlayer,
+    });
+    if (prefersReducedMotion()) return;
+    const target = tileOf(step.targetInstanceId);
+    switch (step.anim) {
+      case "attack": {
+        const attacker = tileOf(step.attackerInstanceId);
+        if (attacker && target) {
+          const v = lungeVector(attacker, target);
+          playAnim(
+            attacker,
+            [
+              { transform: "translate(0,0)" },
+              { transform: `translate(${v.x}px, ${v.y}px)` },
+              { transform: "translate(0,0)" },
+            ],
+            { duration: 380, easing: "ease-in-out" },
+          );
+          drawBeam(attacker, target);
+        }
+        playAnim(
+          target,
+          [{ transform: "translateX(0)" }, { transform: "translateX(-4px)" }, { transform: "translateX(4px)" }, { transform: "translateX(0)" }],
+          { duration: 260, easing: "ease-in-out" },
+        );
+        break;
+      }
+      case "damage":
+      case "debuff":
+        playAnim(
+          target,
+          [{ filter: "brightness(2)" }, { filter: "brightness(1)" }],
+          { duration: 320 },
+        );
+        break;
+      case "heal":
+      case "buff":
+      case "revive":
+        playAnim(
+          target,
+          [{ filter: "brightness(0.6)" }, { filter: "brightness(1.4)" }, { filter: "brightness(1)" }],
+          { duration: 380 },
+        );
+        break;
+      case "destroy":
+        playAnim(
+          target,
+          [
+            { opacity: 1, transform: "scale(1) rotate(0deg)" },
+            { opacity: 0, transform: "scale(0.7) rotate(6deg)" },
+          ],
+          { duration: 420, easing: "ease-in" },
+        );
+        break;
+      case "summon":
+        playAnim(
+          target,
+          [{ opacity: 0, transform: "translateY(10px) scale(0.9)" }, { opacity: 1, transform: "none" }],
+          { duration: 320, easing: "ease-out" },
+        );
+        break;
+      case "directAttack":
+        playAnim(
+          seatOf(step.targetPlayer),
+          [{ transform: "scale(1)", filter: "brightness(1)" }, { transform: "scale(1.08)", filter: "brightness(1.8)" }, { transform: "scale(1)", filter: "brightness(1)" }],
+          { duration: 420, easing: "ease-out" },
+        );
+        break;
+      default:
+        break;
+    }
   };
 
   const startPlayback = (steps: PlaybackStep[]): void => {
     playback = { steps, index: 0 };
     paint();
+    // Animate + emit the first step's moment now that its snapshot is painted.
+    applyStepEffects(steps[0]!);
     scheduleNext();
   };
 
@@ -231,6 +422,7 @@ export function renderPlayableMatch(
         paint();
       } else {
         paint();
+        applyStepEffects(playback.steps[playback.index]!);
         scheduleNext();
       }
     }, options.stepDelayMs ?? step.durationMs);
@@ -269,6 +461,8 @@ export function renderPlayableMatch(
       floaters = steps.filter((s) => s.floatingText !== undefined);
       callout = steps.length > 0 ? steps[steps.length - 1]!.message : null;
       paint();
+      // Animate + emit each resolved moment now that the board is painted.
+      for (const step of steps) applyStepEffects(step);
     }
   };
 
@@ -391,9 +585,11 @@ export function renderPlayableMatch(
     return chips;
   };
 
-  // A Warrior tile: an inspectable body (art/name/stats — taps open the detail
-  // modal, never a gameplay action) plus zero or more explicit action buttons.
-  // The attached Weapon, if any, is its own inspectable chip.
+  // A Warrior tile (Feature A): the full card art is the tile; compact ATK/HP
+  // overlay stats sit on the art, and a small inspect button opens the detail
+  // modal. Tapping the tile SELECTS the Warrior (Feature B) — its actions then
+  // surface in the selected-card panel. Action buttons still live on the tile
+  // (used by target-reveal and the panel) but are de-cluttered via CSS.
   const warriorEl = (
     w: WarriorInPlay,
     opts: {
@@ -407,14 +603,30 @@ export function renderPlayableMatch(
     el.className =
       "play-match__warrior" +
       (opts.selected ? " play-match__warrior--selected" : "") +
-      (opts.highlighted ? " play-match__warrior--target" : "");
-    el.dataset.instance = w.instanceId; // anchor for floating combat text
+      (opts.highlighted ? " play-match__warrior--target" : "") +
+      (selected?.kind === "field" && selected.id === w.instanceId
+        ? " play-match__warrior--picked"
+        : "");
+    el.dataset.instance = w.instanceId; // anchor for floating combat text + animation
+    el.addEventListener("click", () => selectThing({ kind: "field", id: w.instanceId }));
+    if (selected?.kind === "field" && selected.id === w.instanceId) {
+      panelInfo = {
+        title: w.card.name,
+        sub: `⚔${w.currentAttack} · ♥${w.currentHealth}`,
+        card: w.card,
+      };
+    }
 
-    const body = document.createElement("button");
-    body.type = "button";
-    body.className = "play-match__warrior-inspect";
-    body.title = "View card details";
-    body.append(cardArt(w.card));
+    const face = document.createElement("div");
+    face.className = "play-match__warrior-face";
+    face.append(cardArt(w.card));
+    const overlay = document.createElement("span");
+    overlay.className = "play-match__warrior-overlay";
+    overlay.innerHTML =
+      `<span class="play-match__overlay-atk" title="Attack">⚔${w.currentAttack}</span>` +
+      `<span class="play-match__overlay-hp" title="Health">♥${w.currentHealth}</span>`;
+    face.append(overlay);
+
     const statusChips = warriorStatusChips(w)
       .map((c) => `<span class="play-match__warrior-status">${escapeHtml(c)}</span>`)
       .join("");
@@ -427,9 +639,21 @@ export function renderPlayableMatch(
       `<span class="play-match__warrior-meta" title="Attacks remaining">⚡${w.attacksRemaining}</span>` +
       (statusChips ? `<span class="play-match__warrior-statuses">${statusChips}</span>` : "") +
       (opts.badge ? `<span class="play-match__warrior-badge">${escapeHtml(opts.badge)}</span>` : "");
-    body.append(info);
-    body.addEventListener("click", () => inspect(w.card));
-    el.append(body);
+    face.append(info);
+    el.append(face);
+
+    // Small dedicated inspect affordance (the detail modal stays one tap away).
+    const insp = document.createElement("button");
+    insp.type = "button";
+    insp.className = "play-match__warrior-inspect";
+    insp.title = "View card details";
+    insp.setAttribute("aria-label", `Inspect ${w.card.name}`);
+    insp.textContent = "🔍";
+    insp.addEventListener("click", (e) => {
+      e.stopPropagation();
+      inspect(w.card);
+    });
+    el.append(insp);
 
     if (w.attachedWeapon !== undefined) {
       const weapon = w.attachedWeapon;
@@ -438,7 +662,10 @@ export function renderPlayableMatch(
       weaponBtn.className = "play-match__weapon-inspect";
       weaponBtn.title = "View Weapon details";
       weaponBtn.textContent = `⚔ ${weapon.name}`;
-      weaponBtn.addEventListener("click", () => inspect(weapon));
+      weaponBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        inspect(weapon);
+      });
       el.append(weaponBtn);
     }
 
@@ -451,13 +678,17 @@ export function renderPlayableMatch(
     return el;
   };
 
-  // A small gameplay-action button shown on a Warrior tile.
+  // A small gameplay-action button shown on a Warrior tile. Stops propagation so
+  // acting never also re-selects the tile (Feature B).
   const warriorBtn = (label: string, onClick: () => void): HTMLButtonElement => {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "play-match__warrior-btn";
     b.textContent = label;
-    b.addEventListener("click", onClick);
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      onClick();
+    });
     return b;
   };
 
@@ -703,10 +934,54 @@ export function renderPlayableMatch(
     );
   };
 
+  // The dedicated selected-card action panel (Feature B). Shows the tapped card
+  // big, an Inspect button, and that card's available actions WITH disabled
+  // reasons. The action buttons are the very same nodes built on the tile (with
+  // all their wired flows) — moved here — so every manual flow keeps working and
+  // nothing is duplicated. `controls` is the tile's controls node, or null.
+  const selectedCardPanel = (
+    info: { title: string; sub: string; card: Card },
+    controls: HTMLElement | null,
+  ): HTMLElement => {
+    const panel = document.createElement("section");
+    panel.className = "account__panel play-match__selected";
+
+    const head = document.createElement("div");
+    head.className = "play-match__selected-head";
+    head.append(cardArt(info.card));
+    const meta = document.createElement("div");
+    meta.className = "play-match__selected-meta";
+    meta.innerHTML =
+      `<h3 class="account__panel-heading play-match__selected-title">${escapeHtml(info.title)}</h3>` +
+      `<p class="play-match__selected-sub">${escapeHtml(info.sub)}</p>`;
+    head.append(meta);
+    panel.append(head);
+
+    const actions = document.createElement("div");
+    actions.className = "play-match__selected-actions";
+    const inspectBtn = document.createElement("button");
+    inspectBtn.type = "button";
+    inspectBtn.className = "play-match__selected-inspect";
+    inspectBtn.textContent = "Inspect";
+    inspectBtn.addEventListener("click", () => inspect(info.card));
+    actions.append(inspectBtn);
+    if (controls !== null && controls.children.length > 0) {
+      actions.append(controls); // moves the tile's wired action buttons here
+    } else {
+      const none = document.createElement("p");
+      none.className = "play-match__selected-none";
+      none.textContent = "No actions available right now.";
+      actions.append(none);
+    }
+    panel.append(actions);
+    return panel;
+  };
+
   // --- the painter ----------------------------------------------------------
   function paint(): void {
     // Disposed: the board is unmounted; never build DOM (the document may be gone).
     if (disposed) return;
+    panelInfo = null; // re-captured while painting the tiles this frame
     const playing = playback !== null;
     // onComplete fires only once playback (if any) has finished.
     if (!playing && match.isOver()) {
@@ -837,7 +1112,8 @@ export function renderPlayableMatch(
 
     const hint = document.createElement("p");
     hint.className = "play-match__hint";
-    hint.textContent = "Tap any card to view its full details.";
+    hint.textContent =
+      "Tap a card to select it and see its actions; use 🔍 for full details.";
     frag.append(hint);
 
     // Opponent zone: their stats + field (Feature A/C).
@@ -874,7 +1150,31 @@ export function renderPlayableMatch(
       barButton("Enter Battle", idx.enterBattle, "play-match__enter"),
       barButton("End Turn", idx.endTurn, "play-match__end"),
     );
-    frag.append(zone("Your hand", "hand", handRow(me, idx), bar));
+    const handZone = zone("Your hand", "hand", handRow(me, idx), bar);
+
+    // Selected-card action panel (Feature B), shown just above the hand when the
+    // player has tapped a card/Warrior they can act on. We relocate that tile's
+    // action buttons into the panel — the same wired nodes, so flows are intact.
+    if (!playing && selected !== null && panelInfo !== null) {
+      const containerSel =
+        selected.kind === "hand"
+          ? `[data-card-id="${selected.id}"]`
+          : `[data-instance="${selected.id}"]`;
+      const controlsSel =
+        selected.kind === "hand"
+          ? ".play-match__card-controls"
+          : ".play-match__warrior-controls";
+      // Hand tiles live in handZone (not yet appended); field tiles in frag.
+      const scope: ParentNode = selected.kind === "hand" ? handZone : frag;
+      const sourceEl = scope.querySelector<HTMLElement>(containerSel);
+      const controls = sourceEl?.querySelector<HTMLElement>(controlsSel) ?? null;
+      frag.append(selectedCardPanel(panelInfo, controls));
+    } else if (selected !== null && panelInfo === null && !playing) {
+      // The selected card/Warrior is gone (e.g. it resolved): drop the selection.
+      selected = null;
+    }
+
+    frag.append(handZone);
 
     // Battle log (full history).
     frag.append(logPanel(state));
@@ -1155,15 +1455,26 @@ export function renderPlayableMatch(
       const copies = me.hand.filter((c) => c.id === card.id).length;
 
       const el = document.createElement("div");
-      el.className = "play-match__card";
+      el.className =
+        "play-match__card" +
+        (selected?.kind === "hand" && selected.id === card.id
+          ? " play-match__card--selected"
+          : "");
+      el.dataset.cardId = card.id;
+      // Feature B: tapping the card selects it; its actions surface in the panel.
+      el.addEventListener("click", () => selectThing({ kind: "hand", id: card.id }));
+      if (selected?.kind === "hand" && selected.id === card.id) {
+        panelInfo = {
+          title: card.name + (copies > 1 ? ` ×${copies}` : ""),
+          sub: `${card.type} · ◆${card.cost}`,
+          card,
+        };
+      }
 
-      // The card body (name + type/cost) is an inspect button — tapping it opens
-      // the detail modal, never plays the card. Action buttons live separately.
-      const body = document.createElement("button");
-      body.type = "button";
-      body.className = "play-match__card-inspect";
-      body.title = "View card details";
-      body.append(cardArt(card));
+      // The card face is the full art + name/cost — the primary visual (Feature A).
+      const face = document.createElement("div");
+      face.className = "play-match__card-face";
+      face.append(cardArt(card));
       const info = document.createElement("span");
       info.className = "play-match__card-info";
       info.innerHTML =
@@ -1171,9 +1482,21 @@ export function renderPlayableMatch(
         `${copies > 1 ? ` ×${copies}` : ""}</span>` +
         `<span class="play-match__card-meta">${escapeHtml(card.type)} · ` +
         `◆${card.cost}</span>`;
-      body.append(info);
-      body.addEventListener("click", () => inspect(card));
-      el.append(body);
+      face.append(info);
+      el.append(face);
+
+      // Small dedicated inspect affordance (detail modal stays one tap away).
+      const insp = document.createElement("button");
+      insp.type = "button";
+      insp.className = "play-match__card-inspect";
+      insp.title = "View card details";
+      insp.setAttribute("aria-label", `Inspect ${card.name}`);
+      insp.textContent = "🔍";
+      insp.addEventListener("click", (e) => {
+        e.stopPropagation();
+        inspect(card);
+      });
+      el.append(insp);
 
       const controls = document.createElement("div");
       controls.className = "play-match__card-controls";
@@ -1348,7 +1671,11 @@ export function renderPlayableMatch(
     b.textContent = label;
     b.disabled = onClick === undefined;
     if (onClick !== undefined) {
-      b.addEventListener("click", onClick);
+      // Stop propagation so acting never also re-selects the parent card.
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        onClick();
+      });
     } else {
       // Disabled: the label is the reason — expose it as a tooltip and to
       // screen readers so "why can't I?" is answerable on desktop and mobile.

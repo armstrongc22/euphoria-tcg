@@ -2150,3 +2150,183 @@ body {
     padding: 0.85rem 0.9rem;
   }
 }
+
+/* ============================================================================
+ * Cinematic live match pass (Features A–F). Builds on the battlefield styles
+ * above: full-card tiles, a selected-card action panel (Feature B), valid-target
+ * reveal (Feature D), and the attack beam (Feature C/D). Animations themselves
+ * run via the Web Animations API in JS (guarded for jsdom + reduced motion).
+ * ========================================================================== */
+
+/* The board is the positioning context for the attack beam overlay. */
+.play-match {
+  position: relative;
+}
+
+/* Tiles are tappable to select (Feature B). */
+.play-match__card,
+.play-match__warrior {
+  position: relative;
+  cursor: pointer;
+}
+
+/* The card face is the full art — the primary visual (Feature A). */
+.play-match__card-face,
+.play-match__warrior-face {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* Feature B: per-tile action buttons are de-cluttered by default. They surface
+ * in the selected-card panel, or on valid targets during a pick (Feature D). */
+.play-match__card-controls,
+.play-match__warrior-controls {
+  display: none;
+}
+.play-match__warrior--target .play-match__warrior-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* Small corner inspect affordance (the detail modal stays one tap away). */
+.play-match__card-inspect,
+.play-match__warrior-inspect {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 3;
+}
+.play-match__card-inspect:hover,
+.play-match__warrior-inspect:hover {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+/* Compact ATK/HP overlay on Warrior art (Feature A.4). The textual stat line
+ * below stays in the DOM (a11y/tests) but is hidden in favor of the overlay. */
+.play-match__warrior-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0.15rem 0.35rem;
+  font-weight: 800;
+  font-size: 0.82rem;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.78), transparent);
+  border-radius: 7px 7px 0 0;
+  pointer-events: none;
+}
+.play-match__overlay-atk {
+  color: #ffd27a;
+}
+.play-match__overlay-hp {
+  color: #7ad0ff;
+}
+.play-match__warrior .play-match__warrior-stats {
+  display: none;
+}
+
+/* Selected state on the tile itself. */
+.play-match__card--selected,
+.play-match__warrior--picked {
+  outline: 2px solid var(--surfer);
+  outline-offset: 2px;
+  box-shadow: 0 0 14px rgba(54, 198, 168, 0.5);
+}
+
+/* The dedicated selected-card action panel (Feature B). */
+.play-match__selected {
+  border: 1px solid var(--surfer);
+  background: linear-gradient(180deg, rgba(54, 198, 168, 0.1), rgba(0, 0, 0, 0.2));
+}
+.play-match__selected-head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+.play-match__selected-head .play-match__art {
+  width: 4.5rem;
+  flex: 0 0 auto;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 7px;
+}
+.play-match__selected-title {
+  margin: 0;
+}
+.play-match__selected-sub {
+  margin: 0.15rem 0 0;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+.play-match__selected-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+}
+/* The tile's action buttons, relocated into the panel, lay out as a row here. */
+.play-match__selected-actions .play-match__card-controls,
+.play-match__selected-actions .play-match__warrior-controls {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  width: auto;
+}
+.play-match__selected-actions .play-match__card-btn,
+.play-match__selected-actions .play-match__warrior-btn,
+.play-match__selected-inspect {
+  width: auto;
+  padding: 0.5rem 0.9rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.play-match__selected-inspect {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+.play-match__selected-none {
+  margin: 0;
+  align-self: center;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* Attack beam from attacker to target (Feature C/D). Positioned + sized in JS. */
+.play-match__beam {
+  position: absolute;
+  height: 3px;
+  transform-origin: left center;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.15), #ffd27a 40%, #ff7a7a);
+  box-shadow: 0 0 10px rgba(255, 210, 122, 0.9);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 40;
+}
+
+/* Life area pulse target (direct attacks) — the seat stat bar is the anchor. */
+.play-match__stats[data-seat] {
+  border-radius: 8px;
+}

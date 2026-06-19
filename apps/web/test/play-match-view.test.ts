@@ -13,7 +13,12 @@ import type { Card } from "@euphoria/card-data/schema";
 import type { GameState, WarriorInPlay } from "@euphoria/game-engine";
 import { cards } from "../src/cards";
 import { createPlayableMatch } from "../src/play-match";
-import { battleLogLines, renderPlayableMatch } from "../src/play-match-view";
+import {
+  battleLogLines,
+  renderPlayableMatch,
+  MATCH_ANIM_EVENT,
+  type MatchAnimDetail,
+} from "../src/play-match-view";
 import { createCardDetail } from "../src/detail";
 
 /** Minimal in-play Warrior for white-box board scenarios. */
@@ -148,18 +153,42 @@ function matchWithOpponentWarrior(seed: number) {
 }
 
 describe("renderPlayableMatch — card inspection", () => {
-  it("opens the detail modal (onInspect) when a hand card body is tapped", () => {
+  it("opens the detail modal (onInspect) via the card's inspect button", () => {
     const match = newMatch();
     const onInspect = vi.fn();
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop, onInspect });
-    const body = root.querySelector<HTMLButtonElement>(".play-match__card-inspect");
-    expect(body).not.toBeNull();
-    body!.click();
+    // The inspect affordance is now a small dedicated button on the card tile.
+    const card = root.querySelector<HTMLElement>(".play-match__card")!;
+    const inspectBtn = card.querySelector<HTMLButtonElement>(".play-match__card-inspect");
+    expect(inspectBtn).not.toBeNull();
+    inspectBtn!.click();
     expect(onInspect).toHaveBeenCalledTimes(1);
-    // The inspected card is a real card with the displayed name.
-    const card = onInspect.mock.calls[0]![0];
-    expect(typeof card.name).toBe("string");
-    expect(body!.textContent).toContain(card.name);
+    // The inspected card is a real card whose name is shown on the tile face.
+    const inspected = onInspect.mock.calls[0]![0];
+    expect(typeof inspected.name).toBe("string");
+    expect(card.querySelector(".play-match__card-name")?.textContent).toContain(
+      inspected.name,
+    );
+  });
+
+  it("tapping a card selects it and opens the selected-card action panel", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(root.querySelector(".play-match__selected")).toBeNull();
+    // Find the card that offers Summon (a Warrior) and select it via its face.
+    const summon = buttonByText(root, ".play-match__card-btn", "Summon")!;
+    const card = summon.closest<HTMLElement>(".play-match__card")!;
+    card.querySelector<HTMLElement>(".play-match__card-face")!.click();
+    const panel = root.querySelector(".play-match__selected");
+    expect(panel).not.toBeNull();
+    // The panel hosts the card's actions (Summon) + an Inspect button.
+    expect(panel!.querySelector(".play-match__selected-inspect")).not.toBeNull();
+    expect(
+      buttonByText(root, ".play-match__selected-actions .play-match__card-btn", "Summon"),
+    ).toBeDefined();
+    // And the action still performs (Feature B: panel actions work).
+    buttonByText(root, ".play-match__selected-actions .play-match__card-btn", "Summon")!.click();
+    expect(match.state().players.player1.field.length).toBe(1);
   });
 
   it("does NOT inspect when a gameplay action button is clicked", () => {
@@ -1421,13 +1450,15 @@ describe("renderPlayableMatch — battlefield UX polish (Feature A–F)", () => 
     expect(oppZone.querySelectorAll(".play-match__card").length).toBe(0);
   });
 
-  it("keeps live cards inspectable and shows an art thumbnail", () => {
+  it("keeps live cards inspectable and shows a full card-art image", () => {
     const onInspect = vi.fn();
     const match = newMatch();
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop, onInspect });
-    const body = root.querySelector<HTMLButtonElement>(".play-match__card-inspect")!;
-    expect(body.querySelector("img.play-match__art")).not.toBeNull();
-    body.click();
+    const card = root.querySelector<HTMLElement>(".play-match__card")!;
+    // The full card art is shown on the card face (Feature A).
+    expect(card.querySelector("img.play-match__art")).not.toBeNull();
+    // The dedicated inspect button still opens the detail modal.
+    card.querySelector<HTMLButtonElement>(".play-match__card-inspect")!.click();
     expect(onInspect).toHaveBeenCalledTimes(1);
   });
 
@@ -1631,5 +1662,129 @@ describe("live match battlefield layout (CSS, milestone)", () => {
 
   it("shows cards as portrait card art (3 / 4), not landscape thumbnails", () => {
     expect(css).toMatch(/\.play-match__art\s*\{[^}]*aspect-ratio:\s*3 \/ 4/);
+  });
+});
+
+describe("renderPlayableMatch — cinematic pass (Feature B–F)", () => {
+  /** Battle scenario: P1 `attacker` vs P2 `defender`, no Attack cards in hand. */
+  function craftAttack(attack: number, defenderHealth: number) {
+    const atkCard = cards.find((c) => c.type === "Warrior")!;
+    const defCard = cards.find((c) => c.type === "Warrior" && c.id !== atkCard.id)!;
+    const match = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed: 1,
+      opponentFaction: "Dwarf",
+    });
+    const s = match.state();
+    s.phase = "battle";
+    s.turn = 3;
+    s.activePlayer = "player1";
+    s.players.player1.hand = [];
+    const a = wip(atkCard, "a1");
+    a.currentAttack = attack;
+    const d = wip(defCard, "e1");
+    d.currentHealth = defenderHealth;
+    s.players.player1.field = [a];
+    s.players.player2.field = [d];
+    return match;
+  }
+
+  function collectAnim(root: HTMLElement): MatchAnimDetail["kind"][] {
+    const kinds: MatchAnimDetail["kind"][] = [];
+    root.addEventListener(MATCH_ANIM_EVENT, (e) => {
+      kinds.push((e as CustomEvent<MatchAnimDetail>).detail.kind);
+    });
+    return kinds;
+  }
+
+  it("Feature B: selecting a Warrior shows its actions in the panel", () => {
+    const match = craftAttack(100, 5000);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    // Select the attacker tile (its face), not the inspect button.
+    root
+      .querySelector<HTMLElement>('[data-instance="a1"] .play-match__warrior-face')!
+      .click();
+    const panel = root.querySelector(".play-match__selected");
+    expect(panel).not.toBeNull();
+    expect(
+      buttonByText(root, ".play-match__selected-actions .play-match__warrior-btn", "Choose to attack"),
+    ).toBeDefined();
+  });
+
+  it("Feature B: the panel shows a disabled action's reason", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    // Enter Battle so a Warrior in hand becomes unplayable with a clear reason.
+    root.querySelector<HTMLButtonElement>(".play-match__enter")!.click();
+    const blocked = buttonByText(root, ".play-match__card-btn", "Not during Battle")!;
+    const card = blocked.closest<HTMLElement>(".play-match__card")!;
+    card.querySelector<HTMLElement>(".play-match__card-face")!.click();
+    const panel = root.querySelector(".play-match__selected")!;
+    const reason = buttonByText(
+      root,
+      ".play-match__selected-actions .play-match__card-btn",
+      "Not during Battle",
+    );
+    expect(panel.contains(reason ?? null)).toBe(true);
+    expect(reason!.disabled).toBe(true);
+  });
+
+  it("Feature D: valid attack targets are highlighted during target selection", () => {
+    const match = craftAttack(100, 5000);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    // No target highlight before choosing an attacker.
+    expect(root.querySelector(".play-match__field--theirs .play-match__warrior--target")).toBeNull();
+    buttonByText(root, ".play-match__warrior-btn", "Choose to attack")!.click();
+    // The enemy Warrior is now highlighted as a valid target.
+    expect(
+      root.querySelector('.play-match__field--theirs [data-instance="e1"].play-match__warrior--target'),
+    ).not.toBeNull();
+  });
+
+  it("Feature C/F: a summon queues a 'summon' animation event", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const kinds = collectAnim(root);
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    expect(kinds).toContain("summon");
+  });
+
+  it("Feature C/F: a lethal attack queues 'attack' and 'destroy' events", () => {
+    const match = craftAttack(9000, 100); // lethal
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const kinds = collectAnim(root);
+    buttonByText(root, ".play-match__warrior-btn", "Choose to attack")!.click();
+    buttonByText(root, ".play-match__warrior-btn", "Attack")!.click();
+    expect(kinds).toContain("attack");
+    expect(kinds).toContain("destroy");
+  });
+
+  it("Feature E/F: opponent playback queues a 'draw' animation event", () => {
+    let queued: (() => void) | null = null;
+    const scheduler = (cb: () => void): void => {
+      queued = cb;
+    };
+    const flush = (): void => {
+      let guard = 0;
+      while (queued && guard++ < 2000) {
+        const cb = queued;
+        queued = null;
+        cb();
+      }
+    };
+    const match = newMatch(5);
+    const root = renderPlayableMatch(
+      match,
+      { onComplete: noop, onQuit: noop },
+      { scheduler },
+    );
+    const kinds = collectAnim(root);
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+    flush();
+    // The opponent's turn (drawn during playback) emits a draw moment.
+    expect(kinds).toContain("draw");
+    root.dispose();
   });
 });
