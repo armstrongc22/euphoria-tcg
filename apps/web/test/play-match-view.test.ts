@@ -2072,3 +2072,33 @@ describe("renderPlayableMatch — stability isolation toggles (Feature B/C/F)", 
     expect(rows).toBeLessThanOrEqual(25);
   });
 });
+
+describe("renderPlayableMatch — onboarding hints (Feature D)", () => {
+  afterEach(() => window.localStorage.clear());
+
+  it("shows the main-phase hint for a new player", () => {
+    window.localStorage.clear();
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const hint = root.querySelector(".play-match__tutorial-hint");
+    expect(hint).not.toBeNull();
+    expect(hint!.textContent).toContain("Summon Warriors");
+  });
+
+  it("'Got it' hides the hint for this session", () => {
+    window.localStorage.clear();
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    root.querySelector<HTMLButtonElement>(".play-match__tutorial-hint-got")!.click();
+    expect(root.querySelector(".play-match__tutorial-hint")).toBeNull();
+  });
+
+  it("'Don't show again' persists so a fresh board hides the hint", () => {
+    window.localStorage.clear();
+    const first = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    first.querySelector<HTMLButtonElement>(".play-match__tutorial-hint-never")!.click();
+    // A brand-new board (new match) no longer shows the hint.
+    const second = renderPlayableMatch(newMatch(2), { onComplete: noop, onQuit: noop });
+    expect(second.querySelector(".play-match__tutorial-hint")).toBeNull();
+  });
+});

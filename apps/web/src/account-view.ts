@@ -50,6 +50,12 @@ import {
   syncPendingRewards,
   type PendingRewardClaim,
 } from "./pending-reward";
+import {
+  getTutorialStore,
+  nextStep,
+  resetTutorial,
+  type NextStep,
+} from "./tutorial";
 import { createRng } from "@euphoria/game-engine";
 import {
   buildOwnedCardInsert,
@@ -84,6 +90,8 @@ export interface AccountInfo {
   readonly deckMode?: "Starter Deck" | "Custom Deck";
   /** A note shown when a saved deck was invalid and we fell back to the starter. */
   readonly deckNote?: string;
+  /** Contextual onboarding "next step" hint (Feature C); omitted = no card. */
+  readonly nextStep?: NextStep;
 }
 
 function escapeHtml(text: string): string {
@@ -217,6 +225,11 @@ export function renderAccount(
    * Like onPlayMatch it is omitted in pure-render tests.
    */
   onPlayLive?: (faction: StarterFaction) => void,
+  /**
+   * Optional: invoked when the onboarding next-step card's CTA is clicked, with
+   * the step so the mount can route (Play match / Deck Builder / Starter Decks).
+   */
+  onNextStep?: (step: NextStep) => void,
 ): HTMLElement {
   const section = document.createElement("section");
   section.className = "account";
@@ -232,6 +245,30 @@ export function renderAccount(
         : "Local preview account (Supabase not configured)."
     }</p>`;
   section.append(header);
+
+  // Onboarding "Next step" card (Feature C): a single contextual nudge.
+  if (info.nextStep !== undefined) {
+    const step = info.nextStep;
+    const card = document.createElement("section");
+    card.className = "account__panel account__nextstep";
+    card.dataset.step = step.id;
+    const h = document.createElement("h3");
+    h.className = "account__panel-heading";
+    h.textContent = "Next step";
+    const body = document.createElement("p");
+    body.className = "account__panel-body";
+    body.textContent = step.body;
+    card.append(h, body);
+    if (step.cta !== undefined && onNextStep !== undefined) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "account__play account__nextstep-cta";
+      btn.textContent = step.cta;
+      btn.addEventListener("click", () => onNextStep(step));
+      card.append(btn);
+    }
+    section.append(card);
+  }
 
   const list = document.createElement("dl");
   list.className = "account__fields";
@@ -348,6 +385,11 @@ export interface AccountOptions {
    * instead of the account card. Ignored if it doesn't match the profile.
    */
   readonly autoPlay?: StarterFaction;
+  /**
+   * Optional tab navigation, so the onboarding next-step CTA can send the player
+   * to the Starter Decks or Deck Builder tab (the app owns the tabs).
+   */
+  readonly onNavigate?: (tab: "starter" | "deckbuilder") => void;
 }
 
 /**
@@ -391,6 +433,8 @@ export async function mountAccount(
   // we park it here and retry on each account mount, rather than losing it or
   // pretending it saved. Supabase stays the single owned-cards source of truth.
   const pendingStore = getPendingStore();
+  // Tutorial dismissal flags (local only, beta) — backs "Reset tutorial tips".
+  const tutorialStore = getTutorialStore();
   // The active match + deck, tracked so the debug panel can force-save on demand.
   let activeMatch: PlayableMatch | null = null;
   let activeChosen: ChosenActiveDeck | null = null;
@@ -552,7 +596,8 @@ export async function mountAccount(
               ok: false,
               pending: true,
               message:
-                "Reward pending sync — we'll retry when your account reconnects.",
+                "Your reward is saved locally but hasn't synced to your account " +
+                "yet. Retry before editing your deck.",
             };
           }
         }
@@ -859,6 +904,9 @@ export async function mountAccount(
       info0.faction !== null
         ? await resolveActiveDeck(info0.faction, owned)
         : null;
+    // Pending reward claims feed both the banner and the next-step guidance.
+    const pending =
+      pendingStore !== null ? loadPendingClaims(pendingStore, session.userId) : [];
     const info: AccountInfo = {
       ...info0,
       stats,
@@ -867,6 +915,14 @@ export async function mountAccount(
       owned: groupOwnedBySlug(owned),
       deckMode: chosen?.isCustom ? "Custom Deck" : "Starter Deck",
       deckNote: chosen?.usedFallback ? chosen.message : undefined,
+      // Contextual onboarding nudge derived from the freshly-loaded state.
+      nextStep: nextStep({
+        hasFaction: info0.faction !== null,
+        matchCount: stats.total,
+        ownedCount: owned.length,
+        pendingCount: pending.length,
+        hasCustomDeck: chosen?.isCustom === true,
+      }),
     };
     const accountEl = renderAccount(
       info,
@@ -874,7 +930,30 @@ export async function mountAccount(
       handleSignOut,
       showResult,
       (faction) => void showPlayableMatch(faction),
+      (step) => {
+        // Route the next-step CTA: play uses the live faction; the others switch tabs.
+        if (step.cta === "Play match" && info0.faction !== null) {
+          void showPlayableMatch(info0.faction);
+        } else if (step.cta === "Deck Builder") {
+          options.onNavigate?.("deckbuilder");
+        } else if (step.cta === "Starter Decks") {
+          options.onNavigate?.("starter");
+        }
+      },
     );
+    // "Reset tutorial tips" (Feature H): clears only tutorial dismissals, never
+    // game progression. Re-renders so any re-enabled hints reappear.
+    if (tutorialStore !== null) {
+      const reset = document.createElement("button");
+      reset.type = "button";
+      reset.className = "account__reset-tutorial";
+      reset.textContent = "Reset tutorial tips";
+      reset.addEventListener("click", () => {
+        resetTutorial(tutorialStore);
+        void showAccount();
+      });
+      accountEl.append(reset);
+    }
     // A one-time notice if the last resume attempt failed validation (D.6).
     const nodes: Node[] = [];
     if (invalidResumeMessage !== null) {
@@ -887,8 +966,6 @@ export async function mountAccount(
     }
     // Any rewards still pending sync (after the retry above) stay visible until
     // each one syncs — never silently discarded.
-    const pending =
-      pendingStore !== null ? loadPendingClaims(pendingStore, session.userId) : [];
     if (pending.length > 0) nodes.push(renderPendingRewardBanner(pending));
     // Refresh the debug panel's reward snapshot from the freshly-loaded data.
     rewardDiag = {

@@ -11,6 +11,13 @@ import { renderRewardChoice, renderRewardModal } from "../src/reward-view";
 const options = cards.slice(0, 3);
 
 describe("renderRewardChoice", () => {
+  it("shows the onboarding helper copy (Feature E)", () => {
+    const el = renderRewardChoice(options, "/", vi.fn());
+    const body = el.querySelector(".account__panel-body")?.textContent ?? "";
+    expect(body).toContain("added to your collection");
+    expect(body).toContain("Deck Builder");
+  });
+
   it("renders one option per reward card and fires onChoose when picked", () => {
     const onChoose = vi.fn();
     const el = renderRewardChoice(options, "/", onChoose);

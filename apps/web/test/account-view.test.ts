@@ -30,6 +30,31 @@ describe("renderAccount", () => {
     isRemote: true,
   };
 
+  it("renders the onboarding next-step card with its CTA (Feature C)", () => {
+    const onNext = vi.fn();
+    const el = renderAccount(
+      {
+        ...info,
+        nextStep: { id: "first-match", body: "Play your first live match.", cta: "Play match" },
+      },
+      cards,
+      () => {},
+      undefined,
+      undefined,
+      onNext,
+    );
+    const card = el.querySelector<HTMLElement>(".account__nextstep");
+    expect(card).not.toBeNull();
+    expect(card!.dataset.step).toBe("first-match");
+    expect(card!.textContent).toContain("Play your first live match.");
+    el.querySelector<HTMLButtonElement>(".account__nextstep-cta")!.click();
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits the next-step card when no step is provided", () => {
+    expect(renderAccount(info, cards, () => {}).querySelector(".account__nextstep")).toBeNull();
+  });
+
   it("shows the email and selected faction", () => {
     const el = renderAccount(info, cards, () => {});
     const text = el.textContent ?? "";
@@ -152,6 +177,29 @@ describe("mountAccount match stats", () => {
     await mountAccount(container, { auth, pool: cards, onSignOut: () => {} });
     return { container };
   }
+
+  it("shows a contextual next-step card and a Reset tutorial tips button", async () => {
+    window.localStorage.clear();
+    const { container } = await signedInAccount();
+    // Faction chosen, no matches → "play your first live match".
+    const next = container.querySelector(".account__nextstep");
+    expect(next).not.toBeNull();
+    expect(next?.textContent?.toLowerCase()).toContain("play your first live match");
+    expect(container.querySelector(".account__reset-tutorial")).not.toBeNull();
+  });
+
+  it("Reset tutorial tips clears tutorial flags but not progression", async () => {
+    window.localStorage.clear();
+    // Pretend the player dismissed a tutorial + has a non-tutorial key.
+    window.localStorage.setItem("euphoria.tutorial.v1", JSON.stringify({ welcome: true }));
+    window.localStorage.setItem("euphoria.owned.v1", "[]");
+    const { container } = await signedInAccount();
+    container.querySelector<HTMLButtonElement>(".account__reset-tutorial")!.click();
+    await flush();
+    expect(window.localStorage.getItem("euphoria.tutorial.v1")).toBeNull();
+    // Game-progression key is untouched.
+    expect(window.localStorage.getItem("euphoria.owned.v1")).toBe("[]");
+  });
 
   it("shows a stats panel starting at zero matches", async () => {
     const { container } = await signedInAccount();

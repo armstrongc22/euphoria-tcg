@@ -50,6 +50,11 @@ import {
 } from "./match-playback";
 import { recordMatchMetrics, setMatchActive, setMetricsProvider } from "./debug-log";
 import {
+  dismissTutorial,
+  getTutorialStore,
+  isTutorialDismissed,
+} from "./tutorial";
+import {
   artCacheCap,
   lowPowerActive,
   noAnim,
@@ -266,6 +271,12 @@ export function renderPlayableMatch(
   let panelInfo: { title: string; sub: string; card: Card } | null = null;
   let error: string | null = null;
   let completed = false;
+
+  // --- onboarding hints (Feature D) ----------------------------------------
+  // Lightweight contextual hints. Hidden permanently via the tutorial flag
+  // ("Don't show again") or for this session via "Got it".
+  const tutorialStore = getTutorialStore();
+  let hintsHidden = isTutorialDismissed(tutorialStore, "liveHints");
 
   // --- playback (opponent turn) + floating-text state ----------------------
   // True once the board is disposed (unmounted/replaced): every delayed callback
@@ -1216,6 +1227,46 @@ export function renderPlayableMatch(
     hint.textContent =
       "Tap a card to select it and see its actions; use 🔍 for full details.";
     frag.append(hint);
+
+    // Contextual onboarding hint (Feature D): main/battle/attack-card guidance,
+    // shown until the player hides it. Never shown during opponent playback.
+    if (!hintsHidden && !playing) {
+      let hintText: string;
+      if (pendingAttack !== null) {
+        hintText = "Attack cards can replace a regular attack when compatible.";
+      } else if (state.phase === "battle") {
+        hintText =
+          "Attack enemy Warriors. Direct attacks reduce Lives when the opponent " +
+          "has no Warriors.";
+      } else {
+        hintText = "Summon Warriors and play Items or Weapons.";
+      }
+      const tip = document.createElement("div");
+      tip.className = "play-match__tutorial-hint";
+      tip.setAttribute("role", "note");
+      const tipText = document.createElement("span");
+      tipText.className = "play-match__tutorial-hint-text";
+      tipText.textContent = hintText;
+      const gotIt = document.createElement("button");
+      gotIt.type = "button";
+      gotIt.className = "play-match__tutorial-hint-got";
+      gotIt.textContent = "Got it";
+      gotIt.addEventListener("click", () => {
+        hintsHidden = true; // session-only: returns next match
+        paint();
+      });
+      const never = document.createElement("button");
+      never.type = "button";
+      never.className = "play-match__tutorial-hint-never";
+      never.textContent = "Don't show again";
+      never.addEventListener("click", () => {
+        dismissTutorial(tutorialStore, "liveHints");
+        hintsHidden = true;
+        paint();
+      });
+      tip.append(tipText, gotIt, never);
+      frag.append(tip);
+    }
 
     // Opponent zone: their stats + field (Feature A/C).
     frag.append(
