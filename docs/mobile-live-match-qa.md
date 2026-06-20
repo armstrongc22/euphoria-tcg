@@ -41,8 +41,10 @@ which is what pushes mobile Safari/Chrome to discard and reload the tab.
 
 ## Part B/F — mobile repro + diagnostics
 
-1. (Optional) enable diagnostics on the device console:
-   `localStorage.euphoriaDebug = "1"` then reload.
+1. Enable diagnostics **on the device, no console needed**: tap the **build
+   stamp** in the footer **5 times quickly**. The stamp turns teal and the page
+   reloads with diagnostics + the debug panel active. Tap it 5× again to turn it
+   back off. (The console route still works: `localStorage.euphoriaDebug = "1"`.)
 2. Start a live match (Account → **Play match**, or Deck Builder → Play).
 3. Play **20+ turns** — summon, attack, end turn through several opponent turns.
 4. Expected: **no reload**; the match keeps playing.
@@ -68,7 +70,8 @@ which is what pushes mobile Safari/Chrome to discard and reload the tab.
 
 ## In-app debug panel + stability toggles
 
-With `localStorage.euphoriaDebug = "1"` a **debug panel** appears bottom-right on
+Enable diagnostics by tapping the footer **build stamp 5 times** (or setting
+`localStorage.euphoriaDebug = "1"`). A **debug panel** then appears bottom-right on
 the device (no devtools needed). It shows: build stamp, current view, and live
 match metrics (turn, events, `logRows`, `playbackQueue`, `pendingTimers`,
 `floaters`, `beams`, `domNodes`, `imageNodes`, `artNodes`), resume-snapshot

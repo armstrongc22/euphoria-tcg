@@ -201,11 +201,6 @@ body {
 }
 
 .site-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem 1rem;
   padding: 2rem clamp(1rem, 4vw, 3rem);
   margin-top: 1rem;
   border-top: 1px solid var(--border);
@@ -213,27 +208,19 @@ body {
   font-size: 0.85rem;
 }
 
-/* Visible debug on/off toggle (mobile-reachable without a console). Subtle by
- * default; lights up teal when diagnostics + the debug panel are active. */
-.site-footer__debug {
-  flex: 0 0 auto;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg-elev);
-  color: var(--text-dim);
+/* The build stamp is a hidden debug reveal: it looks like plain footer text, but
+ * tapping it 5 times toggles the debug panel. No debug control is shown to normal
+ * users; once enabled the stamp lights teal so a tester knows it's active. */
+.site-footer__stamp {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
   font: inherit;
-  font-size: 0.78rem;
   cursor: pointer;
 }
 
-.site-footer__debug:hover {
-  border-color: var(--text-dim);
-  color: var(--text);
-}
-
-.site-footer__debug--on {
-  border-color: var(--surfer);
+.site-footer__stamp--debug {
   color: var(--surfer);
   font-weight: 700;
 }

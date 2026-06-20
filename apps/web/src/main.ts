@@ -74,10 +74,8 @@ app.innerHTML = `
   <div id="view-rules" class="view" hidden></div>
   <div id="view-lore" class="view" hidden></div>
   <footer class="site-footer">
-    <span class="site-footer__text">Euphoria TCG · beta · build ${BUILD_STAMP}</span>
-    <button type="button" id="debug-toggle" class="site-footer__debug" aria-pressed="false">
-      Debug: off
-    </button>
+    Euphoria TCG · beta · <button type="button" id="build-stamp" class="site-footer__stamp"
+      title="Build version">build ${BUILD_STAMP}</button>
   </footer>
 `;
 
@@ -92,29 +90,44 @@ const tabs = Array.from(
   document.querySelectorAll<HTMLButtonElement>(".site-nav__tab"),
 );
 
-// Visible debug toggle (Feature A): lets a mobile tester turn the diagnostics +
-// in-app debug panel on/off without a console. Reflects the current flag, and
-// reloads so installDiagnostics() / the panel re-initialize consistently.
-const debugToggle = document.querySelector<HTMLButtonElement>("#debug-toggle");
-if (debugToggle !== null) {
-  const syncDebugToggle = (): void => {
+// Hidden debug reveal (Feature A): tapping the build stamp 5 times toggles the
+// diagnostics + in-app debug panel on/off — so normal users never see a debug
+// control, but a mobile tester can enable it without a console. Taps must be in
+// quick succession (the counter resets after a short idle gap). Reflects the
+// current flag (the stamp lights teal when debug is on). The toggle reloads so
+// installDiagnostics() / the panel re-initialize cleanly for the new state.
+const REVEAL_TAPS = 5;
+const REVEAL_RESET_MS = 1200;
+const buildStamp = document.querySelector<HTMLButtonElement>("#build-stamp");
+if (buildStamp !== null) {
+  const syncStamp = (): void => {
     const on = flag(FLAG_DEBUG);
-    debugToggle.textContent = `Debug: ${on ? "on" : "off"}`;
-    debugToggle.classList.toggle("site-footer__debug--on", on);
-    debugToggle.setAttribute("aria-pressed", on ? "true" : "false");
+    buildStamp.classList.toggle("site-footer__stamp--debug", on);
+    buildStamp.setAttribute("aria-pressed", on ? "true" : "false");
   };
-  debugToggle.addEventListener("click", () => {
-    setFlag(FLAG_DEBUG, !flag(FLAG_DEBUG));
-    syncDebugToggle();
-    // Reload so diagnostics capture + the panel mount cleanly for the new state.
-    // Guarded: jsdom (tests) has no navigation, so swallow the "not implemented".
-    try {
-      location.reload();
-    } catch {
-      /* no navigation available (test env) — the flag change still applies */
+  let taps = 0;
+  let resetTimer: ReturnType<typeof setTimeout> | undefined;
+  buildStamp.addEventListener("click", () => {
+    taps += 1;
+    if (resetTimer !== undefined) clearTimeout(resetTimer);
+    if (taps >= REVEAL_TAPS) {
+      taps = 0;
+      setFlag(FLAG_DEBUG, !flag(FLAG_DEBUG));
+      syncStamp();
+      // Reload so diagnostics capture + the panel mount cleanly. Guarded: jsdom
+      // (tests) has no navigation, so swallow the "not implemented".
+      try {
+        location.reload();
+      } catch {
+        /* no navigation available (test env) — the flag change still applies */
+      }
+      return;
     }
+    resetTimer = setTimeout(() => {
+      taps = 0;
+    }, REVEAL_RESET_MS);
   });
-  syncDebugToggle();
+  syncStamp();
 }
 
 function showView(view: ViewId): void {
