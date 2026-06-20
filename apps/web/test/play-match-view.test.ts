@@ -173,6 +173,41 @@ describe("renderPlayableMatch — card inspection", () => {
     );
   });
 
+  it("places the hand-card inspect button in the art region with an aria-label", () => {
+    const match = newMatch();
+    const onInspect = vi.fn();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop, onInspect });
+    const card = root.querySelector<HTMLElement>(".play-match__card")!;
+    const artWrap = card.querySelector<HTMLElement>(".play-match__art-wrap");
+    expect(artWrap).not.toBeNull();
+    const inspectBtn = artWrap!.querySelector<HTMLButtonElement>(".play-match__card-inspect");
+    // The inspect button lives inside the art region (anchored bottom-right via
+    // CSS), keeping its accessible label, and still opens the detail modal.
+    expect(inspectBtn).not.toBeNull();
+    expect(inspectBtn!.getAttribute("aria-label")).toMatch(/^Inspect /);
+    inspectBtn!.click();
+    expect(onInspect).toHaveBeenCalledTimes(1);
+  });
+
+  it("places a field Warrior's inspect button in the art region, not over the stat overlay", () => {
+    const match = newMatch();
+    const onInspect = vi.fn();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop, onInspect });
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    const warrior = root.querySelector<HTMLElement>(
+      ".play-match__field--mine .play-match__warrior",
+    )!;
+    const artWrap = warrior.querySelector<HTMLElement>(".play-match__art-wrap")!;
+    // Both the ATK/HP overlay and the inspect button share the art region; the
+    // inspect button is a distinct element (positioned bottom-right in CSS).
+    expect(artWrap.querySelector(".play-match__warrior-overlay")).not.toBeNull();
+    const inspectBtn = artWrap.querySelector<HTMLButtonElement>(".play-match__warrior-inspect");
+    expect(inspectBtn).not.toBeNull();
+    expect(inspectBtn!.getAttribute("aria-label")).toMatch(/^Inspect /);
+    inspectBtn!.click();
+    expect(onInspect).toHaveBeenCalledTimes(1);
+  });
+
   it("tapping a card selects it and opens the selected-card action panel", () => {
     const match = newMatch();
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });

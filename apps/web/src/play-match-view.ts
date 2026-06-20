@@ -731,13 +731,34 @@ export function renderPlayableMatch(
 
     const face = document.createElement("div");
     face.className = "play-match__warrior-face";
-    face.append(cardArt(w.card, `field:${w.instanceId}`));
+
+    // The art region (art + ATK/HP overlay + the corner inspect button). Keeping
+    // the inspect button in here anchors it to the bottom-right of the IMAGE, so
+    // it never covers the top stat overlay nor the name/controls below.
+    const artWrap = document.createElement("div");
+    artWrap.className = "play-match__art-wrap";
+    artWrap.append(cardArt(w.card, `field:${w.instanceId}`));
     const overlay = document.createElement("span");
     overlay.className = "play-match__warrior-overlay";
     overlay.innerHTML =
       `<span class="play-match__overlay-atk" title="Attack">⚔${w.currentAttack}</span>` +
       `<span class="play-match__overlay-hp" title="Health">♥${w.currentHealth}</span>`;
-    face.append(overlay);
+    artWrap.append(overlay);
+
+    // Small dedicated inspect affordance (the detail modal stays one tap away),
+    // pinned to the bottom-right of the art.
+    const insp = document.createElement("button");
+    insp.type = "button";
+    insp.className = "play-match__warrior-inspect";
+    insp.title = "View card details";
+    insp.setAttribute("aria-label", `Inspect ${w.card.name}`);
+    insp.textContent = "🔍";
+    insp.addEventListener("click", (e) => {
+      e.stopPropagation();
+      inspect(w.card);
+    });
+    artWrap.append(insp);
+    face.append(artWrap);
 
     const statusChips = warriorStatusChips(w)
       .map((c) => `<span class="play-match__warrior-status">${escapeHtml(c)}</span>`)
@@ -753,19 +774,6 @@ export function renderPlayableMatch(
       (opts.badge ? `<span class="play-match__warrior-badge">${escapeHtml(opts.badge)}</span>` : "");
     face.append(info);
     el.append(face);
-
-    // Small dedicated inspect affordance (the detail modal stays one tap away).
-    const insp = document.createElement("button");
-    insp.type = "button";
-    insp.className = "play-match__warrior-inspect";
-    insp.title = "View card details";
-    insp.setAttribute("aria-label", `Inspect ${w.card.name}`);
-    insp.textContent = "🔍";
-    insp.addEventListener("click", (e) => {
-      e.stopPropagation();
-      inspect(w.card);
-    });
-    el.append(insp);
 
     if (w.attachedWeapon !== undefined) {
       const weapon = w.attachedWeapon;
@@ -1673,16 +1681,12 @@ export function renderPlayableMatch(
       // The card face is the full art + name/cost — the primary visual (Feature A).
       const face = document.createElement("div");
       face.className = "play-match__card-face";
-      face.append(cardArt(card, `hand:${card.id}`));
-      const info = document.createElement("span");
-      info.className = "play-match__card-info";
-      info.innerHTML =
-        `<span class="play-match__card-name">${escapeHtml(card.name)}` +
-        `${copies > 1 ? ` ×${copies}` : ""}</span>` +
-        `<span class="play-match__card-meta">${escapeHtml(card.type)} · ` +
-        `◆${card.cost}</span>`;
-      face.append(info);
-      el.append(face);
+
+      // Art region wraps the image + the corner inspect button, so the button
+      // sits at the bottom-right of the IMAGE (clear of the name/cost below).
+      const artWrap = document.createElement("div");
+      artWrap.className = "play-match__art-wrap";
+      artWrap.append(cardArt(card, `hand:${card.id}`));
 
       // Small dedicated inspect affordance (detail modal stays one tap away).
       const insp = document.createElement("button");
@@ -1695,7 +1699,18 @@ export function renderPlayableMatch(
         e.stopPropagation();
         inspect(card);
       });
-      el.append(insp);
+      artWrap.append(insp);
+      face.append(artWrap);
+
+      const info = document.createElement("span");
+      info.className = "play-match__card-info";
+      info.innerHTML =
+        `<span class="play-match__card-name">${escapeHtml(card.name)}` +
+        `${copies > 1 ? ` ×${copies}` : ""}</span>` +
+        `<span class="play-match__card-meta">${escapeHtml(card.type)} · ` +
+        `◆${card.cost}</span>`;
+      face.append(info);
+      el.append(face);
 
       const controls = document.createElement("div");
       controls.className = "play-match__card-controls";
