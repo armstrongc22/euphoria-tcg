@@ -174,16 +174,26 @@ the static site still works with no backend.
   create index if not exists owned_cards_user_created_idx
     on public.owned_cards (user_id, created_at desc);
 
-  -- Already have the table from an earlier setup but rewards "don't stick"?
-  -- Ensure the SELECT policy above exists. With RLS enabled but no SELECT policy,
-  -- the INSERT succeeds yet reads return ZERO rows (Postgres denies SELECT
-  -- silently, not with an error), so a claimed reward never appears in the
-  -- collection or Deck Builder. Run just this if it's missing:
+  -- Rewards "don't stick" troubleshooting. The reward claim does TWO writes:
+  -- an INSERT into owned_cards and an INSERT into reward_events, then reads the
+  -- owned row back. Both tables therefore need an INSERT policy AND owned_cards
+  -- needs a SELECT policy. A missing INSERT policy makes the claim fail with
+  -- "new row violates row-level security policy" (code 42501); a missing SELECT
+  -- policy lets the INSERT succeed but reads return zero rows. Re-apply all of
+  -- them idempotently (safe to run repeatedly — avoids "policy already exists"):
+  --   drop policy if exists "owned_cards_select_own" on public.owned_cards;
   --   create policy "owned_cards_select_own"
   --     on public.owned_cards for select using (auth.uid() = user_id);
-  -- The app now read-back-verifies each reward save and surfaces a retryable
-  -- "pending sync" banner when the row isn't readable, so this misconfig is
-  -- visible instead of silent.
+  --   drop policy if exists "owned_cards_insert_own" on public.owned_cards;
+  --   create policy "owned_cards_insert_own"
+  --     on public.owned_cards for insert with check (auth.uid() = user_id);
+  -- To SEE which policies exist:
+  --   select tablename, policyname, cmd from pg_policies
+  --   where schemaname='public' and tablename in
+  --     ('owned_cards','reward_events','match_history','active_decks');
+  -- The app read-back-verifies each reward save and queues a retryable "pending
+  -- sync" banner (with the real Postgres error) when a save fails, so this
+  -- misconfig is visible and recoverable instead of silently losing the reward.
 
   -- reward_events: which options were offered and which was chosen --------
   create table if not exists public.reward_events (

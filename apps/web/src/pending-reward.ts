@@ -13,6 +13,7 @@
  * behavior is unchanged.
  */
 import { logDebug } from "./debug-log";
+import { describeError } from "./errors";
 import type { Auth, AuthSession } from "./auth";
 import type { OwnedCardInsert, RewardEventInsert } from "./rewards";
 import type { KeyValueStore } from "./signup";
@@ -262,11 +263,7 @@ export async function syncPendingRewards(
     try {
       await auth.saveReward(session, claim.owned, claim.event);
     } catch (error) {
-      recordRetryFailure(
-        store,
-        claim.id,
-        error instanceof Error ? error.message : String(error),
-      );
+      recordRetryFailure(store, claim.id, describeError(error));
       continue; // keep this claim queued, but still try the rest this pass
     }
     removePendingClaim(store, claim.id);
