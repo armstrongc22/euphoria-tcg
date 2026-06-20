@@ -313,6 +313,53 @@ the static site still works with no backend.
   If Supabase is unavailable or unconfigured, the active deck persists to
   localStorage (per faction) instead, so the deck builder still works offline.
 
+### Schema verification (run this if rewards/progression misbehave)
+
+Paste this in the Supabase SQL editor to confirm every table, the required
+columns, and the RLS policies the app depends on. It's read-only — it reports
+what's missing without changing anything.
+
+```sql
+-- 1) Required columns per table. Each row that prints is a column the app needs;
+--    if a row is MISSING from the output, add that column.
+select table_name, column_name, data_type
+from information_schema.columns
+where table_schema = 'public'
+  and (
+    (table_name = 'profiles'      and column_name in ('id','email','selected_faction','created_at')) or
+    (table_name = 'match_history' and column_name in ('id','user_id','player_faction','opponent_faction','winner','result','turns','created_at')) or
+    (table_name = 'owned_cards'   and column_name in ('id','user_id','card_slug','card_name','card_type','faction','source','created_at')) or
+    (table_name = 'reward_events' and column_name in ('id','user_id','player_faction','chosen_slug','option_slugs','milestone','tier','created_at')) or
+    (table_name = 'active_decks'  and column_name in ('id','user_id','faction','cards','updated_at'))
+  )
+order by table_name, column_name;
+
+-- 2) RLS policies. Reward claims need owned_cards + reward_events INSERT (and
+--    owned_cards SELECT); the starter-switch reset needs DELETE on owned_cards /
+--    reward_events / match_history. Confirm each table has the cmds it needs.
+select tablename, policyname, cmd
+from pg_policies
+where schemaname = 'public'
+  and tablename in ('profiles','match_history','owned_cards','reward_events','active_decks')
+order by tablename, cmd, policyname;
+```
+
+**`owned_cards` must include:** `id`, `user_id`, `card_slug`, `card_name`,
+`card_type`, `faction`, `source`, `created_at`.
+
+**`reward_events` must include:** `id`, `user_id`, `player_faction`,
+`chosen_slug`, `option_slugs`, `milestone`, `tier`, `created_at`.
+
+**Required policy commands** (all scoped `auth.uid() = user_id`):
+
+| Table | select | insert | update | delete |
+| --- | --- | --- | --- | --- |
+| profiles | ✓ | ✓ | ✓ | — |
+| match_history | ✓ | ✓ | — | ✓ (reset) |
+| owned_cards | ✓ | ✓ | — | ✓ (reset) |
+| reward_events | ✓ | ✓ | — | ✓ (reset) |
+| active_decks | ✓ | ✓ | ✓ | ✓ |
+
 ### How the app uses it
 
 - `src/supabase-config.ts` — detects the env vars (pure, tested).
