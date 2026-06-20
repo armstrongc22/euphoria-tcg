@@ -208,6 +208,23 @@ body {
   font-size: 0.85rem;
 }
 
+/* The build stamp is a hidden debug reveal: it looks like plain footer text, but
+ * tapping it 5 times toggles the debug panel. No debug control is shown to normal
+ * users; once enabled the stamp lights teal so a tester knows it's active. */
+.site-footer__stamp {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.site-footer__stamp--debug {
+  color: var(--surfer);
+  font-weight: 700;
+}
+
 .card-grid__empty {
   grid-column: 1 / -1;
   text-align: center;

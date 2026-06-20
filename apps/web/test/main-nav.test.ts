@@ -81,3 +81,58 @@ describe("site navigation", () => {
     expect(view("rules").hidden).toBe(true);
   });
 });
+
+describe("hidden debug reveal (tap build stamp 5x)", () => {
+  beforeEach(async () => {
+    await boot();
+  });
+
+  function stamp(): HTMLButtonElement {
+    const el = document.querySelector<HTMLButtonElement>("#build-stamp");
+    if (el === null) throw new Error("build stamp not found");
+    return el;
+  }
+
+  function tap(el: HTMLButtonElement, n: number): void {
+    for (let i = 0; i < n; i++) el.click();
+  }
+
+  it("shows the build stamp but no visible debug control by default", () => {
+    expect(stamp().textContent).toContain("build");
+    // No always-visible debug toggle for normal users.
+    expect(document.querySelector("#debug-toggle")).toBeNull();
+    expect(localStorage.getItem("euphoriaDebug")).toBeNull();
+  });
+
+  it("does NOT enable debug on fewer than 5 taps", () => {
+    tap(stamp(), 4);
+    expect(localStorage.getItem("euphoriaDebug")).toBeNull();
+  });
+
+  it("enables debug after exactly 5 quick taps on the build stamp", () => {
+    const el = stamp();
+    tap(el, 5);
+    expect(localStorage.getItem("euphoriaDebug")).toBe("1");
+    expect(el.getAttribute("aria-pressed")).toBe("true");
+    expect(el.classList.contains("site-footer__stamp--debug")).toBe(true);
+  });
+
+  it("5 more taps toggles debug back off (reversible from the UI)", () => {
+    const el = stamp();
+    tap(el, 5);
+    expect(localStorage.getItem("euphoriaDebug")).toBe("1");
+    tap(el, 5);
+    expect(localStorage.getItem("euphoriaDebug")).toBeNull();
+    expect(el.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("reflects an already-enabled flag on boot (stamp lit)", async () => {
+    localStorage.setItem("euphoriaDebug", "1");
+    document.body.innerHTML = '<div id="app"></div>';
+    vi.resetModules();
+    await import("../src/main");
+    await Promise.resolve();
+    const el = document.querySelector<HTMLButtonElement>("#build-stamp")!;
+    expect(el.classList.contains("site-footer__stamp--debug")).toBe(true);
+  });
+});

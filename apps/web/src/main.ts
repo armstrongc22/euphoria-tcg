@@ -25,6 +25,7 @@ import { mountDeckBuilder } from "./deck-builder-view";
 import { mountRules } from "./rules-view";
 import { mountLore } from "./lore-view";
 import { installDiagnostics, setBuildStamp } from "./debug-log";
+import { FLAG_DEBUG, flag, setFlag } from "./debug-flags";
 import type { StarterFaction } from "./starter";
 
 // Build stamp (set by vite.config define): the deployed commit/timestamp, shown
@@ -72,7 +73,10 @@ app.innerHTML = `
   <div id="view-viewer" class="view" hidden></div>
   <div id="view-rules" class="view" hidden></div>
   <div id="view-lore" class="view" hidden></div>
-  <footer class="site-footer">Euphoria TCG · beta · build ${BUILD_STAMP}</footer>
+  <footer class="site-footer">
+    Euphoria TCG · beta · <button type="button" id="build-stamp" class="site-footer__stamp"
+      title="Build version">build ${BUILD_STAMP}</button>
+  </footer>
 `;
 
 const signupEl = document.querySelector<HTMLElement>("#view-signup")!;
@@ -85,6 +89,46 @@ const loreEl = document.querySelector<HTMLElement>("#view-lore")!;
 const tabs = Array.from(
   document.querySelectorAll<HTMLButtonElement>(".site-nav__tab"),
 );
+
+// Hidden debug reveal (Feature A): tapping the build stamp 5 times toggles the
+// diagnostics + in-app debug panel on/off — so normal users never see a debug
+// control, but a mobile tester can enable it without a console. Taps must be in
+// quick succession (the counter resets after a short idle gap). Reflects the
+// current flag (the stamp lights teal when debug is on). The toggle reloads so
+// installDiagnostics() / the panel re-initialize cleanly for the new state.
+const REVEAL_TAPS = 5;
+const REVEAL_RESET_MS = 1200;
+const buildStamp = document.querySelector<HTMLButtonElement>("#build-stamp");
+if (buildStamp !== null) {
+  const syncStamp = (): void => {
+    const on = flag(FLAG_DEBUG);
+    buildStamp.classList.toggle("site-footer__stamp--debug", on);
+    buildStamp.setAttribute("aria-pressed", on ? "true" : "false");
+  };
+  let taps = 0;
+  let resetTimer: ReturnType<typeof setTimeout> | undefined;
+  buildStamp.addEventListener("click", () => {
+    taps += 1;
+    if (resetTimer !== undefined) clearTimeout(resetTimer);
+    if (taps >= REVEAL_TAPS) {
+      taps = 0;
+      setFlag(FLAG_DEBUG, !flag(FLAG_DEBUG));
+      syncStamp();
+      // Reload so diagnostics capture + the panel mount cleanly. Guarded: jsdom
+      // (tests) has no navigation, so swallow the "not implemented".
+      try {
+        location.reload();
+      } catch {
+        /* no navigation available (test env) — the flag change still applies */
+      }
+      return;
+    }
+    resetTimer = setTimeout(() => {
+      taps = 0;
+    }, REVEAL_RESET_MS);
+  });
+  syncStamp();
+}
 
 function showView(view: ViewId): void {
   signupEl.hidden = view !== "signup";
