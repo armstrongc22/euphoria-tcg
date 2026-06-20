@@ -11,7 +11,7 @@ import { cards } from "../src/cards";
 import { mountAccount } from "../src/account-view";
 import { mountDeckBuilder } from "../src/deck-builder-view";
 import { runTestMatch } from "../src/match";
-import { PENDING_REWARD_KEY, loadPendingClaim } from "../src/pending-reward";
+import { PENDING_REWARD_KEY, loadPendingClaims } from "../src/pending-reward";
 import type { Auth, AuthSession } from "../src/auth";
 import type { OwnedCardRecord } from "../src/rewards";
 import type { StarterFaction } from "../src/starter";
@@ -94,7 +94,7 @@ describe("pending reward claim — remote failure then retry sync", () => {
 
     // The reward is parked as a pending claim — NOT added to owned_cards.
     expect(window.localStorage.getItem(PENDING_REWARD_KEY)).not.toBeNull();
-    expect(loadPendingClaim(window.localStorage, SESSION.userId)).not.toBeNull();
+    expect(loadPendingClaims(window.localStorage, SESSION.userId)).toHaveLength(1);
     expect(owned).toHaveLength(0);
     // The account shows a clear "pending sync" banner.
     expect(container.querySelector(".account__pending-reward")).not.toBeNull();
@@ -119,7 +119,7 @@ describe("pending reward claim — remote failure then retry sync", () => {
     await flush();
 
     // Synced: pending cleared, the card is now a real owned card, banner gone.
-    expect(loadPendingClaim(window.localStorage, SESSION.userId)).toBeNull();
+    expect(loadPendingClaims(window.localStorage, SESSION.userId)).toHaveLength(0);
     expect(owned).toHaveLength(1);
     expect(container.querySelector(".account__pending-reward")).toBeNull();
     expect(container.querySelector(".account__rewards")?.textContent).toContain(
@@ -147,10 +147,59 @@ describe("pending reward claim — remote failure then retry sync", () => {
     await mountDeckBuilder(builderEl, { auth, pool: cards });
     await flush();
 
-    expect(loadPendingClaim(window.localStorage, SESSION.userId)).toBeNull();
+    expect(loadPendingClaims(window.localStorage, SESSION.userId)).toHaveLength(0);
     expect(owned).toHaveLength(1);
     const rewardName = owned[0]!.card_name;
     const builderText = builderEl.textContent ?? "";
     expect(builderText).toContain(rewardName);
+  });
+
+  it("shows a plural banner when multiple rewards are queued, then drains them", async () => {
+    const failSave = { value: true };
+    const { auth, owned } = fakeRemoteAuth(failSave);
+    const container = document.createElement("div");
+
+    // Two failed claims at two different milestones (5 and 10), built directly.
+    const queue = [5, 10].map((m, i) => ({
+      id: `remote-user:${m}:slug${m}:t${i}`,
+      userId: SESSION.userId,
+      owned: {
+        user_id: SESSION.userId,
+        card_slug: `slug${m}`,
+        card_name: `Card ${m}`,
+        faction: "Sonic",
+        card_type: "Warrior",
+        source: "reward",
+      },
+      event: {
+        user_id: SESSION.userId,
+        player_faction: "Sonic",
+        chosen_slug: `slug${m}`,
+        option_slugs: [`slug${m}`],
+        milestone: m,
+        tier: m / 5,
+      },
+      milestone: m,
+      cardName: `Card ${m}`,
+      lastError: "RLS denied",
+      attempts: 1,
+      createdAt: `2026-06-21T00:0${i}:00Z`,
+      updatedAt: `2026-06-21T00:0${i}:00Z`,
+    }));
+    window.localStorage.setItem(PENDING_REWARD_KEY, JSON.stringify(queue));
+
+    await mountAccount(container, { auth, pool: cards, onSignOut: () => {} });
+    await flush();
+    const banner = container.querySelector(".account__pending-reward");
+    expect(banner).not.toBeNull();
+    expect(banner!.textContent).toContain("2 rewards pending sync");
+
+    // Backend recovers; remount drains BOTH queued claims one at a time.
+    failSave.value = false;
+    await mountAccount(container, { auth, pool: cards, onSignOut: () => {} });
+    await flush();
+    expect(loadPendingClaims(window.localStorage, SESSION.userId)).toHaveLength(0);
+    expect(owned).toHaveLength(2);
+    expect(container.querySelector(".account__pending-reward")).toBeNull();
   });
 });
