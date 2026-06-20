@@ -339,6 +339,26 @@ export function createSupabaseAuth(client: SupabaseClient): Auth {
       if (ownedResult.error) throw ownedResult.error;
       const eventResult = await client.from("reward_events").insert(event);
       if (eventResult.error) throw eventResult.error;
+      // Read-back check: confirm the just-inserted owned card is actually
+      // SELECT-able. A missing/again-wrong owned_cards SELECT RLS policy lets the
+      // INSERT succeed but returns ZERO rows on read (Postgres RLS denies SELECT
+      // by returning nothing, not an error) — so the card silently never appears
+      // in the collection or Deck Builder. Treating that as a failure makes the
+      // claim queue + surfaces the retry banner with an actionable message,
+      // instead of the reward vanishing. (No-op cost: one tiny query per reward.)
+      const verify = await client
+        .from("owned_cards")
+        .select("card_slug")
+        .eq("user_id", owned.user_id)
+        .eq("card_slug", owned.card_slug)
+        .limit(1);
+      if (verify.error) throw verify.error;
+      if (!verify.data || (verify.data as unknown[]).length === 0) {
+        throw new Error(
+          "Reward saved but could not be read back — your owned_cards SELECT " +
+            "policy is likely missing. Apply the RLS SQL in apps/web/README.md.",
+        );
+      }
     },
 
     async getOwnedCards(session, limit = 200) {
