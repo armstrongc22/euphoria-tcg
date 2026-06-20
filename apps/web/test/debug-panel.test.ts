@@ -24,6 +24,14 @@ const hooks = (store: KeyValueStore | null) => ({
   userId: () => "user-1",
   currentView: () => "live-match",
   store,
+  reward: () => ({
+    mode: "supabase",
+    wins: 7,
+    nextReward: 10,
+    owned: 0,
+    pending: 1,
+    pendingErrors: ["Fafnir: could not be read back"],
+  }),
   forceSave: () => true,
   simulateReloadCheck: () => "Reload check: OK",
 });
@@ -49,6 +57,15 @@ describe("createDebugPanel", () => {
     expect(text).toContain("turn");
     expect(text).toContain("7");
     expect(text).toContain("120");
+  });
+
+  it("renders the reward pipeline snapshot (mode, wins, owned, pending + error)", () => {
+    window.localStorage.setItem(FLAG_DEBUG, "1");
+    const panel = createDebugPanel(hooks(memoryStore()));
+    const text = panel!.element.textContent ?? "";
+    expect(text).toContain("supabase");
+    expect(text).toContain("nextReward");
+    expect(text).toContain("could not be read back");
   });
 
   it("toggles a stability flag via its button", () => {
