@@ -14,6 +14,7 @@ import type { Card } from "@euphoria/card-data/schema";
 import type { Auth } from "./auth";
 import { cardImageUrl } from "./cards";
 import { createCardDetail } from "./detail";
+import { getPendingStore, syncPendingRewards } from "./pending-reward";
 import type { OwnedCardRecord } from "./rewards";
 import type { DeckEntry, StarterFaction } from "./starter";
 import {
@@ -333,6 +334,10 @@ export async function mountDeckBuilder(
     );
     return;
   }
+
+  // Retry any rewards that failed to save before loading owned cards, so synced
+  // rewards appear in the available pool right away (no-op when nothing pending).
+  await syncPendingRewards(auth, session, getPendingStore());
 
   const owned = await auth.getOwnedCards(session, 200).catch(() => []);
   const saved = await auth.getActiveDeck(session, faction).catch(() => null);

@@ -60,7 +60,8 @@ describe("mountStarterDecks", () => {
     )!;
     sonicCta.click();
 
-    expect(onChoose).toHaveBeenCalledWith("Sonic");
+    // First-time pick: committed immediately, no progression reset.
+    expect(onChoose).toHaveBeenCalledWith("Sonic", { resetProgression: false });
 
     const panel = root.querySelector<HTMLElement>("#starter-panel")!;
     expect(panel.hidden).toBe(false);

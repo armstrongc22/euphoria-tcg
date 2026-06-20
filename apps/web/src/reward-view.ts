@@ -15,6 +15,27 @@ function escapeHtml(text: string): string {
 }
 
 /**
+ * The outcome of persisting a chosen reward, returned by `onChoose`:
+ *   - `ok: true`            — saved to the source of truth; show "claimed".
+ *   - `pending: true`       — the Supabase save failed but the choice was parked
+ *                             as a pending claim to retry; the modal keeps the
+ *                             card chosen (so a DIFFERENT reward can't be claimed
+ *                             for this milestone) and shows a "pending sync" note.
+ *   - neither (`ok: false`) — a hard failure (couldn't even queue it); the modal
+ *                             re-enables so the player can pick again.
+ */
+export interface RewardClaimResult {
+  readonly ok: boolean;
+  /** True when parked as a pending claim after a Supabase failure. */
+  readonly pending?: boolean;
+  /** A short message shown to the player (success / pending / error). */
+  readonly message?: string;
+}
+
+/** What `onChoose` may return: nothing (legacy/success) or a claim result. */
+type ChooseReturn = void | RewardClaimResult | Promise<void | RewardClaimResult>;
+
+/**
  * Builds the reward-choice panel shown after a match. `base` is the asset base
  * path (import.meta.env.BASE_URL) used for card art. `onChoose` fires once with
  * the picked card; further clicks are ignored (the panel disables itself).
@@ -22,7 +43,7 @@ function escapeHtml(text: string): string {
 export function renderRewardChoice(
   options: readonly Card[],
   base: string,
-  onChoose: (card: Card) => void,
+  onChoose: (card: Card) => ChooseReturn,
   /**
    * Optional: when provided, each option gets a "Details" button that calls back
    * to open the shared card-detail modal. Omitted in pure tests that don't
@@ -64,7 +85,35 @@ export function renderRewardChoice(
       panel.classList.add("reward-choice--claimed");
       for (const b of grid.querySelectorAll("button")) b.disabled = true;
       button.classList.add("reward-choice__option--chosen");
-      onChoose(card);
+      body.textContent = `Claiming ${card.name}…`;
+      // Await the save so the modal only confirms "claimed" once it persisted.
+      void Promise.resolve(onChoose(card)).then((result) => {
+        if (result && result.pending === true) {
+          // Parked as a pending claim: keep THIS card chosen (so a different
+          // reward can't be claimed for the same milestone) and show the note.
+          panel.classList.add("reward-choice--pending");
+          body.className = "account__panel-body reward-choice__pending";
+          body.setAttribute("role", "status");
+          body.textContent =
+            result.message ??
+            "Reward pending sync — we'll retry when your account reconnects.";
+        } else if (result && result.ok === false) {
+          // Hard failure (couldn't even queue): re-enable so the player retries.
+          claimed = false;
+          panel.classList.remove("reward-choice--claimed");
+          panel.classList.add("reward-choice--failed");
+          button.classList.remove("reward-choice__option--chosen");
+          for (const b of grid.querySelectorAll("button")) b.disabled = false;
+          body.className = "account__panel-body reward-choice__error";
+          body.setAttribute("role", "alert");
+          body.textContent =
+            result.message ??
+            "Couldn't save your reward. Please check your connection and pick again.";
+        } else {
+          body.className = "account__panel-body reward-choice__claimed-msg";
+          body.textContent = result?.message ?? `${card.name} added to your collection!`;
+        }
+      });
     });
 
     if (onInspect === undefined) {
@@ -103,7 +152,7 @@ export function renderRewardChoice(
 export function renderRewardModal(
   options: readonly Card[],
   base: string,
-  onChoose: (card: Card) => void,
+  onChoose: (card: Card) => ChooseReturn,
   onInspect?: (card: Card) => void,
 ): HTMLElement {
   const overlay = document.createElement("div");

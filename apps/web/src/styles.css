@@ -1139,6 +1139,104 @@ body {
   overflow-y: auto;
 }
 
+/* Reward claim status messages (save succeeded / failed). */
+.reward-choice__error {
+  color: var(--dwarf);
+  font-weight: 700;
+}
+.reward-choice__claimed-msg {
+  color: var(--surfer);
+  font-weight: 700;
+}
+.reward-choice--failed {
+  outline: 1px solid var(--dwarf);
+  border-radius: 12px;
+}
+.reward-choice__pending {
+  color: var(--sonic);
+  font-weight: 700;
+}
+.reward-choice--pending {
+  outline: 1px solid var(--sonic);
+  border-radius: 12px;
+}
+
+/* "Reward pending sync" banner on the account page. */
+.account__pending-reward {
+  border: 1px solid var(--sonic);
+  border-left: 4px solid var(--sonic);
+  background: linear-gradient(180deg, rgba(74, 163, 224, 0.12), rgba(0, 0, 0, 0.15));
+}
+.account__pending-reward-error {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+.account__pending-reward-retry {
+  width: auto;
+  margin-top: 0.7rem;
+}
+
+/* Starter-switch confirmation dialog (destructive reset). */
+.starter-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.starter-confirm__dialog {
+  width: min(460px, 100%);
+  padding: 1.5rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--dwarf);
+  border-radius: 14px;
+}
+
+.starter-confirm__title {
+  margin: 0 0 0.6rem;
+  font-size: 1.25rem;
+}
+
+.starter-confirm__body {
+  margin: 0 0 1.1rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.starter-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+
+.starter-confirm__cancel,
+.starter-confirm__confirm {
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.starter-confirm__cancel {
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+}
+
+.starter-confirm__confirm {
+  border: none;
+  background: var(--dwarf);
+  color: #1a1206;
+}
+
 /* --- Deck builder --------------------------------------------------------- */
 
 .deck-builder {

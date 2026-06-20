@@ -193,8 +193,32 @@ export function renderDeckPanel(
 export interface StarterDecksOptions {
   /** If set, open straight to this deck (e.g. a returning player's pick). */
   readonly initialFaction?: StarterFaction | null;
-  /** Called when the visitor chooses a deck, so the choice can be persisted. */
-  readonly onChoose?: (faction: StarterFaction) => void;
+  /**
+   * The signed-in player's CURRENT faction, when they already have one. Choosing
+   * a DIFFERENT faction is a destructive switch (it resets progression), so the
+   * page shows a confirmation first and reports `resetProgression: true` to the
+   * caller only after the player confirms. Null/undefined = no existing pick, so
+   * any choice is a first-time selection with no reset.
+   */
+  readonly currentFaction?: StarterFaction | null;
+  /**
+   * Called when the visitor commits a deck, so the choice can be persisted.
+   * `resetProgression` is true only for a confirmed switch away from an existing
+   * different faction — the caller must then wipe progression before/with saving.
+   */
+  readonly onChoose?: (
+    faction: StarterFaction,
+    options: { resetProgression: boolean },
+  ) => void;
+}
+
+/** Human-readable confirmation copy for a destructive starter switch. */
+function switchConfirmBody(oldFaction: StarterFaction, newFaction: StarterFaction): string {
+  return (
+    `Changing from ${oldFaction} to ${newFaction} will reset your beta ` +
+    "progression. You will lose earned reward cards, reward progress, saved " +
+    "custom decks, and match history for this account. This cannot be undone."
+  );
 }
 
 /**
@@ -210,7 +234,7 @@ export function mountStarterDecks(
   pool: readonly Card[],
   options: StarterDecksOptions = {},
 ): void {
-  const { initialFaction = null, onChoose } = options;
+  const { initialFaction = null, currentFaction = null, onChoose } = options;
 
   container.innerHTML = `
     <section class="starter-intro">
@@ -250,9 +274,66 @@ export function mountStarterDecks(
     panelEl.replaceChildren(back, renderDeckPanel(faction, pool));
   }
 
-  function choose(faction: StarterFaction): void {
-    onChoose?.(faction);
+  // A non-dismissable confirm dialog for a destructive starter switch (Part B).
+  function renderSwitchConfirm(
+    oldFaction: StarterFaction,
+    newFaction: StarterFaction,
+    onConfirm: () => void,
+    onCancel: () => void,
+  ): HTMLElement {
+    const overlay = document.createElement("div");
+    overlay.className = "starter-confirm";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    const dialog = document.createElement("div");
+    dialog.className = "starter-confirm__dialog";
+    const h = document.createElement("h3");
+    h.className = "starter-confirm__title";
+    h.textContent = "Switch starter deck?";
+    const p = document.createElement("p");
+    p.className = "starter-confirm__body";
+    p.textContent = switchConfirmBody(oldFaction, newFaction);
+    const actions = document.createElement("div");
+    actions.className = "starter-confirm__actions";
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "starter-confirm__cancel";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", onCancel);
+    const confirm = document.createElement("button");
+    confirm.type = "button";
+    confirm.className = "starter-confirm__confirm";
+    confirm.textContent = "Yes, switch and reset";
+    confirm.addEventListener("click", onConfirm);
+    actions.append(cancel, confirm);
+    dialog.append(h, p, actions);
+    overlay.append(dialog);
+    return overlay;
+  }
+
+  function commit(faction: StarterFaction, resetProgression: boolean): void {
+    onChoose?.(faction, { resetProgression });
     showDeck(faction);
+  }
+
+  function choose(faction: StarterFaction): void {
+    // A real switch away from an existing, different faction is destructive:
+    // confirm first, and only then report resetProgression: true. First-time
+    // picks and re-selecting the same faction commit immediately (no reset).
+    if (currentFaction !== null && currentFaction !== faction) {
+      const overlay = renderSwitchConfirm(
+        currentFaction,
+        faction,
+        () => {
+          overlay.remove();
+          commit(faction, true);
+        },
+        () => overlay.remove(),
+      );
+      container.append(overlay);
+      return;
+    }
+    commit(faction, false);
   }
 
   if (initialFaction !== null) {

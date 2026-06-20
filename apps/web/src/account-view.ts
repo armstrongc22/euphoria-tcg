@@ -41,7 +41,14 @@ import {
   type StarterFaction,
 } from "./starter";
 import { chooseActiveDeck, type ChosenActiveDeck } from "./deck-builder";
-import { renderRewardModal } from "./reward-view";
+import { renderRewardModal, type RewardClaimResult } from "./reward-view";
+import {
+  appendPendingClaim,
+  getPendingStore,
+  loadPendingClaims,
+  syncPendingRewards,
+  type PendingRewardClaim,
+} from "./pending-reward";
 import { createRng } from "@euphoria/game-engine";
 import {
   buildOwnedCardInsert,
@@ -378,6 +385,11 @@ export async function mountAccount(
   // action history) to localStorage after each move, so a mobile tab reload
   // mid-match can offer "Resume". Best-effort — null when storage is unavailable.
   const recoveryStore = getRecoveryStore();
+
+  // Pending reward-claim queue (Supabase accounts only): when a reward save fails
+  // we park it here and retry on each account mount, rather than losing it or
+  // pretending it saved. Supabase stays the single owned-cards source of truth.
+  const pendingStore = getPendingStore();
   // The active match + deck, tracked so the debug panel can force-save on demand.
   let activeMatch: PlayableMatch | null = null;
   let activeChosen: ChosenActiveDeck | null = null;
@@ -497,24 +509,57 @@ export async function mountAccount(
   ): void => {
     const options = generateRewardOptions(faction, pool, createRng(seed));
     const detail = createCardDetail(assetBase);
-    const overlay = renderRewardModal(
-      options,
-      assetBase,
-      (card) => {
-        overlay.remove();
-        void auth
-          .saveReward(
-            session,
-            buildOwnedCardInsert(session.userId, card),
-            buildRewardEventInsert(session.userId, faction, options, card, milestone),
-          )
-          .catch(() => {
-            /* persistence is best-effort; never block returning to account */
-          })
-          .finally(() => void showAccount());
-      },
-      (card) => detail.open(card),
-    );
+    let overlay: HTMLElement;
+    // Persist the chosen reward and report the outcome to the modal. We AWAIT the
+    // save and only confirm the claim once it actually persisted. On a Supabase
+    // failure (RLS/network) we DON'T lose it and DON'T pretend success: for a
+    // signed-in remote account the choice is parked as a pending claim (retried
+    // on later mounts) so the milestone's reward isn't re-claimable elsewhere and
+    // Supabase stays the single owned-cards source of truth.
+    const claim = async (card: Card): Promise<RewardClaimResult> => {
+      const owned = buildOwnedCardInsert(session.userId, card);
+      const event = buildRewardEventInsert(session.userId, faction, options, card, milestone);
+      try {
+        await auth.saveReward(session, owned, event);
+      } catch (error) {
+        if (auth.isRemote && pendingStore !== null) {
+          const queued = appendPendingClaim(pendingStore, {
+            userId: session.userId,
+            owned,
+            event,
+            milestone: milestone.milestone,
+            cardName: card.name,
+            lastError: error instanceof Error ? error.message : String(error),
+          });
+          // "added" (new) or "duplicate" (already queued for this milestone) both
+          // mean the reward IS pending — close to the account, where the pending
+          // banner shows. The card is NOT owned until a retry succeeds.
+          if (queued.status !== "error") {
+            overlay.remove();
+            void showAccount();
+            return {
+              ok: false,
+              pending: true,
+              message:
+                "Reward pending sync — we'll retry when your account reconnects.",
+            };
+          }
+        }
+        // Couldn't even queue (no storage, or demo mode with no store): let the
+        // player pick again rather than silently dropping the reward.
+        return {
+          ok: false,
+          message:
+            "Couldn't save your reward — check your connection and pick again.",
+        };
+      }
+      // Saved: close the modal and return to the account, which reloads owned
+      // cards from the same source the Deck Builder uses (so the new card shows).
+      overlay.remove();
+      void showAccount();
+      return { ok: true, message: `${card.name} added to your collection!` };
+    };
+    overlay = renderRewardModal(options, assetBase, claim, (card) => detail.open(card));
     container.append(overlay, detail.element);
   };
 
@@ -709,6 +754,54 @@ export async function mountAccount(
     return banner;
   };
 
+  // A "N rewards pending sync" banner shown when one or more rewards couldn't save
+  // to Supabase and are queued for retry. Offers a manual "Retry now"; claims are
+  // never silently discarded — they stay here (with the latest error) until each
+  // one syncs.
+  const renderPendingRewardBanner = (
+    claims: readonly PendingRewardClaim[],
+  ): HTMLElement => {
+    const count = claims.length;
+    const banner = document.createElement("section");
+    banner.className = "account__panel account__pending-reward";
+    banner.setAttribute("role", "status");
+    const heading = document.createElement("h3");
+    heading.className = "account__panel-heading";
+    heading.textContent =
+      count === 1 ? "1 reward pending sync" : `${count} rewards pending sync`;
+    banner.append(heading);
+    const body = document.createElement("p");
+    body.className = "account__panel-body";
+    const names = claims.map((c) => c.cardName).join(", ");
+    body.textContent =
+      `${names} ${count === 1 ? "isn't" : "aren't"} saved to your account yet — ` +
+      "we'll retry when your account reconnects. " +
+      `${count === 1 ? "It won't" : "They won't"} be added to your collection until ` +
+      `${count === 1 ? "it syncs" : "they sync"}.`;
+    banner.append(body);
+    // Show the most recent error (claims share a cause when the backend is down).
+    const lastErr = claims.map((c) => c.lastError).find((e) => e.length > 0);
+    if (lastErr !== undefined) {
+      const err = document.createElement("p");
+      err.className = "account__pending-reward-error";
+      err.textContent = `Last error: ${lastErr}.`;
+      banner.append(err);
+    }
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "account__play account__pending-reward-retry";
+    retry.textContent = "Retry now";
+    retry.addEventListener("click", () => {
+      retry.disabled = true;
+      retry.textContent = "Retrying…";
+      void syncPendingRewards(auth, session, pendingStore).finally(() =>
+        void showAccount(),
+      );
+    });
+    banner.append(retry);
+    return banner;
+  };
+
   // Debug panel (Feature A): mounted only when euphoriaDebug=1. It can force-save
   // the active match and simulate a reload check against the saved snapshot.
   const mountDebugPanel = (host: HTMLElement): void => {
@@ -733,6 +826,9 @@ export async function mountAccount(
 
   const showAccount = async (): Promise<void> => {
     currentView = "account";
+    // Retry any rewards that failed to save before loading the inventory, so a
+    // just-synced card shows up immediately. Cheap no-op when nothing is pending.
+    await syncPendingRewards(auth, session, pendingStore);
     const [records, owned, stats] = await Promise.all([
       loadHistory(),
       loadOwned(),
@@ -769,6 +865,11 @@ export async function mountAccount(
       invalidResumeMessage = null;
       nodes.push(warn);
     }
+    // Any rewards still pending sync (after the retry above) stay visible until
+    // each one syncs — never silently discarded.
+    const pending =
+      pendingStore !== null ? loadPendingClaims(pendingStore, session.userId) : [];
+    if (pending.length > 0) nodes.push(renderPendingRewardBanner(pending));
     // Surface a resume prompt if a live match was interrupted (scoped to user).
     const saved =
       recoveryStore !== null ? loadActiveMatch(recoveryStore, session.userId) : null;

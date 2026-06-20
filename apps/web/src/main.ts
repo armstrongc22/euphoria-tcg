@@ -26,6 +26,12 @@ import { mountRules } from "./rules-view";
 import { mountLore } from "./lore-view";
 import { installDiagnostics, setBuildStamp } from "./debug-log";
 import { FLAG_DEBUG, flag, setFlag } from "./debug-flags";
+import { clearActiveMatch, getRecoveryStore } from "./match-recovery";
+import {
+  clearPendingClaims,
+  getPendingStore,
+  syncPendingRewards,
+} from "./pending-reward";
 import type { StarterFaction } from "./starter";
 
 // Build stamp (set by vite.config define): the deployed commit/timestamp, shown
@@ -164,6 +170,10 @@ let session: AuthSession | null = null;
 // then it is cleared so ordinary account visits show the card.
 let pendingPlay: StarterFaction | null = null;
 
+// The signed-in player's current starter faction (null when none). Used to
+// detect a destructive starter switch and to seed the starter page's open state.
+let currentFaction: StarterFaction | null = null;
+
 async function refreshAccount(): Promise<void> {
   const autoPlay = pendingPlay;
   pendingPlay = null;
@@ -208,13 +218,34 @@ async function renderSignup(): Promise<void> {
 }
 
 function mountStarter(initialFaction: StarterFaction | null): void {
+  currentFaction = initialFaction;
   mountStarterDecks(starterEl, cards, {
     initialFaction,
-    onChoose: (faction) => {
-      // Persist the choice on the profile, then send the player to their account.
-      void Promise.resolve(session ?? auth.getSession())
-        .then((s) => (s !== null ? auth.saveFaction(s, faction) : undefined))
-        .finally(() => showView("account"));
+    // The current pick drives switch-confirmation: choosing a different faction
+    // is destructive and the starter page confirms before reporting reset:true.
+    currentFaction: initialFaction,
+    onChoose: (faction, { resetProgression }) => {
+      void (async () => {
+        const s = session ?? (await auth.getSession().catch(() => null));
+        if (s !== null) {
+          // Confirmed switch: wipe progression (Supabase rows or local mirrors)
+          // and the in-progress resume snapshot BEFORE changing the faction, so
+          // the account/deck builder reload a clean, new-starter baseline.
+          if (resetProgression) {
+            await auth.resetProgression(s).catch(() => {
+              /* best-effort: surfaced by the account reloading its (now empty) data */
+            });
+            const recovery = getRecoveryStore();
+            if (recovery !== null) clearActiveMatch(recovery);
+            // Queued rewards for the old faction are progression too — drop them.
+            const pending = getPendingStore();
+            if (pending !== null) clearPendingClaims(pending, s.userId);
+          }
+          await auth.saveFaction(s, faction).catch(() => {});
+          currentFaction = faction;
+        }
+        showView("account");
+      })();
     },
   });
 }
@@ -229,6 +260,10 @@ mountLore(loreEl);
 void (async () => {
   session = await auth.getSession().catch(() => null);
   const profile = session ? await auth.getProfile(session).catch(() => null) : null;
+  // Retry rewards that failed to save in a previous session (best-effort).
+  if (session !== null) {
+    await syncPendingRewards(auth, session, getPendingStore()).catch(() => null);
+  }
   await renderSignup();
   mountStarter(profile?.selected_faction ?? null);
   // Signup / Start is the default landing view.
