@@ -174,6 +174,17 @@ the static site still works with no backend.
   create index if not exists owned_cards_user_created_idx
     on public.owned_cards (user_id, created_at desc);
 
+  -- Already have the table from an earlier setup but rewards "don't stick"?
+  -- Ensure the SELECT policy above exists. With RLS enabled but no SELECT policy,
+  -- the INSERT succeeds yet reads return ZERO rows (Postgres denies SELECT
+  -- silently, not with an error), so a claimed reward never appears in the
+  -- collection or Deck Builder. Run just this if it's missing:
+  --   create policy "owned_cards_select_own"
+  --     on public.owned_cards for select using (auth.uid() = user_id);
+  -- The app now read-back-verifies each reward save and surfaces a retryable
+  -- "pending sync" banner when the row isn't readable, so this misconfig is
+  -- visible instead of silent.
+
   -- reward_events: which options were offered and which was chosen --------
   create table if not exists public.reward_events (
     id uuid primary key default gen_random_uuid(),
