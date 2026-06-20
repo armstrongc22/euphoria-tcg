@@ -5,13 +5,24 @@
  * N/30 count badge, the validation banner, Add/Remove controls adjusting used
  * quantity and the count, Reset, and the Save callback (fired only when valid).
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cards } from "../src/cards";
-import { renderDeckBuilder } from "../src/deck-builder-view";
+import { mountDeckBuilder, renderDeckBuilder } from "../src/deck-builder-view";
 import { starterActiveDeck, deckSize } from "../src/deck-builder";
+import { createLocalAuth } from "../src/auth";
+import type { KeyValueStore } from "../src/signup";
 import type { DeckEntry } from "../src/starter";
 
 const BASE = "/";
+
+function memoryStore(): KeyValueStore {
+  const map = new Map<string, string>();
+  return {
+    getItem: (k) => map.get(k) ?? null,
+    setItem: (k, v) => void map.set(k, v),
+    removeItem: (k) => void map.delete(k),
+  };
+}
 
 function build(
   initialDeck: readonly DeckEntry[],
@@ -120,5 +131,38 @@ describe("renderDeckBuilder", () => {
     expect(el.querySelector(".deck-builder__inspect")).toBeNull();
     // Card art and name still render directly in the row.
     expect(el.querySelector(".deck-builder__art")).not.toBeNull();
+  });
+});
+
+describe("mountDeckBuilder — onboarding helper (Feature F)", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  async function mounted(): Promise<HTMLElement> {
+    const auth = createLocalAuth(memoryStore());
+    await auth.signUp("p@example.com", "pw");
+    await auth.saveFaction({ userId: "local-demo", email: "p@example.com" }, "Sonic");
+    const container = document.createElement("div");
+    await mountDeckBuilder(container, { auth, pool: cards });
+    return container;
+  }
+
+  it("renders the helper with the 30-card / ownership / save guidance", async () => {
+    const container = await mounted();
+    const helper = container.querySelector(".deck-builder__helper");
+    expect(helper).not.toBeNull();
+    const text = helper!.textContent ?? "";
+    expect(text).toContain("starter deck plus reward cards");
+    expect(text).toContain("30 cards");
+    expect(text).toContain("more copies than you own");
+    // No owned rewards yet → unlock prompt is shown.
+    expect(helper!.querySelector(".deck-builder__helper-none")).not.toBeNull();
+  });
+
+  it("can be dismissed and stays hidden on re-mount", async () => {
+    const container = await mounted();
+    container.querySelector<HTMLButtonElement>(".deck-builder__helper-dismiss")!.click();
+    // The dismiss re-mounts the builder (async); let its load chain settle.
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    expect(container.querySelector(".deck-builder__helper")).toBeNull();
   });
 });

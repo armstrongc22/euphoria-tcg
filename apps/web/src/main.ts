@@ -179,6 +179,8 @@ async function refreshAccount(): Promise<void> {
     pool: cards,
     base: import.meta.env.BASE_URL,
     autoPlay: autoPlay ?? undefined,
+    // Onboarding next-step CTA can send the player to another tab.
+    onNavigate: (tab) => showView(tab),
     onSignOut: () => {
       session = null;
       void renderSignup();
@@ -221,6 +223,13 @@ function mountStarter(initialFaction: StarterFaction | null): void {
     // The current pick drives switch-confirmation: choosing a different faction
     // is destructive and the starter page confirms before reporting reset:true.
     currentFaction: initialFaction,
+    // Onboarding: welcome panel's "View rules" and the post-selection "Play
+    // live match" prompt (launch via the account autoPlay path).
+    onViewRules: () => showView("rules"),
+    onPlayMatch: (faction) => {
+      pendingPlay = faction;
+      showView("account");
+    },
     onChoose: (faction, { resetProgression }) => {
       void (async () => {
         const s = session ?? (await auth.getSession().catch(() => null));

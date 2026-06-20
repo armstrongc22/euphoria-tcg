@@ -15,6 +15,11 @@ import type { Auth } from "./auth";
 import { cardImageUrl } from "./cards";
 import { createCardDetail } from "./detail";
 import { getPendingStore, syncPendingRewards } from "./pending-reward";
+import {
+  dismissTutorial,
+  getTutorialStore,
+  isTutorialDismissed,
+} from "./tutorial";
 import type { OwnedCardRecord } from "./rewards";
 import type { DeckEntry, StarterFaction } from "./starter";
 import {
@@ -307,6 +312,39 @@ function notice(message: string): HTMLElement {
   return section;
 }
 
+/** Onboarding helper panel for the Deck Builder (Feature F). Dismissible. */
+function renderDeckBuilderHelper(
+  hasOwnedRewards: boolean,
+  onDismiss: () => void,
+): HTMLElement {
+  const panel = document.createElement("section");
+  panel.className = "deck-builder__helper";
+  panel.setAttribute("role", "note");
+  panel.innerHTML =
+    `<p class="deck-builder__helper-lead">Your available cards come from your ` +
+    `starter deck plus reward cards you have earned.</p>` +
+    `<ul class="deck-builder__helper-list">` +
+    `<li>Your deck must be 30 cards.</li>` +
+    `<li>You cannot use more copies than you own.</li>` +
+    `<li>Some cards are faction-restricted.</li>` +
+    `<li>Save your custom deck to use it in live matches.</li>` +
+    `</ul>`;
+  if (!hasOwnedRewards) {
+    const none = document.createElement("p");
+    none.className = "deck-builder__helper-none";
+    none.textContent =
+      "Win reward milestones to unlock more cards for deck building.";
+    panel.append(none);
+  }
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "deck-builder__helper-dismiss";
+  dismiss.textContent = "Don't show again";
+  dismiss.addEventListener("click", onDismiss);
+  panel.append(dismiss);
+  return panel;
+}
+
 /**
  * Loads the session, faction, owned cards, and saved deck, then mounts the deck
  * builder into `container`. Safe to call repeatedly (e.g. when the tab is shown
@@ -365,7 +403,18 @@ export async function mountDeckBuilder(
     onInspect: (card) => detail.open(card),
   });
 
-  const children: Node[] = [view];
+  const children: Node[] = [];
+  // Deck Builder onboarding helper (Feature F), dismissible via the tutorial flag.
+  const tutorialStore = getTutorialStore();
+  if (!isTutorialDismissed(tutorialStore, "deckBuilder")) {
+    children.push(
+      renderDeckBuilderHelper(owned.length > 0, () => {
+        dismissTutorial(tutorialStore, "deckBuilder");
+        void mountDeckBuilder(container, options);
+      }),
+    );
+  }
+  children.push(view);
   if (onPlayMatch !== undefined) {
     const bar = document.createElement("div");
     bar.className = "deck-builder__playbar";

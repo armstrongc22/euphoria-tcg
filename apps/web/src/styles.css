@@ -2627,3 +2627,178 @@ body {
   padding-left: 0.6rem;
   color: var(--dwarf);
 }
+
+/* ============================================================================
+ * Onboarding / tutorial layer (tutorial.ts + per-view hints). Lightweight,
+ * dismissible, mobile-friendly. No gameplay impact.
+ * ========================================================================== */
+
+/* Account "Next step" card (Feature C). */
+.account__nextstep {
+  border: 1px solid var(--sonic);
+  border-left: 4px solid var(--sonic);
+  background: linear-gradient(180deg, rgba(74, 163, 224, 0.12), rgba(0, 0, 0, 0.12));
+}
+.account__nextstep-cta {
+  width: auto;
+  margin-top: 0.6rem;
+}
+.account__reset-tutorial {
+  display: block;
+  margin: 0.9rem auto 0;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.account__reset-tutorial:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+/* Starter welcome panel (Feature A) + helper + next-step (Feature B). */
+.starter-welcome {
+  margin: 0 clamp(1rem, 4vw, 3rem) 0.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--surfer);
+  border-radius: 12px;
+}
+.starter-welcome__title {
+  margin: 0 0 0.4rem;
+  font-size: 1.2rem;
+}
+.starter-welcome__lead {
+  margin: 0 0 0.6rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.starter-welcome__steps {
+  margin: 0 0 0.8rem;
+  padding-left: 1.3rem;
+  line-height: 1.6;
+}
+.starter-welcome__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.starter-welcome__choose {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--surfer);
+  color: #06231d;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.starter-welcome__rules,
+.starter-welcome__skip {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.starter-welcome__skip {
+  color: var(--text-dim);
+}
+
+.starter-helper {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0.6rem 0.85rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.starter-nextstep {
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--surfer);
+  border-radius: 10px;
+  background: rgba(54, 198, 168, 0.1);
+}
+.starter-nextstep__body {
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+}
+.starter-nextstep__play {
+  width: auto;
+}
+
+/* Deck Builder helper (Feature F). */
+.deck-builder__helper {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--sonic);
+  border-radius: 10px;
+  background: rgba(74, 163, 224, 0.08);
+}
+.deck-builder__helper-lead {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+.deck-builder__helper-list {
+  margin: 0;
+  padding-left: 1.3rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.deck-builder__helper-none {
+  margin: 0.5rem 0 0;
+  color: var(--dwarf);
+  font-style: italic;
+}
+.deck-builder__helper-dismiss {
+  margin-top: 0.6rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+/* Live match contextual hint (Feature D). */
+.play-match__tutorial-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background: rgba(74, 163, 224, 0.12);
+  border: 1px solid rgba(74, 163, 224, 0.35);
+  font-size: 0.9rem;
+}
+.play-match__tutorial-hint-text {
+  flex: 1 1 12rem;
+}
+.play-match__tutorial-hint-got,
+.play-match__tutorial-hint-never {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.play-match__tutorial-hint-never {
+  color: var(--text-dim);
+}

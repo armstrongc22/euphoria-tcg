@@ -61,8 +61,10 @@ export function renderRewardChoice(
 
   const body = document.createElement("p");
   body.className = "account__panel-body";
+  // Feature E onboarding helper: explains what claiming does.
   body.textContent =
-    "Pick one card to add to your collection. This choice is final.";
+    "Choose one card. It will be added to your collection and can be used in " +
+    "Deck Builder. This choice is final.";
   panel.append(body);
 
   const grid = document.createElement("div");

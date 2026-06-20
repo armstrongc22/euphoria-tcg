@@ -16,6 +16,11 @@ import {
   type StarterFaction,
   type StarterRecipe,
 } from "./starter";
+import {
+  dismissTutorial,
+  getTutorialStore,
+  isTutorialDismissed,
+} from "./tutorial";
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -210,6 +215,10 @@ export interface StarterDecksOptions {
     faction: StarterFaction,
     options: { resetProgression: boolean },
   ) => void;
+  /** Onboarding: open the Rules tab from the welcome panel (Feature A). */
+  readonly onViewRules?: () => void;
+  /** Onboarding: start a live match from the post-selection prompt (Feature B). */
+  readonly onPlayMatch?: (faction: StarterFaction) => void;
 }
 
 /** Human-readable confirmation copy for a destructive starter switch. */
@@ -234,7 +243,14 @@ export function mountStarterDecks(
   pool: readonly Card[],
   options: StarterDecksOptions = {},
 ): void {
-  const { initialFaction = null, currentFaction = null, onChoose } = options;
+  const {
+    initialFaction = null,
+    currentFaction = null,
+    onChoose,
+    onViewRules,
+    onPlayMatch,
+  } = options;
+  const tutorialStore = getTutorialStore();
 
   container.innerHTML = `
     <section class="starter-intro">
@@ -242,27 +258,94 @@ export function mountStarterDecks(
       <p class="starter-intro__lead">Choose your starter deck. Play games. Earn reward cards. Upgrade your faction over time.</p>
       <p class="starter-intro__note">Beta signup is local preview for now. Real email capture will be connected before launch.</p>
     </section>
+    <div id="starter-welcome"></div>
     <div id="starter-choices" class="starter-choices" role="group" aria-label="Starter faction decks"></div>
     <div id="starter-panel" class="starter-panel" aria-live="polite" hidden></div>
   `;
 
+  const welcomeEl = container.querySelector<HTMLElement>("#starter-welcome")!;
   const choicesEl = container.querySelector<HTMLElement>("#starter-choices")!;
   const panelEl = container.querySelector<HTMLElement>("#starter-panel")!;
+
+  // First-time welcome / onboarding panel (Feature A): only for a brand-new
+  // player (no faction yet) who hasn't skipped it.
+  function renderWelcome(): HTMLElement {
+    const panel = document.createElement("section");
+    panel.className = "starter-welcome";
+    panel.innerHTML =
+      `<h3 class="starter-welcome__title">Welcome to Euphoria TCG</h3>` +
+      `<p class="starter-welcome__lead">Choose a starter faction, play matches, ` +
+      `earn reward cards, and use those cards to customize your deck.</p>` +
+      `<ol class="starter-welcome__steps">` +
+      `<li>Choose a starter faction.</li>` +
+      `<li>Play a live match.</li>` +
+      `<li>Win matches to earn reward cards.</li>` +
+      `<li>Build a custom deck.</li>` +
+      `<li>Keep improving your collection.</li>` +
+      `</ol>`;
+    const actions = document.createElement("div");
+    actions.className = "starter-welcome__actions";
+    const choose = document.createElement("button");
+    choose.type = "button";
+    choose.className = "starter-welcome__choose";
+    choose.textContent = "Choose starter deck";
+    choose.addEventListener("click", () => {
+      dismissTutorial(tutorialStore, "welcome");
+      showChoices();
+    });
+    actions.append(choose);
+    if (onViewRules !== undefined) {
+      const rules = document.createElement("button");
+      rules.type = "button";
+      rules.className = "starter-welcome__rules";
+      rules.textContent = "View rules";
+      rules.addEventListener("click", () => onViewRules());
+      actions.append(rules);
+    }
+    const skip = document.createElement("button");
+    skip.type = "button";
+    skip.className = "starter-welcome__skip";
+    skip.textContent = "Skip tutorial";
+    skip.addEventListener("click", () => {
+      dismissTutorial(tutorialStore, "welcome");
+      showChoices();
+    });
+    actions.append(skip);
+    panel.append(actions);
+    return panel;
+  }
+
+  // Helper text under the choices (Feature B).
+  function renderChoicesHelper(): HTMLElement {
+    const p = document.createElement("p");
+    p.className = "starter-helper";
+    p.textContent =
+      "Your starter faction determines your first 30-card deck. You can switch " +
+      "later, but switching factions resets beta progression.";
+    return p;
+  }
 
   function showChoices(): void {
     panelEl.hidden = true;
     panelEl.replaceChildren();
+    // Welcome panel only for a brand-new player who hasn't dismissed it.
+    welcomeEl.replaceChildren();
+    if (currentFaction === null && !isTutorialDismissed(tutorialStore, "welcome")) {
+      welcomeEl.append(renderWelcome());
+    }
     choicesEl.hidden = false;
     choicesEl.replaceChildren(
+      renderChoicesHelper(),
       ...STARTER_FACTIONS.map((faction) =>
         renderFactionChoice(getRecipe(faction), pool, choose),
       ),
     );
   }
 
-  function showDeck(faction: StarterFaction): void {
+  function showDeck(faction: StarterFaction, justSelected = false): void {
     choicesEl.hidden = true;
     choicesEl.replaceChildren();
+    welcomeEl.replaceChildren();
 
     const back = document.createElement("button");
     back.type = "button";
@@ -270,8 +353,29 @@ export function mountStarterDecks(
     back.textContent = "← Choose a different deck";
     back.addEventListener("click", showChoices);
 
+    const children: Node[] = [back];
+    // Post-selection next-step prompt (Feature B), only on a fresh pick.
+    if (justSelected) {
+      const prompt = document.createElement("section");
+      prompt.className = "starter-nextstep";
+      const msg = document.createElement("p");
+      msg.className = "starter-nextstep__body";
+      msg.textContent = "Starter deck selected. Next: play your first live match.";
+      prompt.append(msg);
+      if (onPlayMatch !== undefined) {
+        const play = document.createElement("button");
+        play.type = "button";
+        play.className = "account__play starter-nextstep__play";
+        play.textContent = "Play live match";
+        play.addEventListener("click", () => onPlayMatch(faction));
+        prompt.append(play);
+      }
+      children.push(prompt);
+    }
+    children.push(renderDeckPanel(faction, pool));
+
     panelEl.hidden = false;
-    panelEl.replaceChildren(back, renderDeckPanel(faction, pool));
+    panelEl.replaceChildren(...children);
   }
 
   // A non-dismissable confirm dialog for a destructive starter switch (Part B).
@@ -313,7 +417,7 @@ export function mountStarterDecks(
 
   function commit(faction: StarterFaction, resetProgression: boolean): void {
     onChoose?.(faction, { resetProgression });
-    showDeck(faction);
+    showDeck(faction, /* justSelected */ true);
   }
 
   function choose(faction: StarterFaction): void {

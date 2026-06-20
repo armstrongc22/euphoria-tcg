@@ -5,7 +5,7 @@
  * every faction: one row per recipe line, with quantity, name, type, and an
  * image for each card, plus the featured spotlight and the upgrades teaser.
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cards } from "../src/cards";
 import { mountStarterDecks, renderDeckPanel } from "../src/starter-view";
 import { STARTER_FACTIONS, getRecipe } from "../src/starter";
@@ -104,5 +104,54 @@ describe("mountStarterDecks — starter switch confirmation (Part B)", () => {
     container.querySelector<HTMLButtonElement>(".starter-confirm__confirm")!.click();
     expect(container.querySelector(".starter-confirm")).toBeNull();
     expect(onChoose).toHaveBeenCalledWith("Dwarf", { resetProgression: true });
+  });
+});
+
+describe("mountStarterDecks — onboarding (Features A/B)", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it("shows the welcome panel + steps for a brand-new player (no faction)", () => {
+    const container = document.createElement("div");
+    mountStarterDecks(container, cards, { onViewRules: () => {} });
+    const welcome = container.querySelector(".starter-welcome");
+    expect(welcome).not.toBeNull();
+    expect(welcome!.textContent).toContain("Welcome to Euphoria TCG");
+    expect(welcome!.querySelectorAll(".starter-welcome__steps li")).toHaveLength(5);
+    expect(welcome!.querySelector(".starter-welcome__rules")).not.toBeNull();
+    // The switch-resets helper text is shown under the choices.
+    expect(container.querySelector(".starter-helper")?.textContent).toContain(
+      "resets beta progression",
+    );
+  });
+
+  it("does not show the welcome panel for a returning player (has faction)", () => {
+    const container = document.createElement("div");
+    mountStarterDecks(container, cards, { currentFaction: "Sonic", initialFaction: null });
+    expect(container.querySelector(".starter-welcome")).toBeNull();
+  });
+
+  it("Skip tutorial hides the welcome panel and persists the dismissal", () => {
+    const container = document.createElement("div");
+    mountStarterDecks(container, cards, {});
+    container.querySelector<HTMLButtonElement>(".starter-welcome__skip")!.click();
+    expect(container.querySelector(".starter-welcome")).toBeNull();
+    // Re-mounting keeps it hidden.
+    const again = document.createElement("div");
+    mountStarterDecks(again, cards, {});
+    expect(again.querySelector(".starter-welcome")).toBeNull();
+  });
+
+  it("selecting a first starter deck shows the play-live-match next step", () => {
+    const container = document.createElement("div");
+    const onPlayMatch = vi.fn();
+    mountStarterDecks(container, cards, { onPlayMatch });
+    container
+      .querySelector<HTMLButtonElement>('.faction-choice__cta[data-faction="Sonic"]')!
+      .click();
+    const prompt = container.querySelector(".starter-nextstep");
+    expect(prompt).not.toBeNull();
+    expect(prompt!.textContent).toContain("play your first live match");
+    container.querySelector<HTMLButtonElement>(".starter-nextstep__play")!.click();
+    expect(onPlayMatch).toHaveBeenCalledWith("Sonic");
   });
 });
