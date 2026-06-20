@@ -209,6 +209,32 @@ the static site still works with no backend.
   If Supabase is unavailable or unconfigured, owned reward cards persist to
   localStorage instead, so the demo flow still earns and shows rewards.
 
+- **Starter-switch reset (DELETE policies).** Changing starter faction resets an
+  account's beta progression, which requires the client to `delete` the user's
+  own rows in `owned_cards`, `reward_events`, and `match_history`. The original
+  policies above grant only `select`/`insert`, so **add user-scoped delete
+  policies** (run once; `active_decks` already allows delete — see below). Never
+  use the `service_role` key in client code; these RLS policies keep deletes
+  scoped to `auth.uid() = user_id`:
+
+  ```sql
+  -- Allow each user to delete only their own progression rows (reset on switch).
+  create policy "owned_cards_delete_own"
+    on public.owned_cards for delete
+    using (auth.uid() = user_id);
+
+  create policy "reward_events_delete_own"
+    on public.reward_events for delete
+    using (auth.uid() = user_id);
+
+  create policy "match_history_delete_own"
+    on public.match_history for delete
+    using (auth.uid() = user_id);
+  ```
+
+  Without these policies the reset's deletes are silently no-ops under RLS (the
+  rows remain), so the switch would change the faction but not clear progression.
+
 - **`public.active_decks`** table — a player's saved custom 30-card deck. One
   row **per user per faction** (enforced by a unique index), upserted on save:
 

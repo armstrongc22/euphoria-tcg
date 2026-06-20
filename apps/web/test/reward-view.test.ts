@@ -68,3 +68,42 @@ describe("renderRewardModal", () => {
     expect(onChoose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("renderRewardChoice — claim result handling", () => {
+  /** Flush microtasks so the awaited onChoose result is applied. */
+  async function flush(): Promise<void> {
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+  }
+
+  it("confirms the claim when onChoose resolves ok", async () => {
+    const el = renderRewardChoice(options, "/", () => Promise.resolve({ ok: true }));
+    el.querySelector<HTMLButtonElement>(".reward-choice__option")!.click();
+    await flush();
+    expect(el.classList.contains("reward-choice--claimed")).toBe(true);
+    expect(el.querySelector(".reward-choice__claimed-msg")).not.toBeNull();
+  });
+
+  it("does NOT falsely show claimed and re-enables on save failure", async () => {
+    const el = renderRewardChoice(options, "/", () =>
+      Promise.resolve({ ok: false, message: "save failed" }),
+    );
+    const first = el.querySelector<HTMLButtonElement>(".reward-choice__option")!;
+    first.click();
+    await flush();
+    // The failure is surfaced and the panel is not left in a claimed state.
+    expect(el.classList.contains("reward-choice--failed")).toBe(true);
+    expect(el.classList.contains("reward-choice--claimed")).toBe(false);
+    expect(el.querySelector(".reward-choice__error")?.textContent).toContain("save failed");
+    // Options are clickable again so the player can retry.
+    expect(first.disabled).toBe(false);
+  });
+
+  it("treats a void return as success (legacy callers)", async () => {
+    const onChoose = vi.fn();
+    const el = renderRewardChoice(options, "/", onChoose);
+    el.querySelector<HTMLButtonElement>(".reward-choice__option")!.click();
+    await flush();
+    expect(onChoose).toHaveBeenCalledTimes(1);
+    expect(el.classList.contains("reward-choice--claimed")).toBe(true);
+  });
+});

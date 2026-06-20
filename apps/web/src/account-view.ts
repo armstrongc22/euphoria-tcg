@@ -41,7 +41,7 @@ import {
   type StarterFaction,
 } from "./starter";
 import { chooseActiveDeck, type ChosenActiveDeck } from "./deck-builder";
-import { renderRewardModal } from "./reward-view";
+import { renderRewardModal, type RewardClaimResult } from "./reward-view";
 import { createRng } from "@euphoria/game-engine";
 import {
   buildOwnedCardInsert,
@@ -497,24 +497,32 @@ export async function mountAccount(
   ): void => {
     const options = generateRewardOptions(faction, pool, createRng(seed));
     const detail = createCardDetail(assetBase);
-    const overlay = renderRewardModal(
-      options,
-      assetBase,
-      (card) => {
-        overlay.remove();
-        void auth
-          .saveReward(
-            session,
-            buildOwnedCardInsert(session.userId, card),
-            buildRewardEventInsert(session.userId, faction, options, card, milestone),
-          )
-          .catch(() => {
-            /* persistence is best-effort; never block returning to account */
-          })
-          .finally(() => void showAccount());
-      },
-      (card) => detail.open(card),
-    );
+    let overlay: HTMLElement;
+    // Persist the chosen reward and report the outcome to the modal. We AWAIT the
+    // save and only confirm the claim once it actually persisted — so a Supabase
+    // RLS/network failure (which previously vanished into a swallowed catch and
+    // left the player with nothing) now shows a clear error and stays claimable.
+    const claim = async (card: Card): Promise<RewardClaimResult> => {
+      try {
+        await auth.saveReward(
+          session,
+          buildOwnedCardInsert(session.userId, card),
+          buildRewardEventInsert(session.userId, faction, options, card, milestone),
+        );
+      } catch {
+        return {
+          ok: false,
+          message:
+            "Couldn't save your reward — check your connection and pick again.",
+        };
+      }
+      // Saved: close the modal and return to the account, which reloads owned
+      // cards from the same source the Deck Builder uses (so the new card shows).
+      overlay.remove();
+      void showAccount();
+      return { ok: true, message: `${card.name} added to your collection!` };
+    };
+    overlay = renderRewardModal(options, assetBase, claim, (card) => detail.open(card));
     container.append(overlay, detail.element);
   };
 

@@ -18,6 +18,7 @@ import {
   computeAccountStats,
   EMPTY_STATS,
   loadLocalMatches,
+  MATCH_STORAGE_KEY,
   type AccountStats,
   type MatchHistoryInsert,
   type MatchRecord,
@@ -26,11 +27,14 @@ import {
   appendLocalOwned,
   appendLocalRewardEvent,
   loadLocalOwned,
+  OWNED_STORAGE_KEY,
+  REWARD_EVENTS_STORAGE_KEY,
   type OwnedCardInsert,
   type OwnedCardRecord,
   type RewardEventInsert,
 } from "./rewards";
 import {
+  ACTIVE_DECK_STORAGE_KEY,
   coerceActiveDeckRow,
   loadLocalActiveDeck,
   saveLocalActiveDeck,
@@ -130,6 +134,14 @@ export interface Auth {
     session: AuthSession,
     faction: StarterFaction,
   ): Promise<ActiveDeckRecord | null>;
+  /**
+   * Wipes ALL beta progression for the signed-in user: owned reward cards,
+   * reward events, match history, and saved custom decks. Used by the
+   * "switch starter deck" reset flow (the faction itself is changed separately
+   * via saveFaction). Does NOT touch the resume-match snapshot, which the caller
+   * clears (it lives in a separate recovery store).
+   */
+  resetProgression(session: AuthSession): Promise<void>;
 }
 
 /** Columns selected from match_history; mirrors {@link MatchRecord}. */
@@ -360,6 +372,29 @@ export function createSupabaseAuth(client: SupabaseClient): Auth {
       if (error) throw error;
       return coerceActiveDeckRow(data as Record<string, unknown> | null);
     },
+
+    async resetProgression(session) {
+      // Delete every progression row the user owns. Needs user-scoped DELETE RLS
+      // policies on owned_cards / reward_events / match_history (active_decks
+      // already allows delete) — see apps/web/README.md for the SQL. Each delete
+      // is user-scoped; a missing policy surfaces as an error here rather than
+      // silently leaving data behind.
+      const tables = [
+        "owned_cards",
+        "reward_events",
+        "match_history",
+        "active_decks",
+      ] as const;
+      for (const table of tables) {
+        const { error } = await client
+          .from(table)
+          .delete()
+          .eq("user_id", session.userId);
+        if (error) {
+          throw new Error(`Reset failed on ${table}: ${error.message}`);
+        }
+      }
+    },
   };
 }
 
@@ -458,6 +493,16 @@ export function createLocalAuth(store: KeyValueStore | null): Auth {
     async getActiveDeck(_session, faction) {
       if (store === null) return null;
       return loadLocalActiveDeck(store, faction);
+    },
+
+    async resetProgression(_session) {
+      // Clear every local progression mirror so the demo flow resets exactly as
+      // the Supabase path does (the resume snapshot is cleared by the caller).
+      if (store === null) return;
+      store.removeItem(OWNED_STORAGE_KEY);
+      store.removeItem(REWARD_EVENTS_STORAGE_KEY);
+      store.removeItem(MATCH_STORAGE_KEY);
+      store.removeItem(ACTIVE_DECK_STORAGE_KEY);
     },
   };
 }
