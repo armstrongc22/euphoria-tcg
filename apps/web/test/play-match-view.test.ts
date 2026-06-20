@@ -8,7 +8,7 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Card } from "@euphoria/card-data/schema";
 import type { GameState, WarriorInPlay } from "@euphoria/game-engine";
 import { smartAgent } from "@euphoria/simulator";
@@ -1974,5 +1974,101 @@ describe("renderPlayableMatch — mobile forced-refresh pressure (Part D)", () =
     } finally {
       window.localStorage.removeItem("euphoriaLowPower");
     }
+  });
+});
+
+describe("renderPlayableMatch — stability isolation toggles (Feature B/C/F)", () => {
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("no-art mode renders the live match without <img> card art", () => {
+    window.localStorage.setItem("euphoriaNoArt", "1");
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    // Cards still render (placeholders), but no heavy <img> art nodes.
+    expect(root.querySelectorAll(".play-match__card").length).toBeGreaterThan(0);
+    expect(root.querySelectorAll("img.play-match__art").length).toBe(0);
+    expect(root.querySelectorAll(".play-match__art--placeholder").length)
+      .toBeGreaterThan(0);
+    // Still playable.
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    expect(match.state().players.player1.field.length).toBe(1);
+  });
+
+  it("no-anim mode tags the board so CSS motion is disabled", () => {
+    window.localStorage.setItem("euphoriaNoAnim", "1");
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(root.classList.contains("play-match--no-anim")).toBe(true);
+  });
+
+  it("no-anim mode still emits anim events (state changes preserved)", () => {
+    window.localStorage.setItem("euphoriaNoAnim", "1");
+    const atkCard = cards.find((c) => c.type === "Warrior")!;
+    const defCard = cards.find((c) => c.type === "Warrior" && c.id !== atkCard.id)!;
+    const match = createPlayableMatch({
+      faction: "Sonic", pool: cards, seed: 1, opponentFaction: "Dwarf",
+    });
+    const s = match.state();
+    s.phase = "battle";
+    s.turn = 3;
+    s.activePlayer = "player1";
+    s.players.player1.hand = [];
+    const a = wip(atkCard, "a1");
+    a.currentAttack = 9000;
+    const d = wip(defCard, "e1");
+    d.currentHealth = 100;
+    s.players.player1.field = [a];
+    s.players.player2.field = [d];
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const kinds: string[] = [];
+    root.addEventListener(MATCH_ANIM_EVENT, (e) => {
+      kinds.push((e as CustomEvent<MatchAnimDetail>).detail.kind);
+    });
+    buttonByText(root, ".play-match__warrior-btn", "Choose to attack")!.click();
+    buttonByText(root, ".play-match__warrior-btn", "Attack")!.click();
+    // Events still fire even with motion disabled.
+    expect(kinds).toContain("attack");
+  });
+
+  it("no-playback mode condenses the opponent turn (no queued timers)", () => {
+    window.localStorage.setItem("euphoriaNoPlayback", "1");
+    let queued: (() => void) | null = null;
+    const scheduler = (cb: () => void): void => {
+      queued = cb;
+    };
+    const match = newMatch(5);
+    const root = renderPlayableMatch(
+      match,
+      { onComplete: noop, onQuit: noop },
+      { scheduler },
+    );
+    buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+    root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+    // Opponent reply is applied immediately with no step-by-step playback queue.
+    expect(queued).toBeNull();
+    expect(root.querySelector(".play-match__playback-banner")).toBeNull();
+    root.dispose();
+  });
+
+  it("low-power mode caps the rendered battle log at 25 rows", () => {
+    window.localStorage.setItem("euphoriaLowPower", "1");
+    const agent = smartAgent();
+    const match = createPlayableMatch({
+      faction: "Sonic", pool: cards, seed: 11, opponentFaction: "Dwarf",
+    });
+    let guard = 0;
+    while (!match.isOver() && match.state().events.length < 200 && guard < 600) {
+      const legal = match.legalActions();
+      if (legal.length === 0) break;
+      match.apply(agent(match.state(), legal));
+      guard++;
+    }
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const rows = root.querySelectorAll(
+      ".play-match__log-entry, .play-match__log-turn",
+    ).length;
+    expect(rows).toBeLessThanOrEqual(25);
   });
 });

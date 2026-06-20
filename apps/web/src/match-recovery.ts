@@ -99,7 +99,7 @@ export function saveActiveMatch(
   store: KeyValueStore,
   input: SavedMatchInput,
   now: Date = new Date(),
-): void {
+): boolean {
   const record: SavedMatch = {
     ...input,
     version: SAVE_VERSION,
@@ -107,9 +107,73 @@ export function saveActiveMatch(
   };
   try {
     store.setItem(ACTIVE_MATCH_KEY, JSON.stringify(record));
+    return true;
   } catch {
-    /* storage full/blocked — recovery is best-effort, never break the match */
+    // Storage full/blocked (e.g. quota exceeded) — recovery is best-effort and
+    // must never break the match. Caller can surface this via diagnostics.
+    return false;
   }
+}
+
+/** The current saved-snapshot's size (bytes) and age, for the debug panel. */
+export interface SnapshotInfo {
+  readonly exists: boolean;
+  readonly bytes: number;
+  readonly turn: number | null;
+  readonly savedAt: string | null;
+  /** Age in seconds, or null when absent. */
+  readonly ageSeconds: number | null;
+  /** A validation/availability problem, or null when fine. */
+  readonly problem: string | null;
+}
+
+/** Inspects the saved snapshot for `userId` without rebuilding the match. */
+export function snapshotInfo(
+  store: KeyValueStore,
+  userId: string,
+  now: Date = new Date(),
+): SnapshotInfo {
+  const empty: SnapshotInfo = {
+    exists: false,
+    bytes: 0,
+    turn: null,
+    savedAt: null,
+    ageSeconds: null,
+    problem: null,
+  };
+  let raw: string | null;
+  try {
+    raw = store.getItem(ACTIVE_MATCH_KEY);
+  } catch {
+    return { ...empty, problem: "storage read failed" };
+  }
+  if (raw === null) return empty;
+  const bytes = raw.length;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ...empty, exists: true, bytes, problem: "corrupt JSON" };
+  }
+  const saved = coerceSavedMatch(parsed);
+  if (saved === null) {
+    return { ...empty, exists: true, bytes, problem: "invalid/old shape" };
+  }
+  if (saved.userId !== userId) {
+    return { ...empty, exists: true, bytes, problem: "different user" };
+  }
+  const ageSeconds = Math.max(
+    0,
+    Math.round((now.getTime() - new Date(saved.savedAt).getTime()) / 1000),
+  );
+  return {
+    exists: true,
+    bytes,
+    turn: saved.turn,
+    savedAt: saved.savedAt,
+    ageSeconds,
+    problem: null,
+  };
 }
 
 /** Loads a saved match for `userId`, or null if absent/corrupt/another user's. */

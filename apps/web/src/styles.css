@@ -2367,3 +2367,148 @@ body {
 .play-match__stats[data-seat] {
   border-radius: 8px;
 }
+
+/* ============================================================================
+ * Mobile debug/stability harness (debug-panel.ts + stability toggles). Present
+ * only when localStorage.euphoriaDebug = "1"; never affects normal users.
+ * ========================================================================== */
+
+/* No-art mode: lightweight text placeholder instead of a card image. */
+.play-match__art--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.05),
+    rgba(255, 255, 255, 0.05) 6px,
+    rgba(255, 255, 255, 0.02) 6px,
+    rgba(255, 255, 255, 0.02) 12px
+  );
+}
+
+/* No-anim mode: kill CSS motion on floats/beams (JS WAAPI is already gated). */
+.play-match--no-anim .play-match__float,
+.play-match--no-anim .play-match__beam {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* The floating debug panel: fixed, scrollable, mobile-reachable without devtools. */
+.debug-panel {
+  position: fixed;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 9999;
+  width: min(320px, 92vw);
+  max-height: 70vh;
+  overflow: auto;
+  background: rgba(10, 12, 16, 0.96);
+  border: 1px solid var(--surfer);
+  border-radius: 10px;
+  color: var(--text);
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+
+.debug-panel__header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.6rem;
+  background: rgba(54, 198, 168, 0.18);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.debug-panel__collapse {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.debug-panel--collapsed .debug-panel__body {
+  display: none;
+}
+
+.debug-panel__body {
+  padding: 0.5rem 0.6rem 0.7rem;
+}
+
+.debug-panel__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.1rem 0;
+  border-bottom: 1px dotted rgba(255, 255, 255, 0.08);
+}
+
+.debug-panel__key {
+  color: var(--text-dim);
+}
+
+.debug-panel__val {
+  font-weight: 700;
+  text-align: right;
+  word-break: break-word;
+}
+
+.debug-panel__toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.55rem 0 0.3rem;
+}
+
+.debug-panel__toggle {
+  flex: 1 1 auto;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.debug-panel__toggle--on {
+  border-color: var(--surfer);
+  background: rgba(54, 198, 168, 0.25);
+  color: var(--text);
+}
+
+.debug-panel__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.debug-panel__btn {
+  padding: 0.45rem 0.5rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--surfer);
+  color: #06231d;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.debug-panel__note {
+  margin: 0.5rem 0 0;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.account__resume-invalid {
+  border-left: 4px solid var(--dwarf);
+  padding-left: 0.6rem;
+  color: var(--dwarf);
+}

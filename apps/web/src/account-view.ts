@@ -21,8 +21,12 @@ import {
   getRecoveryStore,
   loadActiveMatch,
   saveActiveMatch,
+  snapshotInfo,
   type SavedMatch,
 } from "./match-recovery";
+import { logDebug, noteSnapshotSaved } from "./debug-log";
+import { noSnapshot, snapshotThrottleMs } from "./debug-flags";
+import { createDebugPanel } from "./debug-panel";
 import {
   buildMatchHistoryInsert,
   EMPTY_STATS,
@@ -374,9 +378,35 @@ export async function mountAccount(
   // action history) to localStorage after each move, so a mobile tab reload
   // mid-match can offer "Resume". Best-effort — null when storage is unavailable.
   const recoveryStore = getRecoveryStore();
-  const persistMatch = (match: PlayableMatch, chosen: ChosenActiveDeck): void => {
-    if (recoveryStore === null) return;
-    saveActiveMatch(recoveryStore, {
+  // The active match + deck, tracked so the debug panel can force-save on demand.
+  let activeMatch: PlayableMatch | null = null;
+  let activeChosen: ChosenActiveDeck | null = null;
+  let lastSnapshotAt = 0;
+  // Set when a resume failed validation, shown once on the next account render.
+  let invalidResumeMessage: string | null = null;
+  // The current top-level state, for the debug panel's "view" field.
+  let currentView = "account";
+
+  // Persists the active match. Throttled (Feature F.3) so rapid actions don't
+  // hammer localStorage; `force` bypasses the throttle (Feature D.3). Disabled
+  // entirely under euphoriaNoSnapshot (isolates write pressure). A failed write
+  // (quota/blocked) is surfaced via diagnostics rather than crashing.
+  const persistMatch = (
+    match: PlayableMatch,
+    chosen: ChosenActiveDeck,
+    force = false,
+  ): boolean => {
+    activeMatch = match;
+    activeChosen = chosen;
+    if (recoveryStore === null) return false;
+    if (noSnapshot()) {
+      logDebug("snapshotSkipped", { reason: "euphoriaNoSnapshot" });
+      return false;
+    }
+    const now = Date.now();
+    if (!force && now - lastSnapshotAt < snapshotThrottleMs()) return false;
+    lastSnapshotAt = now;
+    const ok = saveActiveMatch(recoveryStore, {
       userId: session.userId,
       faction: match.playerFaction,
       opponentFaction: match.opponentFaction,
@@ -385,9 +415,18 @@ export async function mountAccount(
       actions: match.history(),
       turn: match.state().turn,
     });
+    if (ok) noteSnapshotSaved();
+    else logDebug("snapshotSaveFailed", { turn: match.state().turn });
+    return ok;
   };
-  const clearRecovery = (): void => {
-    if (recoveryStore !== null) clearActiveMatch(recoveryStore);
+  // Records WHY a resumable match was dropped before clearing it, so a silent
+  // discard can never hide a bug (Feature D.5).
+  const clearRecovery = (reason: string): void => {
+    if (recoveryStore === null) return;
+    logDebug("snapshotCleared", { reason });
+    clearActiveMatch(recoveryStore);
+    activeMatch = null;
+    activeChosen = null;
   };
 
   const handleSignOut = async (): Promise<void> => {
@@ -562,20 +601,21 @@ export async function mountAccount(
   // start (showPlayableMatch) and a resumed one (resumeMatch).
   const launchMatch = (match: PlayableMatch, chosen: ChosenActiveDeck): void => {
     const faction = match.playerFaction;
-    persistMatch(match, chosen); // checkpoint the starting/resumed state
+    currentView = "live-match";
+    persistMatch(match, chosen, true); // checkpoint the starting/resumed state
     // Reuse the shared card-detail modal (same as the Card Viewer / Deck
     // Builder). It lives as a sibling of the board so the board's in-place
     // re-renders never disturb the open dialog.
     const detail = createCardDetail(assetBase);
     const board = renderPlayableMatch(match, {
       onComplete: (summary) => {
-        clearRecovery(); // the match is finished — nothing to resume
+        clearRecovery("match completed"); // finished — nothing to resume
         void finishMatch(faction, summary, chosen, () =>
           void showPlayableMatch(faction),
         );
       },
       onQuit: () => {
-        clearRecovery(); // conceding abandons the in-progress match
+        clearRecovery("conceded"); // conceding abandons the in-progress match
         void showAccount();
       },
       onInspect: (card) => detail.open(card),
@@ -583,6 +623,7 @@ export async function mountAccount(
     });
     const note = deckNote(chosen);
     swapMain(...(note ? [note, board] : [board]), detail.element);
+    mountDebugPanel(container);
     activeBoard = board;
   };
 
@@ -615,8 +656,12 @@ export async function mountAccount(
         replay: saved.actions,
       });
     } catch (error) {
-      clearRecovery();
+      // Record WHY before discarding an invalid snapshot (Feature D.5/D.6).
+      const message = error instanceof Error ? error.message : String(error);
+      clearRecovery(`replay failed: ${message}`);
       if (error instanceof ReplayError) {
+        invalidResumeMessage =
+          "Your saved match could no longer be resumed and was discarded.";
         void showAccount();
         return;
       }
@@ -656,7 +701,7 @@ export async function mountAccount(
     discard.className = "account__signout account__resume-discard";
     discard.textContent = "Discard";
     discard.addEventListener("click", () => {
-      clearRecovery();
+      clearRecovery("user discarded");
       void showAccount();
     });
     row.append(resume, discard);
@@ -664,7 +709,30 @@ export async function mountAccount(
     return banner;
   };
 
+  // Debug panel (Feature A): mounted only when euphoriaDebug=1. It can force-save
+  // the active match and simulate a reload check against the saved snapshot.
+  const mountDebugPanel = (host: HTMLElement): void => {
+    const panel = createDebugPanel({
+      userId: () => session.userId,
+      currentView: () => currentView,
+      store: recoveryStore,
+      forceSave: () => {
+        if (activeMatch === null || activeChosen === null) return false;
+        return persistMatch(activeMatch, activeChosen, true);
+      },
+      simulateReloadCheck: () => {
+        if (recoveryStore === null) return "no storage";
+        const info = snapshotInfo(recoveryStore, session.userId);
+        if (!info.exists) return "Reload check: no snapshot — Resume would NOT show";
+        if (info.problem !== null) return `Reload check: invalid (${info.problem})`;
+        return `Reload check: OK — Resume would show (turn ${info.turn})`;
+      },
+    });
+    if (panel !== null) host.append(panel.element);
+  };
+
   const showAccount = async (): Promise<void> => {
+    currentView = "account";
     const [records, owned, stats] = await Promise.all([
       loadHistory(),
       loadOwned(),
@@ -691,14 +759,23 @@ export async function mountAccount(
       showResult,
       (faction) => void showPlayableMatch(faction),
     );
+    // A one-time notice if the last resume attempt failed validation (D.6).
+    const nodes: Node[] = [];
+    if (invalidResumeMessage !== null) {
+      const warn = document.createElement("p");
+      warn.className = "account__panel-body account__resume-invalid";
+      warn.setAttribute("role", "alert");
+      warn.textContent = invalidResumeMessage;
+      invalidResumeMessage = null;
+      nodes.push(warn);
+    }
     // Surface a resume prompt if a live match was interrupted (scoped to user).
     const saved =
       recoveryStore !== null ? loadActiveMatch(recoveryStore, session.userId) : null;
-    if (saved !== null) {
-      swapMain(renderResumeBanner(saved), accountEl);
-    } else {
-      swapMain(accountEl);
-    }
+    if (saved !== null) nodes.push(renderResumeBanner(saved));
+    nodes.push(accountEl);
+    swapMain(...nodes);
+    mountDebugPanel(container);
   };
 
   // When asked (e.g. coming from the Deck Builder's "Play match"), jump straight

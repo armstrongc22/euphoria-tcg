@@ -24,14 +24,15 @@ import { mountStarterDecks } from "./starter-view";
 import { mountDeckBuilder } from "./deck-builder-view";
 import { mountRules } from "./rules-view";
 import { mountLore } from "./lore-view";
-import { installDiagnostics } from "./debug-log";
+import { installDiagnostics, setBuildStamp } from "./debug-log";
 import type { StarterFaction } from "./starter";
 
 // Build stamp (set by vite.config define): the deployed commit/timestamp, shown
-// in the footer and on window so a tester can confirm the page isn't a stale
-// cached asset. Falls back to "dev" when running unbuilt.
+// in the footer, on window, and in the debug panel so a tester can confirm the
+// page isn't a stale cached asset. Falls back to "dev" when running unbuilt.
 const BUILD_STAMP: string = import.meta.env.VITE_BUILD_STAMP ?? "dev";
 (window as Window & { __EUPHORIA_BUILD__?: string }).__EUPHORIA_BUILD__ = BUILD_STAMP;
+setBuildStamp(BUILD_STAMP);
 
 // Opt-in mobile diagnostics (localStorage.euphoriaDebug = "1"): captures uncaught
 // errors, promise rejections, and page lifecycle to help chase the mobile reload.

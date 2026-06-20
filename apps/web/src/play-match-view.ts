@@ -48,7 +48,15 @@ import {
   type MatchAnimDetail,
   type PlaybackStep,
 } from "./match-playback";
-import { recordMatchMetrics, setMatchActive } from "./debug-log";
+import { recordMatchMetrics, setMatchActive, setMetricsProvider } from "./debug-log";
+import {
+  artCacheCap,
+  lowPowerActive,
+  noAnim,
+  noArt,
+  noPlayback,
+  renderedLogCap,
+} from "./debug-flags";
 
 /** Base path Vite serves card art from (see cardImageUrl). */
 const LIVE_ART_BASE = import.meta.env.BASE_URL;
@@ -100,24 +108,6 @@ function prefersReducedMotion(): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Coarse "this is a phone / low-power device" check, so we can shed animation
- * and DOM weight where the forced reload happens — without touching desktop
- * (fine pointer + wide viewport stay full-fat). Triggers on a coarse pointer +
- * small viewport, on reduced-motion, or via an explicit opt-in flag.
- */
-function lowPowerMode(): boolean {
-  try {
-    if (globalThis.localStorage?.getItem("euphoriaLowPower") === "1") return true;
-    const coarse = window.matchMedia("(pointer: coarse)").matches;
-    const small = window.matchMedia("(max-width: 820px)").matches;
-    if (coarse && small) return true;
-  } catch {
-    /* matchMedia/localStorage unavailable — fall through */
-  }
-  return prefersReducedMotion();
 }
 
 function escapeHtml(text: string): string {
@@ -232,16 +222,20 @@ export function renderPlayableMatch(
   const root = document.createElement("section") as PlayableMatchBoard;
   root.className = "account play-match";
 
-  // Shed animation/DOM weight on phones (preserves desktop). Computed once.
-  const lowPower = lowPowerMode();
-  // Cap the rendered battle log harder on low-power devices.
-  const logCap = lowPower
-    ? Math.min(30, MAX_RENDERED_LOG_ENTRIES)
-    : MAX_RENDERED_LOG_ENTRIES;
-  // Reuse card-art <img> nodes across repaints instead of recreating (and
-  // re-decoding) them every frame — the dominant mobile memory pressure. Keyed
-  // by tile identity; bounded by the number of distinct cards/Warriors in play.
-  const artCache = new Map<string, HTMLImageElement>();
+  // Stability switches (Feature B/C), read once. All default off; desktop is
+  // unaffected unless a flag is set. Each isolates one suspected reload cause.
+  const flags = {
+    noAnim: noAnim(),
+    noArt: noArt(),
+    noPlayback: noPlayback(),
+  };
+  // Cap the rendered battle log harder on low-power/safe mode (25 vs 60).
+  const logCap = renderedLogCap();
+  const cacheCap = artCacheCap();
+  // Reuse card-art nodes across repaints instead of recreating (and re-decoding)
+  // them every frame — the dominant mobile memory pressure. Keyed by tile
+  // identity, capped at `cacheCap`, evicting the oldest (insertion order).
+  const artCache = new Map<string, HTMLElement>();
 
   // Transient UI selection state, reset on every successful action.
   let selectedAttacker: string | null = null;
@@ -343,9 +337,9 @@ export function renderPlayableMatch(
   };
 
   // Draw a short-lived beam from attacker to target (Feature D.2). DOM + WAAPI,
-  // guarded; a no-op without layout (jsdom) or under reduced motion.
+  // guarded; a no-op without layout (jsdom), under reduced motion, or no-anim.
   const drawBeam = (from: Element, to: Element): void => {
-    if (prefersReducedMotion()) return;
+    if (flags.noAnim || prefersReducedMotion()) return;
     const a = from.getBoundingClientRect();
     const b = to.getBoundingClientRect();
     const rootBox = root.getBoundingClientRect();
@@ -383,7 +377,9 @@ export function renderPlayableMatch(
       targetInstanceId: step.targetInstanceId,
       targetPlayer: step.targetPlayer,
     });
-    if (prefersReducedMotion()) return;
+    // The sound-ready event always fires; the visual motion is suppressed under
+    // no-anim / reduced-motion so we can isolate animation as a reload cause.
+    if (flags.noAnim || prefersReducedMotion()) return;
     const target = tileOf(step.targetInstanceId);
     switch (step.anim) {
       case "attack": {
@@ -508,6 +504,7 @@ export function renderPlayableMatch(
       }
     }
     artCache.clear();
+    setMetricsProvider(null);
     setMatchActive(false);
   };
 
@@ -526,7 +523,15 @@ export function renderPlayableMatch(
     actions.onAction?.();
     const steps = toPlaybackSteps(res.frames);
     const passedTurn = res.frames.some((f) => f.actor === "opponent");
-    if (passedTurn && steps.length > 0) {
+    if (passedTurn && steps.length > 0 && flags.noPlayback) {
+      // No-playback isolation mode: skip the step-by-step animation entirely.
+      // Jump to the final state with one summary callout, still emitting the
+      // sound-ready events so nothing downstream changes — just no timed queue.
+      floaters = [];
+      callout = steps[steps.length - 1]!.message;
+      paint();
+      for (const step of steps) applyStepEffects(step);
+    } else if (passedTurn && steps.length > 0) {
       // The turn passed to the AI: play the whole reply back, locked.
       floaters = [];
       startPlayback(steps);
@@ -633,25 +638,42 @@ export function renderPlayableMatch(
   // Opens the shared card-detail modal for `card`, when an inspector is wired.
   const inspect = (card: Card): void => actions.onInspect?.(card);
 
-  // The card-art <img> for a live tile, reused across repaints via `artCache`
-  // (keyed by tile identity) so the same decoded image node is moved into each
-  // new frame rather than recreated/re-decoded — the key mobile-memory fix. On
-  // load failure it flips to a flat placeholder, mirroring the Card Viewer.
-  const cardArt = (card: Card, key: string): HTMLImageElement => {
+  // The card visual for a live tile, reused across repaints via `artCache` (keyed
+  // by tile identity) so the same decoded node is moved into each new frame rather
+  // than recreated/re-decoded — the key mobile-memory fix. In no-art mode it's a
+  // lightweight text placeholder (no <img>, no decode) to isolate image pressure.
+  // The cache is capped (oldest evicted) so it can't grow unbounded.
+  const cardArt = (card: Card, key: string): HTMLElement => {
     const cached = artCache.get(key);
     if (cached !== undefined) return cached;
-    const img = document.createElement("img");
-    img.className = "play-match__art";
-    img.alt = "";
-    img.loading = "lazy";
-    img.decoding = "async";
-    img.src = cardImageUrl(card, LIVE_ART_BASE);
-    img.addEventListener("error", () => {
-      img.removeAttribute("src");
-      img.classList.add("play-match__art--missing");
-    });
-    artCache.set(key, img);
-    return img;
+    let node: HTMLElement;
+    if (flags.noArt) {
+      const ph = document.createElement("div");
+      ph.className = "play-match__art play-match__art--placeholder";
+      ph.textContent = card.name.slice(0, 2).toUpperCase();
+      ph.setAttribute("aria-hidden", "true");
+      node = ph;
+    } else {
+      const img = document.createElement("img");
+      img.className = "play-match__art";
+      img.alt = "";
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.src = cardImageUrl(card, LIVE_ART_BASE);
+      img.addEventListener("error", () => {
+        img.removeAttribute("src");
+        img.classList.add("play-match__art--missing");
+      });
+      node = img;
+    }
+    // Cap the cache: evict the oldest entry once over the limit.
+    while (artCache.size >= cacheCap) {
+      const oldest = artCache.keys().next().value;
+      if (oldest === undefined) break;
+      artCache.delete(oldest);
+    }
+    artCache.set(key, node);
+    return node;
   };
 
   // Short status chips for a live Warrior (tank form, foreign control, a
@@ -1294,16 +1316,27 @@ export function renderPlayableMatch(
 
     // Debug-only: record growth counters so a mobile reload can be correlated
     // with state/DOM/timer size (no-op unless the debug flag is set).
-    recordMatchMetrics({
-      turn: state.turn,
-      events: state.events.length,
-      logRows: root.querySelectorAll(".play-match__log-entry, .play-match__log-turn").length,
-      artNodes: artCache.size,
-      floaters: activeFloaters.length,
-      playbackQueue: playback ? playback.steps.length - playback.index : 0,
-      domNodes: root.querySelectorAll("*").length,
-    });
+    recordMatchMetrics(collectMetrics(state.turn, state.events.length, activeFloaters.length));
   }
+
+  // Snapshot of live counters the debug panel pulls (also recorded each paint).
+  // Centralized so the panel and the per-paint record never drift.
+  const collectMetrics = (
+    turn: number,
+    events: number,
+    floaterCount: number,
+  ): Record<string, number> => ({
+    turn,
+    events,
+    logRows: root.querySelectorAll(".play-match__log-entry, .play-match__log-turn").length,
+    artNodes: artCache.size,
+    imageNodes: root.querySelectorAll("img.play-match__art").length,
+    floaters: floaterCount,
+    beams: root.querySelectorAll(".play-match__beam").length,
+    playbackQueue: playback ? playback.steps.length - playback.index : 0,
+    pendingTimers: pendingTimer !== undefined ? 1 : 0,
+    domNodes: root.querySelectorAll("*").length,
+  });
 
   /** Anchors each floater near its target Warrior tile or player life area. */
   function renderFloaters(frag: DocumentFragment, steps: PlaybackStep[]): void {
@@ -1841,7 +1874,17 @@ export function renderPlayableMatch(
     return panel;
   };
 
+  // Stability-mode marker classes (CSS kills float/beam motion under no-anim;
+  // no-art tightens placeholder visuals). Only present when a flag is set.
+  root.classList.toggle("play-match--no-anim", flags.noAnim);
+  root.classList.toggle("play-match--no-art", flags.noArt);
+  if (lowPowerActive()) root.classList.add("play-match--low-power");
+
   root.dispose = dispose;
+  // Let the debug panel pull live counters on demand (cleared on dispose).
+  setMetricsProvider(() =>
+    collectMetrics(match.state().turn, match.state().events.length, floaters.length),
+  );
   setMatchActive(true); // diagnostics marker: a live match is now on screen
   paint();
   return root;

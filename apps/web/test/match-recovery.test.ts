@@ -11,6 +11,7 @@ import {
   coerceSavedMatch,
   loadActiveMatch,
   saveActiveMatch,
+  snapshotInfo,
   type SavedMatchInput,
 } from "../src/match-recovery";
 import type { KeyValueStore } from "../src/signup";
@@ -108,5 +109,58 @@ describe("coerceSavedMatch", () => {
     const ok = coerceSavedMatch({ ...input(), version: SAVE_VERSION, savedAt: "x" });
     expect(ok).not.toBeNull();
     expect(ok!.faction).toBe("Sonic");
+  });
+});
+
+describe("saveActiveMatch — write-failure signalling", () => {
+  it("returns false when the store throws (quota/blocked)", () => {
+    const failing: KeyValueStore = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+      removeItem: () => {},
+    };
+    expect(saveActiveMatch(failing, input())).toBe(false);
+  });
+
+  it("returns true on a successful write", () => {
+    expect(saveActiveMatch(memoryStore(), input())).toBe(true);
+  });
+});
+
+describe("snapshotInfo", () => {
+  it("reports no snapshot when none is stored", () => {
+    expect(snapshotInfo(memoryStore(), "user-1")).toMatchObject({
+      exists: false,
+      bytes: 0,
+      problem: null,
+    });
+  });
+
+  it("reports size, turn, and age for a stored snapshot", () => {
+    const store = memoryStore();
+    saveActiveMatch(store, input({ turn: 12 }), new Date("2026-06-20T00:00:00Z"));
+    const info = snapshotInfo(store, "user-1", new Date("2026-06-20T00:00:30Z"));
+    expect(info.exists).toBe(true);
+    expect(info.turn).toBe(12);
+    expect(info.bytes).toBeGreaterThan(0);
+    expect(info.ageSeconds).toBe(30);
+    expect(info.problem).toBeNull();
+  });
+
+  it("flags a corrupt snapshot with a problem reason", () => {
+    const store = memoryStore();
+    store.setItem(ACTIVE_MATCH_KEY, "{not json");
+    expect(snapshotInfo(store, "user-1")).toMatchObject({
+      exists: true,
+      problem: "corrupt JSON",
+    });
+  });
+
+  it("flags a different user's snapshot", () => {
+    const store = memoryStore();
+    saveActiveMatch(store, input({ userId: "someone-else" }));
+    expect(snapshotInfo(store, "user-1").problem).toBe("different user");
   });
 });
