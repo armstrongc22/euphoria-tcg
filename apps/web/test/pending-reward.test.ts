@@ -204,34 +204,38 @@ describe("syncPendingRewards — one at a time", () => {
     expect(loadPendingClaims(store, "user-1")).toHaveLength(0);
   });
 
-  it("removes only the synced claim and preserves the rest on a mid-pass failure", async () => {
+  it("attempts EVERY claim each pass — an earlier failure doesn't block a later one", async () => {
     const store = memoryStore();
     appendPendingClaim(store, input("fafnir", 5), new Date("2026-06-21T00:00:00Z"));
     appendPendingClaim(store, input("titan", 10), new Date("2026-06-21T00:01:00Z"));
     const { auth } = remoteAuthStub(0);
-    // First saves ok, second fails.
-    (auth.saveReward as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => {});
+    // The EARLIER claim (milestone 5) fails; the later one (milestone 10) succeeds.
     (auth.saveReward as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => {
       throw new Error("RLS denied");
     });
     const res = await syncPendingRewards(auth, SESSION, store);
+    // The later claim still synced this pass; only the failed one remains.
     expect(res.synced).toBe(1);
     const left = loadPendingClaims(store, "user-1");
     expect(left).toHaveLength(1);
-    expect(left[0]!.milestone).toBe(10);
+    expect(left[0]!.milestone).toBe(5);
     expect(left[0]!.lastError).toContain("RLS denied");
+    expect(left[0]!.attempts).toBe(2);
   });
 
   it("eventually drains the whole queue across retries as the backend recovers", async () => {
     const store = memoryStore();
     appendPendingClaim(store, input("fafnir", 5), new Date("2026-06-21T00:00:00Z"));
     appendPendingClaim(store, input("titan", 10), new Date("2026-06-21T00:01:00Z"));
-    const { auth } = remoteAuthStub(1); // first call fails, rest succeed
+    const { auth } = remoteAuthStub(1); // only the first call fails, rest succeed
+    // Pass 1: claim 5 fails, claim 10 succeeds (we still try it). One left.
     const first = await syncPendingRewards(auth, SESSION, store);
-    expect(first.synced).toBe(0);
-    expect(first.remaining).toBe(2);
+    expect(first.synced).toBe(1);
+    expect(first.remaining).toBe(1);
+    expect(loadPendingClaims(store, "user-1")[0]!.milestone).toBe(5);
+    // Pass 2: the backend is healthy now; the last claim drains.
     const second = await syncPendingRewards(auth, SESSION, store);
-    expect(second.synced).toBe(2);
+    expect(second.synced).toBe(1);
     expect(loadPendingClaims(store, "user-1")).toHaveLength(0);
   });
 });

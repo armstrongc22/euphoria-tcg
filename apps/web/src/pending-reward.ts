@@ -242,9 +242,11 @@ export interface SyncResult {
 
 /**
  * Retries the user's pending claims one at a time (earliest first). No-op for
- * demo/local accounts (they never queue). Each success removes only that claim;
- * the first failure records its error and stops the pass, leaving every
- * still-unsynced claim intact (a later mount/startup retries again).
+ * demo/local accounts (they never queue). EVERY claim is attempted each pass:
+ * a success removes only that claim; a failure records its error and is left
+ * queued, but we continue to the next claim — so a single bad claim never blocks
+ * the others, and per-claim failures (not just a down backend) still make
+ * progress. Whatever doesn't sync stays queued for a later mount/startup.
  */
 export async function syncPendingRewards(
   auth: Auth,
@@ -265,7 +267,7 @@ export async function syncPendingRewards(
         claim.id,
         error instanceof Error ? error.message : String(error),
       );
-      break; // stop at the first failure; the rest stay queued for next time
+      continue; // keep this claim queued, but still try the rest this pass
     }
     removePendingClaim(store, claim.id);
     synced += 1;
