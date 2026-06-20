@@ -2804,117 +2804,189 @@ body {
 }
 
 /* ============================================================================
- * Onboarding v2 — prominent "Getting Started" checklist (Feature I). Mobile-
- * friendly, clearly more than helper text.
+ * Onboarding "Getting Started" card — a COMPACT quest-log card. Width-matched to
+ * the account content column (not a full-width page takeover); minimal padding;
+ * compact rows; only the current step is visually prominent.
  * ========================================================================== */
 .onboarding {
+  width: min(640px, 100%);
+  margin: clamp(1.5rem, 5vw, 3.5rem) auto 0.5rem;
+  padding: 0.9rem 1.1rem;
   border: 1px solid var(--surfer);
   border-top: 3px solid var(--surfer);
-  background: linear-gradient(180deg, rgba(54, 198, 168, 0.14), rgba(0, 0, 0, 0.18));
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(54, 198, 168, 0.1), rgba(0, 0, 0, 0.15));
+}
+
+.onboarding__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
 }
 .onboarding__heading {
-  margin: 0 0 0.25rem;
-  font-size: 1.25rem;
+  margin: 0;
+  font-size: 1.05rem;
   letter-spacing: 0.01em;
 }
 .onboarding__count {
-  margin: 0 0 0.4rem;
   color: var(--text-dim);
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 700;
+  white-space: nowrap;
 }
+
 .onboarding__progress {
-  height: 8px;
+  height: 6px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
   overflow: hidden;
-  margin-bottom: 0.8rem;
+  margin-bottom: 0.6rem;
 }
 .onboarding__progress-fill {
   height: 100%;
   background: var(--surfer);
   transition: width 0.3s ease;
 }
+
 .onboarding__list {
   list-style: none;
-  margin: 0 0 0.7rem;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.15rem;
 }
+
+/* Compact rows: small and low-height by default. */
 .onboarding__item {
   display: flex;
-  gap: 0.6rem;
-  align-items: flex-start;
-  padding: 0.4rem 0.5rem;
-  border-radius: 8px;
-}
-.onboarding__item--current {
-  background: rgba(54, 198, 168, 0.12);
-  border: 1px solid rgba(54, 198, 168, 0.4);
-}
-.onboarding__item--upcoming {
-  opacity: 0.6;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.2rem 0.3rem;
+  border-radius: 7px;
+  font-size: 0.9rem;
 }
 .onboarding__mark {
-  flex: 0 0 1.4rem;
-  width: 1.4rem;
-  height: 1.4rem;
+  flex: 0 0 1.15rem;
+  width: 1.15rem;
+  height: 1.15rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   font-weight: 800;
   background: rgba(255, 255, 255, 0.1);
-}
-.onboarding__item--done .onboarding__mark {
-  background: var(--surfer);
-  color: #06231d;
-}
-.onboarding__item--current .onboarding__mark {
-  background: var(--sonic);
-  color: #04121f;
 }
 .onboarding__item-text {
   flex: 1 1 auto;
   min-width: 0;
 }
 .onboarding__label {
-  font-weight: 700;
+  font-weight: 600;
+}
+
+/* Done: small + satisfying (muted, struck through). */
+.onboarding__item--done .onboarding__mark {
+  background: var(--surfer);
+  color: #06231d;
 }
 .onboarding__item--done .onboarding__label {
   text-decoration: line-through;
   color: var(--text-dim);
 }
+
+/* Upcoming: muted, low emphasis — never dominates. */
+.onboarding__item--upcoming {
+  opacity: 0.5;
+}
+
+/* Current: the ONE prominent item — its body + CTA show inline. */
+.onboarding__item--current {
+  align-items: flex-start;
+  padding: 0.5rem 0.55rem;
+  background: rgba(74, 163, 224, 0.12);
+  border: 1px solid rgba(74, 163, 224, 0.45);
+}
+.onboarding__item--current .onboarding__mark {
+  background: var(--sonic);
+  color: #04121f;
+}
+.onboarding__item--current .onboarding__label {
+  font-weight: 800;
+}
 .onboarding__body {
-  margin: 0.3rem 0 0;
+  margin: 0.25rem 0 0;
   color: var(--text);
-  line-height: 1.5;
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 .onboarding__cta {
   width: auto;
-  margin-top: 0.55rem;
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.9rem;
 }
-.onboarding__collapse,
+
+/* Footer text controls (Show all / Collapse / Hide guide). */
+.onboarding__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.9rem;
+  align-items: center;
+  margin-top: 0.6rem;
+}
 .onboarding__expand,
+.onboarding__collapse,
+.onboarding__hide,
 .onboarding__dismiss {
-  margin-top: 0.4rem;
-  padding: 0.35rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: transparent;
+  padding: 0;
+  border: none;
+  background: none;
   color: var(--text-dim);
   font: inherit;
   font-size: 0.8rem;
+  text-decoration: underline;
   cursor: pointer;
 }
+.onboarding__expand,
+.onboarding__collapse {
+  color: var(--sonic);
+}
+.onboarding__expand:hover,
+.onboarding__collapse:hover,
+.onboarding__hide:hover,
+.onboarding__dismiss:hover {
+  color: var(--text);
+}
+
+/* Completion: tiny, centered, satisfying. */
 .onboarding--complete {
   text-align: center;
+  padding: 0.85rem 1.1rem;
+}
+.onboarding--complete .onboarding__heading {
+  margin-bottom: 0.3rem;
 }
 .onboarding--complete .onboarding__dismiss {
-  margin-top: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+/* The "Show Getting Started" button shown once the guide is hidden. */
+.onboarding__show {
+  display: block;
+  width: min(640px, 100%);
+  margin: clamp(1.5rem, 5vw, 3.5rem) auto 0;
+  padding: 0.4rem 0.8rem;
+  border: 1px dashed var(--surfer);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--surfer);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
 }
 
 .match-result__onboard-note {
@@ -2924,9 +2996,6 @@ body {
 }
 
 @media (max-width: 560px) {
-  .onboarding__heading {
-    font-size: 1.1rem;
-  }
   .onboarding__cta {
     width: 100%;
   }

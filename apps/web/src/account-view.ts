@@ -59,7 +59,7 @@ import {
   setOnboardingDismissed,
   type ChecklistItem,
 } from "./onboarding-checklist";
-import { renderChecklistCard } from "./onboarding-checklist-view";
+import { renderChecklistCard, renderShowGuide } from "./onboarding-checklist-view";
 import { createRng } from "@euphoria/game-engine";
 import {
   buildOwnedCardInsert,
@@ -439,6 +439,9 @@ export async function mountAccount(
   const pendingStore = getPendingStore();
   // Tutorial dismissal flags (local only, beta) — backs "Reset tutorial tips".
   const tutorialStore = getTutorialStore();
+  // Getting Started card: expanded is session/mount-scoped (compact by default on
+  // each visit); the "hidden" state persists in localStorage (isOnboardingDismissed).
+  let onboardingExpanded = false;
   // The active match + deck, tracked so the debug panel can force-save on demand.
   let activeMatch: PlayableMatch | null = null;
   let activeChosen: ChosenActiveDeck | null = null;
@@ -976,8 +979,18 @@ export async function mountAccount(
       deckBuilderOpened: hasOnboardingProgress(tutorialStore, "deckBuilderOpened"),
       customDeckMatchPlayed: hasOnboardingProgress(tutorialStore, "customDeckMatchPlayed"),
     });
-    const dismissed = isOnboardingDismissed(tutorialStore);
-    if (!(checklist.complete && dismissed)) {
+    // "Hidden" persists across visits; "expanded" is session/mount-scoped so the
+    // card defaults back to its compact shape on each return to the account.
+    const hidden = isOnboardingDismissed(tutorialStore);
+    if (hidden && !checklist.complete) {
+      // Hidden but unfinished: a tiny button to bring the guide back.
+      nodes.push(
+        renderShowGuide(() => {
+          setOnboardingDismissed(tutorialStore, false);
+          void showAccount();
+        }),
+      );
+    } else if (!(checklist.complete && hidden)) {
       const runCta = (item: ChecklistItem): void => {
         switch (item.cta) {
           case "Choose Starter Deck":
@@ -998,14 +1011,18 @@ export async function mountAccount(
         }
       };
       nodes.push(
-        renderChecklistCard(checklist, dismissed && !checklist.complete, {
+        renderChecklistCard(checklist, onboardingExpanded ? "expanded" : "compact", {
           onCta: runCta,
-          onCollapse: () => {
-            setOnboardingDismissed(tutorialStore, true);
+          onExpand: () => {
+            onboardingExpanded = true;
             void showAccount();
           },
-          onExpand: () => {
-            setOnboardingDismissed(tutorialStore, false);
+          onCollapse: () => {
+            onboardingExpanded = false;
+            void showAccount();
+          },
+          onHide: () => {
+            setOnboardingDismissed(tutorialStore, true);
             void showAccount();
           },
           onDismissComplete: () => {
