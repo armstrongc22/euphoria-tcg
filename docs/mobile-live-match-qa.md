@@ -66,8 +66,52 @@ which is what pushes mobile Safari/Chrome to discard and reload the tab.
   or a proven-invalid replay (never silently).
 - Confirm the saved record exists: `localStorage["euphoria.activeMatch.v1"]`.
 
+## In-app debug panel + stability toggles
+
+With `localStorage.euphoriaDebug = "1"` a **debug panel** appears bottom-right on
+the device (no devtools needed). It shows: build stamp, current view, and live
+match metrics (turn, events, `logRows`, `playbackQueue`, `pendingTimers`,
+`floaters`, `beams`, `domNodes`, `imageNodes`, `artNodes`), resume-snapshot
+existence/size/age, last save time, last lifecycle event, and last error. Buttons:
+**Copy Debug Dump** (to clipboard, falls back to console), **Force save snapshot**,
+**Simulate reload check** (reports whether Resume would show), and the toggles
+below. `euphoriaDebugDump()` in the console still works too.
+
+### Stability toggles (all `localStorage`, value `"1"`)
+
+| Flag | Effect |
+| --- | --- |
+| `euphoriaDebug` | Master gate: diagnostics + debug panel. |
+| `euphoriaLowPower` | Tighter caps (rendered log → 25, smaller art cache). |
+| `euphoriaNoAnim` | Disables Web Animations, attack beams, and float motion (state changes still shown). |
+| `euphoriaNoArt` | Live battlefield uses text placeholders, no `<img>` art (detail modal art is unaffected). |
+| `euphoriaNoPlayback` | Condenses opponent playback to a single callout (no step queue/timers). |
+| `euphoriaNoSnapshot` | Disables resume-snapshot writes (isolate localStorage write pressure). |
+| `euphoriaSafeMode` | Mobile Safe Mode: low-power + no-anim + condensed playback + throttled snapshots. |
+
+Toggle them from the panel, or set in the console then reload.
+
+## Controlled test matrix (Feature E)
+
+Run each on the device, **play 20+ turns**, and record: did a reload happen? at
+what turn? did Resume appear after? then `euphoriaDebugDump()` (or Copy Debug Dump).
+
+| Test | Flags (all with `euphoriaDebug=1`) | Isolates |
+| --- | --- | --- |
+| 1. Normal | (none extra) | Baseline |
+| 2. No animations | `euphoriaNoAnim=1` | Web Animations / beams / float motion |
+| 3. No art | `euphoriaNoArt=1` | Card image decoding/memory |
+| 4. No playback | `euphoriaNoPlayback=1` | Opponent playback queue/timers |
+| 5. Full safe mode | `euphoriaLowPower=1` + `euphoriaNoAnim=1` + `euphoriaNoArt=1` | Combined pressure |
+| 6. No snapshot | `euphoriaNoSnapshot=1` | localStorage write pressure |
+
+If a reload **stops** under one toggle, that subsystem is the culprit — report
+which test was clean. Compare `artNodes` / `imageNodes` / `domNodes` growth across
+tests in the dumps.
+
 ## Known limitation
 
-Animations and image decoding can't be measured in jsdom, so the bounded-DOM and
-node-reuse behavior is asserted structurally in tests; the actual mobile memory
-profile should be confirmed on-device with the diagnostics above.
+Animations and image decoding can't be measured in jsdom, so the bounded-DOM,
+node-reuse, and toggle behavior are asserted structurally in tests; the actual
+mobile memory profile and which subsystem triggers the reload must be confirmed
+on-device with the panel + test matrix above.

@@ -87,7 +87,77 @@ export function setMatchActive(active: boolean): void {
 
 /** Records a periodic snapshot of match/runtime counters (debug only). */
 export function recordMatchMetrics(metrics: Record<string, number>): void {
+  lastMetrics = metrics;
   logDebug("metrics", metrics);
+}
+
+// --- live metrics for the in-app debug panel --------------------------------
+
+/** The most recent metrics recorded by the active board (null when none). */
+let lastMetrics: Record<string, number> | null = null;
+
+/** A provider the active board registers so the panel can pull LIVE counters. */
+type MetricsProvider = () => Record<string, number>;
+let metricsProvider: MetricsProvider | null = null;
+
+/** Registers (or clears with null) the live-metrics provider for the panel. */
+export function setMetricsProvider(provider: MetricsProvider | null): void {
+  metricsProvider = provider;
+}
+
+/** Current live match metrics (provider if registered, else the last snapshot). */
+export function getLiveMetrics(): Record<string, number> {
+  if (metricsProvider !== null) {
+    try {
+      return metricsProvider();
+    } catch {
+      /* provider threw — fall back to the last recorded snapshot */
+    }
+  }
+  return lastMetrics ?? {};
+}
+
+/** The build stamp injected at build time (set once from main.ts). */
+let buildStamp = "dev";
+export function setBuildStamp(stamp: string): void {
+  buildStamp = stamp;
+}
+export function getBuildStamp(): string {
+  return buildStamp;
+}
+
+/** The last resume-snapshot save time, for the panel (set by the recovery flow). */
+let lastSnapshotSaveAt: string | null = null;
+export function noteSnapshotSaved(at: string = new Date().toISOString()): void {
+  lastSnapshotSaveAt = at;
+}
+export function getLastSnapshotSaveAt(): string | null {
+  return lastSnapshotSaveAt;
+}
+
+/** The most recent recorded error/rejection text, for the panel (or null). */
+export function lastErrorText(): string | null {
+  const events = readDebugLog();
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i]!;
+    if (e.kind === "error" || e.kind === "unhandledrejection") {
+      return String(e.data?.["message"] ?? e.data?.["reason"] ?? e.kind);
+    }
+  }
+  return null;
+}
+
+/** The most recent page-lifecycle event kind/state, for the panel (or null). */
+export function lastLifecycleEvent(): string | null {
+  const events = readDebugLog();
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i]!;
+    if (e.kind === "pagehide" || e.kind === "visibilitychange") {
+      const state = e.data?.["state"];
+      return state !== undefined ? `${e.kind}:${String(state)}` : e.kind;
+    }
+  }
+  return null;
 }
 
 /**
