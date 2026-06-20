@@ -1,20 +1,32 @@
 /**
- * "Getting Started" checklist card — a PURE DOM builder (jsdom-testable) over the
- * computed {@link Checklist}. Deliberately prominent (Feature I): a heading, a
- * progress bar, status-marked rows, and the current step's CTA — not tiny helper
- * text. Three shapes: full (default), collapsed (after "Skip for now"), and a
- * small completion card. All behavior is the injected callbacks; no auth/network.
+ * "Getting Started" card — a PURE DOM builder (jsdom-testable) over the computed
+ * {@link Checklist}. Designed as a COMPACT quest-log card, not an admin list:
+ *
+ *   - compact (default): title, progress, the CURRENT step only + its CTA, and a
+ *     "Show all steps" link. Upcoming/locked steps are NOT rendered.
+ *   - expanded: the same header plus all 8 steps as compact rows (current
+ *     highlighted), and a "Collapse" link.
+ *   - complete: a small "you're set up" card with a Dismiss.
+ *
+ * A separate {@link renderShowGuide} renders the tiny "Show Getting Started"
+ * button shown after the guide is hidden. All behavior is the injected
+ * callbacks; no auth/network/state — the checklist logic lives elsewhere.
  */
 import type { Checklist, ChecklistItem } from "./onboarding-checklist";
+
+/** Which shape to render. */
+export type ChecklistView = "compact" | "expanded";
 
 export interface ChecklistCardCallbacks {
   /** Fired when the current step's CTA is clicked. */
   readonly onCta: (item: ChecklistItem) => void;
-  /** Collapse the full checklist to a small card ("Skip for now"). */
-  readonly onCollapse: () => void;
-  /** Re-expand a collapsed checklist ("Show all steps"). */
+  /** compact → expanded ("Show all steps"). */
   readonly onExpand: () => void;
-  /** Dismiss the completion card entirely. */
+  /** expanded → compact ("Collapse"). */
+  readonly onCollapse: () => void;
+  /** Hide the guide entirely ("Hide guide"); bring back via renderShowGuide. */
+  readonly onHide: () => void;
+  /** Dismiss the completion card. */
   readonly onDismissComplete: () => void;
 }
 
@@ -47,108 +59,113 @@ function ctaButton(item: ChecklistItem, onCta: ChecklistCardCallbacks["onCta"]):
   return btn;
 }
 
+/** A status row. The current row also carries its body + CTA; others are compact. */
+function itemRow(
+  item: ChecklistItem,
+  onCta: ChecklistCardCallbacks["onCta"],
+): HTMLElement {
+  const li = document.createElement("li");
+  li.className = `onboarding__item onboarding__item--${item.status}`;
+  li.dataset.step = item.id;
+  const mark = document.createElement("span");
+  mark.className = "onboarding__mark";
+  mark.setAttribute("aria-hidden", "true");
+  mark.textContent = STATUS_GLYPH[item.status];
+  const text = document.createElement("div");
+  text.className = "onboarding__item-text";
+  const label = document.createElement("span");
+  label.className = "onboarding__label";
+  label.textContent = item.label;
+  text.append(label);
+  if (item.status === "current") {
+    const body = document.createElement("p");
+    body.className = "onboarding__body";
+    body.textContent = item.body;
+    text.append(body);
+    if (item.cta !== undefined) text.append(ctaButton(item, onCta));
+  }
+  li.append(mark, text);
+  return li;
+}
+
+function textButton(label: string, cls: string, onClick: () => void): HTMLElement {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = cls;
+  b.textContent = label;
+  b.addEventListener("click", onClick);
+  return b;
+}
+
 /** The current actionable item, if any. */
 function currentItem(checklist: Checklist): ChecklistItem | undefined {
   return checklist.items.find((i) => i.id === checklist.currentId);
 }
 
 /**
- * Builds the checklist card for the given state. `collapsed` shows the compact
- * shape. A completed checklist renders a small completion card regardless.
+ * Builds the compact (default) or expanded "Getting Started" card. A completed
+ * checklist always renders the small completion card.
  */
 export function renderChecklistCard(
   checklist: Checklist,
-  collapsed: boolean,
+  view: ChecklistView,
   cb: ChecklistCardCallbacks,
 ): HTMLElement {
   const card = document.createElement("section");
   card.className = "account__panel onboarding";
   card.dataset.complete = String(checklist.complete);
 
-  // Completion state (Feature G): short message + dismiss.
+  // Completion: short, satisfying, dismissible.
   if (checklist.complete) {
     card.classList.add("onboarding--complete");
     card.innerHTML =
       `<h3 class="onboarding__heading">You're all set 🎉</h3>` +
       `<p class="onboarding__body"></p>`;
     card.querySelector(".onboarding__body")!.textContent = checklist.completionMessage;
-    const dismiss = document.createElement("button");
-    dismiss.type = "button";
-    dismiss.className = "onboarding__dismiss";
-    dismiss.textContent = "Dismiss";
-    dismiss.addEventListener("click", cb.onDismissComplete);
-    card.append(dismiss);
+    card.append(textButton("Dismiss", "onboarding__dismiss", cb.onDismissComplete));
     return card;
   }
 
+  card.classList.add(view === "compact" ? "onboarding--compact" : "onboarding--expanded");
+
+  // Header: title + progress (same in both shapes).
+  const head = document.createElement("div");
+  head.className = "onboarding__head";
   const heading = document.createElement("h3");
   heading.className = "onboarding__heading";
   heading.textContent = "Getting Started";
-  card.append(heading);
-
-  const count = document.createElement("p");
+  const count = document.createElement("span");
   count.className = "onboarding__count";
   count.textContent = `${checklist.doneCount} of ${checklist.total} complete`;
-  card.append(count);
-  card.append(progressBar(checklist.doneCount, checklist.total));
+  head.append(heading, count);
+  card.append(head, progressBar(checklist.doneCount, checklist.total));
 
-  const current = currentItem(checklist);
-
-  if (collapsed) {
-    // Compact shape: just the current step + CTA + a way to expand.
-    card.classList.add("onboarding--collapsed");
-    if (current !== undefined) {
-      const body = document.createElement("p");
-      body.className = "onboarding__body";
-      body.textContent = current.body;
-      card.append(body);
-      if (current.cta !== undefined) card.append(ctaButton(current, cb.onCta));
-    }
-    const expand = document.createElement("button");
-    expand.type = "button";
-    expand.className = "onboarding__expand";
-    expand.textContent = "Show all steps";
-    expand.addEventListener("click", cb.onExpand);
-    card.append(expand);
-    return card;
-  }
-
-  // Full shape: every step as a status row.
   const list = document.createElement("ol");
   list.className = "onboarding__list";
-  for (const item of checklist.items) {
-    const li = document.createElement("li");
-    li.className = `onboarding__item onboarding__item--${item.status}`;
-    li.dataset.step = item.id;
-    const mark = document.createElement("span");
-    mark.className = "onboarding__mark";
-    mark.setAttribute("aria-hidden", "true");
-    mark.textContent = STATUS_GLYPH[item.status];
-    const text = document.createElement("div");
-    text.className = "onboarding__item-text";
-    const label = document.createElement("span");
-    label.className = "onboarding__label";
-    label.textContent = item.label;
-    text.append(label);
-    // Only the current step shows its explanatory body + CTA inline.
-    if (item.status === "current") {
-      const body = document.createElement("p");
-      body.className = "onboarding__body";
-      body.textContent = item.body;
-      text.append(body);
-      if (item.cta !== undefined) text.append(ctaButton(item, cb.onCta));
-    }
-    li.append(mark, text);
-    list.append(li);
+  if (view === "compact") {
+    // Only the current step — no locked future rows taking over the page.
+    const current = currentItem(checklist);
+    if (current !== undefined) list.append(itemRow(current, cb.onCta));
+  } else {
+    for (const item of checklist.items) list.append(itemRow(item, cb.onCta));
   }
   card.append(list);
 
-  const skip = document.createElement("button");
-  skip.type = "button";
-  skip.className = "onboarding__collapse";
-  skip.textContent = "Skip for now";
-  skip.addEventListener("click", cb.onCollapse);
-  card.append(skip);
+  // Footer controls.
+  const footer = document.createElement("div");
+  footer.className = "onboarding__footer";
+  footer.append(
+    view === "compact"
+      ? textButton("Show all steps", "onboarding__expand", cb.onExpand)
+      : textButton("Collapse", "onboarding__collapse", cb.onCollapse),
+  );
+  footer.append(textButton("Hide guide", "onboarding__hide", cb.onHide));
+  card.append(footer);
 
   return card;
+}
+
+/** The tiny "Show Getting Started" button shown once the guide is hidden. */
+export function renderShowGuide(onShow: () => void): HTMLElement {
+  return textButton("Show Getting Started", "onboarding__show", onShow);
 }

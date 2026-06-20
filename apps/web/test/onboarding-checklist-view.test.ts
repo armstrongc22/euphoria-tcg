@@ -1,12 +1,15 @@
 /**
  * @vitest-environment jsdom
  *
- * Getting Started checklist card: prominent full shape, the current step's CTA,
- * the collapsed shape (after Skip), and the completion shape.
+ * Getting Started card: compact (default) shows only the current step; expanded
+ * shows all 8; completion + hidden states. Visual redesign behavior.
  */
 import { describe, expect, it, vi } from "vitest";
 import { buildChecklist, type ChecklistState } from "../src/onboarding-checklist";
-import { renderChecklistCard } from "../src/onboarding-checklist-view";
+import {
+  renderChecklistCard,
+  renderShowGuide,
+} from "../src/onboarding-checklist-view";
 
 const fresh: ChecklistState = {
   hasFaction: false,
@@ -21,47 +24,72 @@ const fresh: ChecklistState = {
 
 const cbs = () => ({
   onCta: vi.fn(),
-  onCollapse: vi.fn(),
   onExpand: vi.fn(),
+  onCollapse: vi.fn(),
+  onHide: vi.fn(),
   onDismissComplete: vi.fn(),
 });
 
-describe("renderChecklistCard", () => {
-  it("renders a prominent heading, progress bar, and all 8 rows (full)", () => {
-    const card = renderChecklistCard(buildChecklist(fresh), false, cbs());
+describe("renderChecklistCard — compact (default)", () => {
+  it("shows title, progress, the current step + CTA, and Show all steps", () => {
+    const card = renderChecklistCard(buildChecklist(fresh), "compact", cbs());
+    expect(card.classList.contains("onboarding--compact")).toBe(true);
     expect(card.querySelector(".onboarding__heading")?.textContent).toBe("Getting Started");
+    expect(card.querySelector(".onboarding__count")?.textContent).toBe("0 of 8 complete");
     expect(card.querySelector(".onboarding__progress")).not.toBeNull();
-    expect(card.querySelectorAll(".onboarding__item")).toHaveLength(8);
-    // The first step is current with its CTA inline.
     const current = card.querySelector<HTMLElement>(".onboarding__item--current");
     expect(current?.dataset.step).toBe("choose-starter");
     expect(current?.textContent).toContain("Choose Starter Deck");
+    expect(card.querySelector(".onboarding__expand")?.textContent).toBe("Show all steps");
   });
 
-  it("fires onCta with the current item when its CTA is clicked", () => {
+  it("does NOT render upcoming/locked steps by default (only the current one)", () => {
+    const card = renderChecklistCard(buildChecklist(fresh), "compact", cbs());
+    expect(card.querySelectorAll(".onboarding__item")).toHaveLength(1);
+    expect(card.querySelector(".onboarding__item--upcoming")).toBeNull();
+  });
+
+  it("Show all steps expands; Hide guide hides", () => {
     const cb = cbs();
-    const card = renderChecklistCard(buildChecklist(fresh), false, cb);
+    const card = renderChecklistCard(buildChecklist(fresh), "compact", cb);
+    card.querySelector<HTMLButtonElement>(".onboarding__expand")!.click();
+    expect(cb.onExpand).toHaveBeenCalledTimes(1);
+    card.querySelector<HTMLButtonElement>(".onboarding__hide")!.click();
+    expect(cb.onHide).toHaveBeenCalledTimes(1);
+  });
+
+  it("CTA fires with the current item", () => {
+    const cb = cbs();
+    const card = renderChecklistCard(buildChecklist(fresh), "compact", cb);
     card.querySelector<HTMLButtonElement>(".onboarding__cta")!.click();
-    expect(cb.onCta).toHaveBeenCalledTimes(1);
     expect(cb.onCta.mock.calls[0]![0].id).toBe("choose-starter");
   });
+});
 
-  it("Skip for now collapses (and Show all steps expands)", () => {
+describe("renderChecklistCard — expanded", () => {
+  it("shows all 8 compact rows with their statuses and a Collapse control", () => {
+    const c = buildChecklist({ ...fresh, hasFaction: true });
     const cb = cbs();
-    const full = renderChecklistCard(buildChecklist(fresh), false, cb);
-    full.querySelector<HTMLButtonElement>(".onboarding__collapse")!.click();
+    const card = renderChecklistCard(c, "expanded", cb);
+    expect(card.classList.contains("onboarding--expanded")).toBe(true);
+    expect(card.querySelectorAll(".onboarding__item")).toHaveLength(8);
+    // First step done, second current.
+    expect(card.querySelector('[data-step="choose-starter"]')?.className).toContain(
+      "onboarding__item--done",
+    );
+    expect(card.querySelector('[data-step="play-first-match"]')?.className).toContain(
+      "onboarding__item--current",
+    );
+    expect(card.querySelector('[data-step="win-first-match"]')?.className).toContain(
+      "onboarding__item--upcoming",
+    );
+    card.querySelector<HTMLButtonElement>(".onboarding__collapse")!.click();
     expect(cb.onCollapse).toHaveBeenCalledTimes(1);
-
-    // Collapsed shape: compact, no full row list, but keeps the current CTA.
-    const collapsed = renderChecklistCard(buildChecklist(fresh), true, cb);
-    expect(collapsed.classList.contains("onboarding--collapsed")).toBe(true);
-    expect(collapsed.querySelectorAll(".onboarding__item")).toHaveLength(0);
-    expect(collapsed.querySelector(".onboarding__cta")).not.toBeNull();
-    collapsed.querySelector<HTMLButtonElement>(".onboarding__expand")!.click();
-    expect(cb.onExpand).toHaveBeenCalledTimes(1);
   });
+});
 
-  it("renders the completion card with a dismiss action", () => {
+describe("renderChecklistCard — completion + hidden", () => {
+  it("renders the completion card with a Dismiss", () => {
     const complete = buildChecklist({
       ...fresh,
       hasFaction: true,
@@ -71,12 +99,19 @@ describe("renderChecklistCard", () => {
       hasCustomDeck: true,
       customDeckMatchPlayed: true,
     });
-    expect(complete.complete).toBe(true);
     const cb = cbs();
-    const card = renderChecklistCard(complete, false, cb);
+    const card = renderChecklistCard(complete, "compact", cb);
     expect(card.classList.contains("onboarding--complete")).toBe(true);
     expect(card.textContent).toContain("You're set up");
     card.querySelector<HTMLButtonElement>(".onboarding__dismiss")!.click();
     expect(cb.onDismissComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("renderShowGuide brings the hidden guide back", () => {
+    const onShow = vi.fn();
+    const btn = renderShowGuide(onShow);
+    expect(btn.textContent).toBe("Show Getting Started");
+    btn.click();
+    expect(onShow).toHaveBeenCalledTimes(1);
   });
 });

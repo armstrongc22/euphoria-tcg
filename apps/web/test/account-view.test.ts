@@ -178,15 +178,18 @@ describe("mountAccount match stats", () => {
     return { container };
   }
 
-  it("shows the Getting Started checklist and a Reset tutorial tips button", async () => {
+  it("shows a COMPACT Getting Started card (current step only) by default", async () => {
     window.localStorage.clear();
     const { container } = await signedInAccount();
-    // Faction chosen, no matches → the checklist's current step is "Play first match".
     const onboarding = container.querySelector(".onboarding");
     expect(onboarding).not.toBeNull();
+    expect(onboarding?.classList.contains("onboarding--compact")).toBe(true);
     expect(onboarding?.textContent).toContain("Getting Started");
+    // Faction chosen, no matches → current step is "Play first match"…
     const current = onboarding!.querySelector<HTMLElement>(".onboarding__item--current");
     expect(current?.dataset.step).toBe("play-first-match");
+    // …and the locked future steps are NOT rendered by default.
+    expect(onboarding!.querySelectorAll(".onboarding__item")).toHaveLength(1);
     expect(container.querySelector(".account__reset-tutorial")).not.toBeNull();
   });
 
@@ -239,29 +242,48 @@ describe("mountAccount match stats", () => {
     ).toMatch(/win|completed a match/i);
     container.querySelector<HTMLButtonElement>(".match-result__back")!.click();
     await flush();
-    // The checklist's "play first match" step is now done; current advanced past it.
-    const playStep = container.querySelector<HTMLElement>(
-      '.onboarding__item[data-step="play-first-match"]',
-    );
-    expect(playStep?.className).toContain("onboarding__item--done");
+    // "Play first match" is now done, so the compact card's current step has
+    // advanced past it (compact renders only the current step).
+    const current = container.querySelector<HTMLElement>(".onboarding__item--current");
+    expect(current).not.toBeNull();
+    expect(current!.dataset.step).not.toBe("play-first-match");
+    expect(current!.dataset.step).not.toBe("choose-starter");
   });
 
-  it("Skip collapses the checklist but keeps the current next-step CTA", async () => {
+  it("Show all steps expands to the full list; Collapse returns to compact", async () => {
     window.localStorage.clear();
     const { container } = await signedInAccount();
-    container.querySelector<HTMLButtonElement>(".onboarding__collapse")!.click();
+    // Default compact: one item.
+    expect(container.querySelectorAll(".onboarding__item")).toHaveLength(1);
+    container.querySelector<HTMLButtonElement>(".onboarding__expand")!.click();
     await flush();
-    const onboarding = container.querySelector(".onboarding");
-    expect(onboarding?.classList.contains("onboarding--collapsed")).toBe(true);
-    // Collapsed: full rows hidden, but the derived next-step CTA still present.
-    expect(onboarding!.querySelectorAll(".onboarding__item")).toHaveLength(0);
-    expect(onboarding!.querySelector(".onboarding__cta")).not.toBeNull();
-    // Expand brings the full list back.
-    onboarding!.querySelector<HTMLButtonElement>(".onboarding__expand")!.click();
+    const expanded = container.querySelector(".onboarding");
+    expect(expanded?.classList.contains("onboarding--expanded")).toBe(true);
+    expect(container.querySelectorAll(".onboarding__item")).toHaveLength(8);
+    // Collapse returns to the compact single-step card.
+    expanded!.querySelector<HTMLButtonElement>(".onboarding__collapse")!.click();
     await flush();
-    expect(
-      container.querySelectorAll(".onboarding__item").length,
-    ).toBeGreaterThan(0);
+    expect(container.querySelector(".onboarding")?.classList.contains("onboarding--compact"))
+      .toBe(true);
+    expect(container.querySelectorAll(".onboarding__item")).toHaveLength(1);
+  });
+
+  it("Hide guide hides the card and Show Getting Started brings it back", async () => {
+    window.localStorage.clear();
+    const { container } = await signedInAccount();
+    container.querySelector<HTMLButtonElement>(".onboarding__hide")!.click();
+    await flush();
+    expect(container.querySelector(".onboarding")).toBeNull();
+    const show = container.querySelector<HTMLButtonElement>(".onboarding__show");
+    expect(show?.textContent).toBe("Show Getting Started");
+    show!.click();
+    await flush();
+    // Back to the compact card, with the derived next step preserved.
+    const card = container.querySelector(".onboarding");
+    expect(card?.classList.contains("onboarding--compact")).toBe(true);
+    expect(card!.querySelector<HTMLElement>(".onboarding__item--current")?.dataset.step).toBe(
+      "play-first-match",
+    );
   });
 
   it("shows an empty reward inventory before any rewards are earned", async () => {
