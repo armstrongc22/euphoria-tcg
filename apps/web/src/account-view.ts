@@ -519,9 +519,16 @@ export async function mountAccount(
     const claim = async (card: Card): Promise<RewardClaimResult> => {
       const owned = buildOwnedCardInsert(session.userId, card);
       const event = buildRewardEventInsert(session.userId, faction, options, card, milestone);
+      logDebug("rewardClaim", {
+        slug: card.slug,
+        milestone: milestone.milestone,
+        mode: auth.isRemote ? "supabase" : "demo",
+      });
       try {
         await auth.saveReward(session, owned, event);
       } catch (error) {
+        const lastError = error instanceof Error ? error.message : String(error);
+        logDebug("rewardClaimFailed", { slug: card.slug, error: lastError });
         if (auth.isRemote && pendingStore !== null) {
           const queued = appendPendingClaim(pendingStore, {
             userId: session.userId,
@@ -529,8 +536,9 @@ export async function mountAccount(
             event,
             milestone: milestone.milestone,
             cardName: card.name,
-            lastError: error instanceof Error ? error.message : String(error),
+            lastError,
           });
+          logDebug("rewardClaimQueued", { slug: card.slug, status: queued.status });
           // "added" (new) or "duplicate" (already queued for this milestone) both
           // mean the reward IS pending — close to the account, where the pending
           // banner shows. The card is NOT owned until a retry succeeds.
@@ -555,6 +563,7 @@ export async function mountAccount(
       }
       // Saved: close the modal and return to the account, which reloads owned
       // cards from the same source the Deck Builder uses (so the new card shows).
+      logDebug("rewardClaimSaved", { slug: card.slug });
       overlay.remove();
       void showAccount();
       return { ok: true, message: `${card.name} added to your collection!` };
@@ -802,6 +811,13 @@ export async function mountAccount(
     return banner;
   };
 
+  // A live snapshot of the reward/owned pipeline for the debug panel, refreshed
+  // each showAccount. Lets a dump answer "why aren't rewards showing": the auth
+  // mode, win count, owned count, and any pending-claim errors.
+  let rewardDiag: Record<string, unknown> = {
+    mode: auth.isRemote ? "supabase" : "demo",
+  };
+
   // Debug panel (Feature A): mounted only when euphoriaDebug=1. It can force-save
   // the active match and simulate a reload check against the saved snapshot.
   const mountDebugPanel = (host: HTMLElement): void => {
@@ -809,6 +825,7 @@ export async function mountAccount(
       userId: () => session.userId,
       currentView: () => currentView,
       store: recoveryStore,
+      reward: () => rewardDiag,
       forceSave: () => {
         if (activeMatch === null || activeChosen === null) return false;
         return persistMatch(activeMatch, activeChosen, true);
@@ -870,6 +887,17 @@ export async function mountAccount(
     const pending =
       pendingStore !== null ? loadPendingClaims(pendingStore, session.userId) : [];
     if (pending.length > 0) nodes.push(renderPendingRewardBanner(pending));
+    // Refresh the debug panel's reward snapshot from the freshly-loaded data.
+    rewardDiag = {
+      mode: auth.isRemote ? "supabase" : "demo",
+      wins: stats.wins,
+      nextReward: nextRewardMilestone(stats.wins),
+      owned: owned.length,
+      pending: pending.length,
+      pendingErrors: pending
+        .filter((c) => c.lastError.length > 0)
+        .map((c) => `${c.cardName}: ${c.lastError}`),
+    };
     // Surface a resume prompt if a live match was interrupted (scoped to user).
     const saved =
       recoveryStore !== null ? loadActiveMatch(recoveryStore, session.userId) : null;

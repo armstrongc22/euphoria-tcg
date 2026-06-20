@@ -36,6 +36,12 @@ export interface DebugPanelHooks {
   readonly forceSave?: () => boolean;
   /** Validate whether a reload would offer Resume (Feature D.4). */
   readonly simulateReloadCheck?: () => string;
+  /**
+   * A snapshot of the reward/owned pipeline (auth mode, wins, owned count,
+   * pending-claim count + errors), refreshed by the account view. Lets a dump
+   * answer "why aren't rewards showing" without devtools.
+   */
+  readonly reward?: () => Record<string, unknown>;
 }
 
 /** Builds the full debug dump object (also what "Copy" serializes). */
@@ -52,6 +58,7 @@ export function buildDebugDump(hooks: DebugPanelHooks): Record<string, unknown> 
     view: hooks.currentView(),
     flags: Object.fromEntries(STABILITY_FLAGS.map((f) => [f, flag(f)])),
     metrics: getLiveMetrics(),
+    reward: hooks.reward?.() ?? null,
     snapshot: snap,
     lastSnapshotSaveAt: getLastSnapshotSaveAt(),
     lastLifecycle: lastLifecycleEvent(),
@@ -124,6 +131,19 @@ export function createDebugPanel(
 
     body.append(row("build", String(dump["build"])));
     body.append(row("view", String(dump["view"])));
+
+    // Reward/owned pipeline — answers "why aren't rewards showing".
+    const reward = dump["reward"] as Record<string, unknown> | null;
+    if (reward !== null) {
+      for (const key of ["mode", "wins", "nextReward", "owned", "pending"]) {
+        if (reward[key] !== undefined) body.append(row(key, String(reward[key])));
+      }
+      const errs = reward["pendingErrors"];
+      if (Array.isArray(errs) && errs.length > 0) {
+        body.append(row("pendingErr", String(errs[0])));
+      }
+    }
+
     const m = dump["metrics"] as Record<string, number>;
     for (const key of [
       "turn",
