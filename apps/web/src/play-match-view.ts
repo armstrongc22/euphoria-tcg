@@ -48,6 +48,7 @@ import {
   type MatchAnimDetail,
   type PlaybackStep,
 } from "./match-playback";
+import { recordMatchMetrics, setMatchActive } from "./debug-log";
 
 /** Base path Vite serves card art from (see cardImageUrl). */
 const LIVE_ART_BASE = import.meta.env.BASE_URL;
@@ -77,9 +78,15 @@ function playAnim(
   options: KeyframeAnimationOptions,
 ): Animation | null {
   if (el === null || el === undefined) return null;
-  const animate = (el as HTMLElement).animate;
+  const target = el as HTMLElement & { getAnimations?: () => Animation[] };
+  const animate = target.animate;
   if (typeof animate !== "function") return null;
   try {
+    // Cancel any in-flight animation on this element so they never stack up
+    // (Part D: bound the number of live Animation objects on mobile).
+    if (typeof target.getAnimations === "function") {
+      for (const a of target.getAnimations()) a.cancel();
+    }
     return animate.call(el, keyframes, options);
   } catch {
     return null;
@@ -93,6 +100,24 @@ function prefersReducedMotion(): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Coarse "this is a phone / low-power device" check, so we can shed animation
+ * and DOM weight where the forced reload happens — without touching desktop
+ * (fine pointer + wide viewport stay full-fat). Triggers on a coarse pointer +
+ * small viewport, on reduced-motion, or via an explicit opt-in flag.
+ */
+function lowPowerMode(): boolean {
+  try {
+    if (globalThis.localStorage?.getItem("euphoriaLowPower") === "1") return true;
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    const small = window.matchMedia("(max-width: 820px)").matches;
+    if (coarse && small) return true;
+  } catch {
+    /* matchMedia/localStorage unavailable — fall through */
+  }
+  return prefersReducedMotion();
 }
 
 function escapeHtml(text: string): string {
@@ -206,6 +231,17 @@ export function renderPlayableMatch(
 ): PlayableMatchBoard {
   const root = document.createElement("section") as PlayableMatchBoard;
   root.className = "account play-match";
+
+  // Shed animation/DOM weight on phones (preserves desktop). Computed once.
+  const lowPower = lowPowerMode();
+  // Cap the rendered battle log harder on low-power devices.
+  const logCap = lowPower
+    ? Math.min(30, MAX_RENDERED_LOG_ENTRIES)
+    : MAX_RENDERED_LOG_ENTRIES;
+  // Reuse card-art <img> nodes across repaints instead of recreating (and
+  // re-decoding) them every frame — the dominant mobile memory pressure. Keyed
+  // by tile identity; bounded by the number of distinct cards/Warriors in play.
+  const artCache = new Map<string, HTMLImageElement>();
 
   // Transient UI selection state, reset on every successful action.
   let selectedAttacker: string | null = null;
@@ -456,9 +492,23 @@ export function renderPlayableMatch(
       clearTimeout(pendingTimer);
       pendingTimer = undefined;
     }
-    // Drop any transient overlay nodes (e.g. an in-flight attack beam) so nothing
-    // is left animating against a detached board.
+    // Drop any transient overlay nodes (e.g. an in-flight attack beam) and cancel
+    // any running keyframe animations so nothing is left animating against a
+    // detached board (Part D: bound live timers/animations/DOM on teardown).
     root.querySelectorAll(".play-match__beam").forEach((b) => b.remove());
+    const all = root as HTMLElement & { getAnimations?: () => Animation[] };
+    if (typeof all.getAnimations === "function") {
+      try {
+        for (const a of root.querySelectorAll("*")) {
+          const el = a as HTMLElement & { getAnimations?: () => Animation[] };
+          el.getAnimations?.().forEach((anim) => anim.cancel());
+        }
+      } catch {
+        /* getAnimations unsupported — nothing to cancel */
+      }
+    }
+    artCache.clear();
+    setMatchActive(false);
   };
 
   const act = (action: GameAction): void => {
@@ -583,19 +633,24 @@ export function renderPlayableMatch(
   // Opens the shared card-detail modal for `card`, when an inspector is wired.
   const inspect = (card: Card): void => actions.onInspect?.(card);
 
-  // A cropped art thumbnail for a live tile. Decorative (the tile name/stats
-  // carry the meaning); on load failure it flips to a flat placeholder rather
-  // than a broken-image icon, mirroring the Card Viewer's fallback.
-  const cardArt = (card: Card): HTMLImageElement => {
+  // The card-art <img> for a live tile, reused across repaints via `artCache`
+  // (keyed by tile identity) so the same decoded image node is moved into each
+  // new frame rather than recreated/re-decoded — the key mobile-memory fix. On
+  // load failure it flips to a flat placeholder, mirroring the Card Viewer.
+  const cardArt = (card: Card, key: string): HTMLImageElement => {
+    const cached = artCache.get(key);
+    if (cached !== undefined) return cached;
     const img = document.createElement("img");
     img.className = "play-match__art";
     img.alt = "";
     img.loading = "lazy";
+    img.decoding = "async";
     img.src = cardImageUrl(card, LIVE_ART_BASE);
     img.addEventListener("error", () => {
       img.removeAttribute("src");
       img.classList.add("play-match__art--missing");
     });
+    artCache.set(key, img);
     return img;
   };
 
@@ -643,7 +698,7 @@ export function renderPlayableMatch(
 
     const face = document.createElement("div");
     face.className = "play-match__warrior-face";
-    face.append(cardArt(w.card));
+    face.append(cardArt(w.card, `field:${w.instanceId}`));
     const overlay = document.createElement("span");
     overlay.className = "play-match__warrior-overlay";
     overlay.innerHTML =
@@ -972,7 +1027,7 @@ export function renderPlayableMatch(
 
     const head = document.createElement("div");
     head.className = "play-match__selected-head";
-    head.append(cardArt(info.card));
+    head.append(cardArt(info.card, `sel:${info.card.id}`));
     const meta = document.createElement("div");
     meta.className = "play-match__selected-meta";
     meta.innerHTML =
@@ -1212,6 +1267,42 @@ export function renderPlayableMatch(
     renderFloaters(frag, activeFloaters);
 
     root.replaceChildren(frag);
+
+    // Prune cached art for tiles no longer in play, so the cache can't grow
+    // unbounded over a long match (it tracks only on-screen cards/Warriors).
+    if (artCache.size > 0) {
+      const live = new Set<string>();
+      for (const seat of [me, opp]) {
+        for (const w of seat.field) live.add(`field:${w.instanceId}`);
+      }
+      for (const c of me.hand) live.add(`hand:${c.id}`);
+      // The selected-card panel keeps its own art node (it can't share the tile's
+      // node, which is elsewhere in the DOM), so keep its key live too.
+      const sel = selected;
+      if (sel?.kind === "hand") {
+        live.add(`sel:${sel.id}`);
+      } else if (sel?.kind === "field") {
+        const w =
+          me.field.find((x) => x.instanceId === sel.id) ??
+          opp.field.find((x) => x.instanceId === sel.id);
+        if (w !== undefined) live.add(`sel:${w.card.id}`);
+      }
+      for (const key of artCache.keys()) {
+        if (!live.has(key)) artCache.delete(key);
+      }
+    }
+
+    // Debug-only: record growth counters so a mobile reload can be correlated
+    // with state/DOM/timer size (no-op unless the debug flag is set).
+    recordMatchMetrics({
+      turn: state.turn,
+      events: state.events.length,
+      logRows: root.querySelectorAll(".play-match__log-entry, .play-match__log-turn").length,
+      artNodes: artCache.size,
+      floaters: activeFloaters.length,
+      playbackQueue: playback ? playback.steps.length - playback.index : 0,
+      domNodes: root.querySelectorAll("*").length,
+    });
   }
 
   /** Anchors each floater near its target Warrior tile or player life area. */
@@ -1498,7 +1589,7 @@ export function renderPlayableMatch(
       // The card face is the full art + name/cost — the primary visual (Feature A).
       const face = document.createElement("div");
       face.className = "play-match__card-face";
-      face.append(cardArt(card));
+      face.append(cardArt(card, `hand:${card.id}`));
       const info = document.createElement("span");
       info.className = "play-match__card-info";
       info.innerHTML =
@@ -1721,10 +1812,8 @@ export function renderPlayableMatch(
     const all = battleLogEntries(state);
     // Render only the most recent rows so the DOM stays bounded on long matches
     // (the full log is still available via battleLogLines / the saved history).
-    const entries =
-      all.length > MAX_RENDERED_LOG_ENTRIES
-        ? all.slice(-MAX_RENDERED_LOG_ENTRIES)
-        : all;
+    // `logCap` is tighter on low-power/mobile devices.
+    const entries = all.length > logCap ? all.slice(-logCap) : all;
     if (all.length === 0) {
       const li = document.createElement("li");
       li.className = "play-match__log-empty";
@@ -1753,6 +1842,7 @@ export function renderPlayableMatch(
   };
 
   root.dispose = dispose;
+  setMatchActive(true); // diagnostics marker: a live match is now on screen
   paint();
   return root;
 }

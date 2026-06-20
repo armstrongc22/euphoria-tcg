@@ -24,7 +24,19 @@ import { mountStarterDecks } from "./starter-view";
 import { mountDeckBuilder } from "./deck-builder-view";
 import { mountRules } from "./rules-view";
 import { mountLore } from "./lore-view";
+import { installDiagnostics } from "./debug-log";
 import type { StarterFaction } from "./starter";
+
+// Build stamp (set by vite.config define): the deployed commit/timestamp, shown
+// in the footer and on window so a tester can confirm the page isn't a stale
+// cached asset. Falls back to "dev" when running unbuilt.
+const BUILD_STAMP: string = import.meta.env.VITE_BUILD_STAMP ?? "dev";
+(window as Window & { __EUPHORIA_BUILD__?: string }).__EUPHORIA_BUILD__ = BUILD_STAMP;
+
+// Opt-in mobile diagnostics (localStorage.euphoriaDebug = "1"): captures uncaught
+// errors, promise rejections, and page lifecycle to help chase the mobile reload.
+// A no-op unless the flag is set; installed before anything else runs.
+installDiagnostics();
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (app === null) throw new Error("#app mount point missing from index.html");
@@ -59,7 +71,7 @@ app.innerHTML = `
   <div id="view-viewer" class="view" hidden></div>
   <div id="view-rules" class="view" hidden></div>
   <div id="view-lore" class="view" hidden></div>
-  <footer class="site-footer">Euphoria TCG · beta</footer>
+  <footer class="site-footer">Euphoria TCG · beta · build ${BUILD_STAMP}</footer>
 `;
 
 const signupEl = document.querySelector<HTMLElement>("#view-signup")!;

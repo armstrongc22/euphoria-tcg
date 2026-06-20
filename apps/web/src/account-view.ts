@@ -18,7 +18,7 @@ import { renderPlayableMatch, type PlayableMatchBoard } from "./play-match-view"
 import { createCardDetail } from "./detail";
 import {
   clearActiveMatch,
-  getSessionStore,
+  getRecoveryStore,
   loadActiveMatch,
   saveActiveMatch,
   type SavedMatch,
@@ -371,9 +371,9 @@ export async function mountAccount(
   };
 
   // Crash/refresh recovery: persist the in-progress live match (seed + deck +
-  // action history) to sessionStorage after each move, so a mobile tab reload
+  // action history) to localStorage after each move, so a mobile tab reload
   // mid-match can offer "Resume". Best-effort — null when storage is unavailable.
-  const recoveryStore = getSessionStore();
+  const recoveryStore = getRecoveryStore();
   const persistMatch = (match: PlayableMatch, chosen: ChosenActiveDeck): void => {
     if (recoveryStore === null) return;
     saveActiveMatch(recoveryStore, {

@@ -8,14 +8,16 @@
  * that descriptor and, on return, rebuild the match by replaying the actions
  * (createPlayableMatch({ replay })). Nothing here imports the engine or DOM.
  *
- * Storage is sessionStorage by default (per-tab; cleared when the tab closes, but
- * preserved across an in-tab reload — exactly the recovery window we want).
+ * Storage is localStorage (see {@link getRecoveryStore}): a mobile browser that
+ * kills a backgrounded tab and reloads it as a fresh navigation loses
+ * sessionStorage, so the recovery record MUST outlive the tab session. It's only
+ * cleared on match end, concede, explicit discard, or a proven-invalid replay.
  */
 import type { GameAction } from "@euphoria/game-engine";
 import { STARTER_FACTIONS, type DeckEntry, type StarterFaction } from "./starter";
 import type { KeyValueStore } from "./signup";
 
-/** sessionStorage key. Versioned so the shape can change without clashing. */
+/** localStorage key. Versioned so the shape can change without clashing. */
 export const ACTIVE_MATCH_KEY = "euphoria.activeMatch.v1";
 
 /** Bumped when {@link SavedMatch}'s shape changes, to invalidate old saves. */
@@ -137,18 +139,25 @@ export function clearActiveMatch(store: KeyValueStore): void {
   }
 }
 
+/** True when a resumable match exists for `userId` (cheap startup check). */
+export function hasResumableMatch(store: KeyValueStore, userId: string): boolean {
+  return loadActiveMatch(store, userId) !== null;
+}
+
 /**
- * Returns a usable sessionStorage, or null when unavailable/blocked (private
- * mode, SSR, disabled storage). The match simply runs without recovery then.
+ * Returns a usable localStorage, or null when unavailable/blocked (private mode,
+ * SSR, disabled storage). localStorage (not sessionStorage) is used so the
+ * recovery record survives a mobile tab being discarded and reloaded as a fresh
+ * navigation. The match simply runs without recovery when storage is absent.
  */
-export function getSessionStore(): KeyValueStore | null {
+export function getRecoveryStore(): KeyValueStore | null {
   try {
-    const ss = globalThis.sessionStorage as KeyValueStore | undefined;
-    if (!ss) return null;
+    const ls = globalThis.localStorage as KeyValueStore | undefined;
+    if (!ls) return null;
     const probe = "__euphoria_probe__";
-    ss.setItem(probe, "1");
-    ss.removeItem(probe);
-    return ss;
+    ls.setItem(probe, "1");
+    ls.removeItem(probe);
+    return ls;
   } catch {
     return null;
   }
