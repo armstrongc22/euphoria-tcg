@@ -26,12 +26,9 @@ import { mountRules } from "./rules-view";
 import { mountLore } from "./lore-view";
 import { installDiagnostics, setBuildStamp } from "./debug-log";
 import { FLAG_DEBUG, flag, setFlag } from "./debug-flags";
-import { clearActiveMatch, getRecoveryStore } from "./match-recovery";
-import {
-  clearPendingClaims,
-  getPendingStore,
-  syncPendingRewards,
-} from "./pending-reward";
+import { getRecoveryStore } from "./match-recovery";
+import { getPendingStore, syncPendingRewards } from "./pending-reward";
+import { resetAllProgression } from "./progression";
 import type { StarterFaction } from "./starter";
 
 // Build stamp (set by vite.config define): the deployed commit/timestamp, shown
@@ -228,18 +225,14 @@ function mountStarter(initialFaction: StarterFaction | null): void {
       void (async () => {
         const s = session ?? (await auth.getSession().catch(() => null));
         if (s !== null) {
-          // Confirmed switch: wipe progression (Supabase rows or local mirrors)
-          // and the in-progress resume snapshot BEFORE changing the faction, so
-          // the account/deck builder reload a clean, new-starter baseline.
+          // Confirmed switch: wipe ALL progression (backend rows + resume snapshot
+          // + pending reward queue) BEFORE changing the faction, so the account /
+          // deck builder reload a clean, new-starter baseline.
           if (resetProgression) {
-            await auth.resetProgression(s).catch(() => {
-              /* best-effort: surfaced by the account reloading its (now empty) data */
+            await resetAllProgression(auth, s, {
+              recovery: getRecoveryStore(),
+              pending: getPendingStore(),
             });
-            const recovery = getRecoveryStore();
-            if (recovery !== null) clearActiveMatch(recovery);
-            // Queued rewards for the old faction are progression too — drop them.
-            const pending = getPendingStore();
-            if (pending !== null) clearPendingClaims(pending, s.userId);
           }
           await auth.saveFaction(s, faction).catch(() => {});
           currentFaction = faction;

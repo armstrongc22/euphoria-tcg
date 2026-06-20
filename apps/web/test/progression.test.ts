@@ -18,6 +18,9 @@ import {
   type RewardMilestone,
 } from "../src/rewards";
 import { availableCards, starterActiveDeck } from "../src/deck-builder";
+import { resetAllProgression } from "../src/progression";
+import { loadActiveMatch, saveActiveMatch } from "../src/match-recovery";
+import { appendPendingClaim, loadPendingClaims } from "../src/pending-reward";
 import type { KeyValueStore } from "../src/signup";
 import type { Card } from "@euphoria/card-data/schema";
 
@@ -158,5 +161,79 @@ describe("resetProgression (starter switch)", () => {
     // No reward-sourced cards remain.
     expect(avail.every((a) => a.source === "starter")).toBe(true);
     expect(avail.find((a) => a.card.slug === card.slug)).toBeUndefined();
+  });
+});
+
+describe("resetAllProgression (full starter-switch reset)", () => {
+  it("clears backend rows, the resume snapshot, and the pending reward queue", async () => {
+    const store = memoryStore();
+    const auth = createLocalAuth(store);
+    const card = rewardCardNotInStarter("Sonic");
+    await claimReward(auth, "Sonic", card);
+    await auth.saveActiveDeck(SESSION, {
+      user_id: SESSION.userId,
+      faction: "Sonic",
+      cards: starterActiveDeck("Sonic"),
+      updated_at: new Date().toISOString(),
+    });
+
+    // Local resume snapshot + pending reward claim (separate localStorage stores).
+    const recovery = memoryStore();
+    const pending = memoryStore();
+    saveActiveMatch(recovery, {
+      userId: SESSION.userId,
+      faction: "Sonic",
+      opponentFaction: "Dwarf",
+      seed: 1,
+      playerDeck: null,
+      actions: [],
+      turn: 3,
+    });
+    appendPendingClaim(pending, {
+      userId: SESSION.userId,
+      owned: buildOwnedCardInsert(SESSION.userId, card),
+      event: buildRewardEventInsert(SESSION.userId, "Sonic", [card], card, MILESTONE),
+      milestone: 5,
+      cardName: card.name,
+      lastError: "x",
+    });
+    // Sanity: everything is present.
+    expect(await auth.getOwnedCards(SESSION)).toHaveLength(1);
+    expect(loadActiveMatch(recovery, SESSION.userId)).not.toBeNull();
+    expect(loadPendingClaims(pending, SESSION.userId)).toHaveLength(1);
+
+    await resetAllProgression(auth, SESSION, { recovery, pending });
+
+    // Backend rows gone…
+    expect(await auth.getOwnedCards(SESSION)).toHaveLength(0);
+    expect((await auth.getMatchStats(SESSION)).total).toBe(0);
+    expect(await auth.getActiveDeck(SESSION, "Sonic")).toBeNull();
+    // …and the local resume snapshot + pending queue gone too.
+    expect(loadActiveMatch(recovery, SESSION.userId)).toBeNull();
+    expect(loadPendingClaims(pending, SESSION.userId)).toHaveLength(0);
+  });
+
+  it("still clears local stores when the backend reset throws (best-effort)", async () => {
+    const recovery = memoryStore();
+    const pending = memoryStore();
+    saveActiveMatch(recovery, {
+      userId: SESSION.userId,
+      faction: "Sonic",
+      opponentFaction: "Dwarf",
+      seed: 1,
+      playerDeck: null,
+      actions: [],
+      turn: 1,
+    });
+    const failingAuth = {
+      isRemote: true,
+      resetProgression: async () => {
+        throw new Error("network down");
+      },
+    } as unknown as Parameters<typeof resetAllProgression>[0];
+    await expect(
+      resetAllProgression(failingAuth, SESSION, { recovery, pending }),
+    ).resolves.toBeUndefined();
+    expect(loadActiveMatch(recovery, SESSION.userId)).toBeNull();
   });
 });

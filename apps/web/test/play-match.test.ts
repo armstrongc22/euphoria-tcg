@@ -59,6 +59,44 @@ describe("createPlayableMatch — starting a match", () => {
       state.players.player1.hand.map((c) => c.id),
     );
   });
+
+  it("uses the custom deck's cards, NOT the starter deck, in the live match", () => {
+    // A custom deck with a composition that the Sonic starter does NOT have:
+    // 30 copies of a single Sonic Warrior. If the live match used the starter
+    // instead, player1's cards would be the varied starter list.
+    const oneCard = cards.find((c) => c.slug === "yojimbo")!;
+    const customEntries = [{ slug: oneCard.slug, quantity: STARTER_DECK_SIZE }];
+
+    const custom = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed: 3,
+      opponentFaction: "Dwarf",
+      playerDeck: customEntries,
+    });
+    const customSlugs = [
+      ...custom.state().players.player1.deck,
+      ...custom.state().players.player1.hand,
+    ].map((c) => c.slug);
+    // The whole player deck is the custom card — the starter never is.
+    expect(customSlugs).toHaveLength(STARTER_DECK_SIZE);
+    expect(customSlugs.every((s) => s === oneCard.slug)).toBe(true);
+
+    // The starter deck (no playerDeck) is varied — proving the two differ.
+    const starter = createPlayableMatch({
+      faction: "Sonic",
+      pool: cards,
+      seed: 3,
+      opponentFaction: "Dwarf",
+    });
+    const starterSlugs = new Set(
+      [
+        ...starter.state().players.player1.deck,
+        ...starter.state().players.player1.hand,
+      ].map((c) => c.slug),
+    );
+    expect(starterSlugs.size).toBeGreaterThan(1);
+  });
 });
 
 describe("createPlayableMatch — legal actions", () => {
