@@ -50,12 +50,16 @@ import {
   syncPendingRewards,
   type PendingRewardClaim,
 } from "./pending-reward";
+import { getTutorialStore, resetTutorial, type NextStep } from "./tutorial";
 import {
-  getTutorialStore,
-  nextStep,
-  resetTutorial,
-  type NextStep,
-} from "./tutorial";
+  buildChecklist,
+  hasOnboardingProgress,
+  isOnboardingDismissed,
+  markOnboardingProgress,
+  setOnboardingDismissed,
+  type ChecklistItem,
+} from "./onboarding-checklist";
+import { renderChecklistCard } from "./onboarding-checklist-view";
 import { createRng } from "@euphoria/game-engine";
 import {
   buildOwnedCardInsert,
@@ -661,6 +665,14 @@ export async function mountAccount(
     });
     const note = deckNote(chosen);
     swapMain(...(note ? [note, result] : [result]));
+    // Onboarding match-completion nudge (Feature D): the result screen already
+    // has Play again + Back to account; add an encouraging win/loss line.
+    const nudge = document.createElement("p");
+    nudge.className = "account__panel-body match-result__onboard-note";
+    nudge.textContent = summary.playerWon
+      ? "Nice win. Wins move you toward reward cards."
+      : "You completed a match. Try again to build toward your first reward.";
+    result.append(nudge);
     if (saveFailed) {
       const warn = document.createElement("p");
       warn.className = "account__panel-body match-result__save-warning";
@@ -704,6 +716,9 @@ export async function mountAccount(
   const launchMatch = (match: PlayableMatch, chosen: ChosenActiveDeck): void => {
     const faction = match.playerFaction;
     currentView = "live-match";
+    // Onboarding marker: a match played with the saved custom deck completes the
+    // final checklist step (no server signal records which deck a match used).
+    if (chosen.isCustom) markOnboardingProgress(tutorialStore, "customDeckMatchPlayed");
     persistMatch(match, chosen, true); // checkpoint the starting/resumed state
     // Reuse the shared card-detail modal (same as the Card Viewer / Deck
     // Builder). It lives as a sibling of the board so the board's in-place
@@ -915,14 +930,8 @@ export async function mountAccount(
       owned: groupOwnedBySlug(owned),
       deckMode: chosen?.isCustom ? "Custom Deck" : "Starter Deck",
       deckNote: chosen?.usedFallback ? chosen.message : undefined,
-      // Contextual onboarding nudge derived from the freshly-loaded state.
-      nextStep: nextStep({
-        hasFaction: info0.faction !== null,
-        matchCount: stats.total,
-        ownedCount: owned.length,
-        pendingCount: pending.length,
-        hasCustomDeck: chosen?.isCustom === true,
-      }),
+      // The prominent "Getting Started" checklist (below) is now the primary
+      // guidance, so the small inline next-step card is omitted here.
     };
     const accountEl = renderAccount(
       info,
@@ -930,16 +939,6 @@ export async function mountAccount(
       handleSignOut,
       showResult,
       (faction) => void showPlayableMatch(faction),
-      (step) => {
-        // Route the next-step CTA: play uses the live faction; the others switch tabs.
-        if (step.cta === "Play match" && info0.faction !== null) {
-          void showPlayableMatch(info0.faction);
-        } else if (step.cta === "Deck Builder") {
-          options.onNavigate?.("deckbuilder");
-        } else if (step.cta === "Starter Decks") {
-          options.onNavigate?.("starter");
-        }
-      },
     );
     // "Reset tutorial tips" (Feature H): clears only tutorial dismissals, never
     // game progression. Re-renders so any re-enabled hints reappear.
@@ -963,6 +962,58 @@ export async function mountAccount(
       warn.textContent = invalidResumeMessage;
       invalidResumeMessage = null;
       nodes.push(warn);
+    }
+    // Prominent "Getting Started" checklist (Onboarding v2) — the primary
+    // guidance, derived from real account state (faction, matches, rewards, deck)
+    // plus two local action markers. Shown until complete-and-dismissed.
+    const checklist = buildChecklist({
+      hasFaction: info0.faction !== null,
+      matchCount: stats.total,
+      winCount: stats.wins,
+      ownedCount: owned.length,
+      pendingCount: pending.length,
+      hasCustomDeck: chosen?.isCustom === true,
+      deckBuilderOpened: hasOnboardingProgress(tutorialStore, "deckBuilderOpened"),
+      customDeckMatchPlayed: hasOnboardingProgress(tutorialStore, "customDeckMatchPlayed"),
+    });
+    const dismissed = isOnboardingDismissed(tutorialStore);
+    if (!(checklist.complete && dismissed)) {
+      const runCta = (item: ChecklistItem): void => {
+        switch (item.cta) {
+          case "Choose Starter Deck":
+            options.onNavigate?.("starter");
+            break;
+          case "Open Deck Builder":
+            options.onNavigate?.("deckbuilder");
+            break;
+          case "Retry Reward Sync":
+            void syncPendingRewards(auth, session, pendingStore).finally(
+              () => void showAccount(),
+            );
+            break;
+          case "Play Match":
+            if (info0.faction !== null) void showPlayableMatch(info0.faction);
+            else options.onNavigate?.("starter");
+            break;
+        }
+      };
+      nodes.push(
+        renderChecklistCard(checklist, dismissed && !checklist.complete, {
+          onCta: runCta,
+          onCollapse: () => {
+            setOnboardingDismissed(tutorialStore, true);
+            void showAccount();
+          },
+          onExpand: () => {
+            setOnboardingDismissed(tutorialStore, false);
+            void showAccount();
+          },
+          onDismissComplete: () => {
+            setOnboardingDismissed(tutorialStore, true);
+            void showAccount();
+          },
+        }),
+      );
     }
     // Any rewards still pending sync (after the retry above) stay visible until
     // each one syncs — never silently discarded.

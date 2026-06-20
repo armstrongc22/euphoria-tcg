@@ -20,6 +20,7 @@ import {
   getTutorialStore,
   isTutorialDismissed,
 } from "./tutorial";
+import { markOnboardingProgress } from "./onboarding-checklist";
 import type { OwnedCardRecord } from "./rewards";
 import type { DeckEntry, StarterFaction } from "./starter";
 import {
@@ -372,6 +373,10 @@ export async function mountDeckBuilder(
     );
     return;
   }
+
+  // Onboarding marker: reaching the builder with a faction completes the
+  // "Open Deck Builder" checklist step (no account-data signal records a visit).
+  markOnboardingProgress(getTutorialStore(), "deckBuilderOpened");
 
   // Retry any rewards that failed to save before loading owned cards, so synced
   // rewards appear in the available pool right away (no-op when nothing pending).
