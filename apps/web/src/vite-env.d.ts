@@ -5,6 +5,8 @@
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_ANON_KEY?: string;
+  /** Build stamp (commit SHA or timestamp) injected by vite.config.ts. */
+  readonly VITE_BUILD_STAMP?: string;
 }
 
 interface ImportMeta {

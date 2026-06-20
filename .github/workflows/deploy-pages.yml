@@ -49,6 +49,9 @@ jobs:
         run: npm run web:build
         env:
           VITE_BASE: /euphoria-tcg/
+          # Stamp the bundle with the deployed commit so the footer/window marker
+          # confirms which build is live (GitHub Pages cache-staleness check).
+          GITHUB_SHA: ${{ github.sha }}
           # Supabase Auth (Phase 1). Set these as repository secrets under
           # Settings → Secrets and variables → Actions. Use only the anon
           # (publishable) key here — never the service_role key. If either is

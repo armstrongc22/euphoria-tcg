@@ -1924,3 +1924,55 @@ describe("renderPlayableMatch — mobile stability on long matches", () => {
     }
   });
 });
+
+describe("renderPlayableMatch — mobile forced-refresh pressure (Part D)", () => {
+  it("reuses the same card-art <img> node across repaints (no recreation)", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    // Grab a hand card's art node, then trigger a repaint by selecting a card.
+    const firstArt = root.querySelector<HTMLImageElement>(
+      ".play-match__card .play-match__art",
+    );
+    expect(firstArt).not.toBeNull();
+    const src = firstArt!.getAttribute("src");
+    // Force several repaints (select toggles re-render the board in place).
+    const face = root.querySelector<HTMLElement>(".play-match__card-face")!;
+    face.click();
+    face.click();
+    face.click();
+    const afterArt = root.querySelector<HTMLImageElement>(
+      ".play-match__card .play-match__art",
+    );
+    // The cached node is moved into the new frame — same element identity + src.
+    expect(afterArt).toBe(firstArt);
+    expect(afterArt!.getAttribute("src")).toBe(src);
+  });
+
+  it("dispose() cancels animations and clears transient nodes", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    // Inject a fake beam to prove dispose sweeps transient overlay nodes.
+    const beam = document.createElement("div");
+    beam.className = "play-match__beam";
+    root.append(beam);
+    expect(root.querySelector(".play-match__beam")).not.toBeNull();
+    root.dispose();
+    expect(root.querySelector(".play-match__beam")).toBeNull();
+    // Idempotent + safe after teardown.
+    expect(() => root.dispose()).not.toThrow();
+  });
+
+  it("renders in low-power mode (coarse pointer) and still plays", () => {
+    window.localStorage.setItem("euphoriaLowPower", "1");
+    try {
+      const match = newMatch();
+      const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+      expect(root.querySelectorAll(".play-match__card").length).toBeGreaterThan(0);
+      // A core action still performs in low-power mode.
+      buttonByText(root, ".play-match__card-btn", "Summon")!.click();
+      expect(match.state().players.player1.field.length).toBe(1);
+    } finally {
+      window.localStorage.removeItem("euphoriaLowPower");
+    }
+  });
+});

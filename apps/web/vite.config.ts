@@ -14,10 +14,21 @@ const repoRoot = path.resolve(here, "..", "..");
 // cardImageUrl uses import.meta.env.BASE_URL, so art resolves under any base.
 const base = process.env["VITE_BASE"] ?? "/";
 
+// A build stamp so a deployed bundle's freshness is verifiable from the page
+// (footer + window.__EUPHORIA_BUILD__). Uses the CI commit SHA when present,
+// else a local timestamp. This is how we confirm GitHub Pages isn't serving a
+// stale asset after a deploy.
+const buildStamp =
+  process.env["GITHUB_SHA"]?.slice(0, 7) ??
+  new Date().toISOString().slice(0, 16).replace("T", " ");
+
 export default defineConfig({
   base,
   root: here,
   publicDir: path.join(repoRoot, "assets", "cards"),
   server: { fs: { allow: [repoRoot] } },
   build: { outDir: path.join(here, "dist"), emptyOutDir: true },
+  define: {
+    "import.meta.env.VITE_BUILD_STAMP": JSON.stringify(buildStamp),
+  },
 });

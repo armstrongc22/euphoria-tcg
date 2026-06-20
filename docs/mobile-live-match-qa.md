@@ -1,40 +1,73 @@
-# Mobile live-match QA (stability)
+# Mobile live-match QA (forced refresh + resume)
 
-Manual check for the mobile forced-refresh fix (long live/manual matches).
+Manual checks for the mobile forced-reload during long live/manual matches, the
+opt-in diagnostics, and Resume Match.
 
-## Why this matters
+## Root cause (updated)
 
-On mobile the live match could force-refresh/reload after ~12–15 turns. Root
-cause: the battle log re-rendered the **entire** match history on every repaint
-(every action and every opponent-playback step), so the live container's DOM
-grew without bound and the mobile browser killed the tab under memory pressure.
+The first stability fix (capping the **rendered** battle log) helped but was not
+the whole story. The dominant remaining pressure was **card-art image nodes**:
+the board recreated a fresh `<img>` (re-decoding the art) for every card on the
+field and in hand on **every** repaint — and the board repaints ~10× per
+opponent turn. Over 15–30 turns that is thousands of image-node creations/decodes,
+which is what pushes mobile Safari/Chrome to discard and reload the tab.
 
-The fix caps the **rendered** battle-log rows (`MAX_RENDERED_LOG_ENTRIES`, latest
-60) while keeping the full history in the engine/log; it also guarantees playback
-timers and transient overlay nodes (attack beam) are cleaned up.
+### Fixes in this change
 
-## How to test on mobile
+- **Reuse card-art `<img>` nodes** across repaints (`artCache`, keyed by tile
+  identity) instead of recreating/re-decoding them — the main memory fix. The
+  cache is pruned to on-screen cards and cleared on teardown.
+- **Cancel keyframe animations** before starting a new one and on `dispose()`, so
+  Web Animations objects can't accumulate; attack beams are swept on teardown.
+- **Low-power mode** on phones (coarse pointer + small viewport, reduced-motion,
+  or `localStorage.euphoriaLowPower = "1"`): tighter rendered-log cap.
+- **Resume now uses `localStorage`** (not `sessionStorage`) so the recovery
+  record survives a tab being discarded and reloaded as a fresh navigation.
+- **Opt-in diagnostics** capture `window.onerror` / `unhandledrejection` /
+  `pagehide` / `visibilitychange` to a ring buffer that survives the reload.
 
-1. Open the site on a phone (or a desktop browser in mobile-emulation mode) and
-   sign in.
-2. Start a live match (Account → **Play match**, or the Deck Builder's Play
-   button).
+## Part A — confirm the deployed build is current
+
+1. Load the site and read the footer: `Euphoria TCG · beta · build <stamp>`.
+   On a CI deploy the stamp is the 7-char commit SHA.
+2. In the console: `window.__EUPHORIA_BUILD__` — should match the footer.
+3. Compare to the latest commit on `master`. If it differs, GitHub Pages is
+   serving a stale asset → hard-refresh / clear site data (below).
+4. **Hard refresh / clear mobile cache:**
+   - iOS Safari: Settings → Safari → Clear History and Website Data, or use a
+     Private tab.
+   - Android Chrome: ⋮ → History → Clear browsing data → Cached images and files,
+     or long-press reload → "Reload (hard)".
+
+## Part B/F — mobile repro + diagnostics
+
+1. (Optional) enable diagnostics on the device console:
+   `localStorage.euphoriaDebug = "1"` then reload.
+2. Start a live match (Account → **Play match**, or Deck Builder → Play).
 3. Play **20+ turns** — summon, attack, end turn through several opponent turns.
-4. Watch for an unexpected reload/refresh of the page. Expected: **no reload**;
-   the match keeps playing smoothly.
-5. Confirm the battle log still shows recent history with a
-   "Showing the latest 60 of N events." note once the match is long enough — the
-   log should not keep growing taller indefinitely.
-6. If you have remote debugging (Safari Web Inspector / Chrome `chrome://inspect`)
-   attached, watch the console for errors and the Elements panel for the live
-   match container's node count — it should stabilise, not climb every turn.
+4. Expected: **no reload**; the match keeps playing.
+5. Inspect diagnostics any time: `euphoriaDebugDump()` in the console returns the
+   last 50 events (errors, page lifecycle, and per-paint metrics: turn, events,
+   `logRows`, `artNodes`, `domNodes`, `playbackQueue`, `floaters`).
+   - `artNodes` and `domNodes` should **stabilise**, not climb every turn.
+   - An `error` / `unhandledrejection` entry near a reload points at a crash;
+     a `pagehide` with `matchActive:true` and no following `matchEnd` points at
+     the browser killing the tab (memory).
+6. If a reload still happens, check whether the **Resume Match** banner appears
+   on the Account page afterwards.
 
-## If a reload still occurs
+## Part C — Resume Match
 
-A full in-match **resume** ("Resume match?") was intentionally deferred (see the
-PR notes): the engine state isn't trivially serialisable, so a safe resume needs
-deterministic action-replay persistence (record the player's `GameAction`s + seed,
-re-apply on reload). The current change removes the growth that caused the
-reload; if a reload is still observed after this fix, capture the turn count,
-device/browser, and any console output and file a follow-up so we can prioritise
-the replay-based resume.
+- The match is persisted after **every** player action (seed + faction/deck +
+  action list), so the latest checkpoint is always one move behind at most.
+- After an interruption, the Account page shows **"Match in progress … Resume?"**
+  with **Resume** (rebuilds the exact match via deterministic replay) and
+  **Discard**. The save is only cleared on match end, concede, explicit discard,
+  or a proven-invalid replay (never silently).
+- Confirm the saved record exists: `localStorage["euphoria.activeMatch.v1"]`.
+
+## Known limitation
+
+Animations and image decoding can't be measured in jsdom, so the bounded-DOM and
+node-reuse behavior is asserted structurally in tests; the actual mobile memory
+profile should be confirmed on-device with the diagnostics above.

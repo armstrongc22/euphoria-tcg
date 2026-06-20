@@ -284,7 +284,7 @@ describe("mountAccount — interrupted-match recovery", () => {
   }
 
   function seedSavedMatch(): void {
-    saveActiveMatch(window.sessionStorage, {
+    saveActiveMatch(window.localStorage, {
       userId: "local-demo",
       faction: "Dwarf",
       opponentFaction: "Sonic",
@@ -296,7 +296,7 @@ describe("mountAccount — interrupted-match recovery", () => {
   }
 
   beforeEach(() => {
-    window.sessionStorage.clear();
+    window.localStorage.clear();
   });
 
   it("shows a Resume banner when a live match was interrupted", async () => {
@@ -327,7 +327,7 @@ describe("mountAccount — interrupted-match recovery", () => {
     const container = await mountDemo();
     container.querySelector<HTMLButtonElement>(".account__resume-discard")!.click();
     await flush();
-    expect(window.sessionStorage.getItem(ACTIVE_MATCH_KEY)).toBeNull();
+    expect(window.localStorage.getItem(ACTIVE_MATCH_KEY)).toBeNull();
     expect(container.querySelector(".account__resume")).toBeNull();
   });
 
@@ -338,10 +338,10 @@ describe("mountAccount — interrupted-match recovery", () => {
     await flush();
     expect(container.querySelector(".play-match")).not.toBeNull();
     // The in-progress match is checkpointed for recovery.
-    expect(window.sessionStorage.getItem(ACTIVE_MATCH_KEY)).not.toBeNull();
+    expect(window.localStorage.getItem(ACTIVE_MATCH_KEY)).not.toBeNull();
     // Conceding abandons the match and clears the saved state.
     container.querySelector<HTMLButtonElement>(".play-match__quit")!.click();
     await flush();
-    expect(window.sessionStorage.getItem(ACTIVE_MATCH_KEY)).toBeNull();
+    expect(window.localStorage.getItem(ACTIVE_MATCH_KEY)).toBeNull();
   });
 });
