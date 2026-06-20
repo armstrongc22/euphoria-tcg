@@ -81,3 +81,41 @@ describe("site navigation", () => {
     expect(view("rules").hidden).toBe(true);
   });
 });
+
+describe("visible debug toggle", () => {
+  beforeEach(async () => {
+    await boot();
+  });
+
+  function debugToggle(): HTMLButtonElement {
+    const el = document.querySelector<HTMLButtonElement>("#debug-toggle");
+    if (el === null) throw new Error("debug toggle not found");
+    return el;
+  }
+
+  it("renders a footer debug toggle that starts off", () => {
+    const btn = debugToggle();
+    expect(btn.textContent?.trim()).toBe("Debug: off");
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    expect(localStorage.getItem("euphoriaDebug")).toBeNull();
+  });
+
+  it("enables debug mode (sets the flag) when clicked", () => {
+    const btn = debugToggle();
+    btn.click();
+    expect(localStorage.getItem("euphoriaDebug")).toBe("1");
+    expect(btn.textContent?.trim()).toBe("Debug: on");
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+    expect(btn.classList.contains("site-footer__debug--on")).toBe(true);
+  });
+
+  it("reflects an already-enabled flag on boot", async () => {
+    localStorage.setItem("euphoriaDebug", "1");
+    document.body.innerHTML = '<div id="app"></div>';
+    vi.resetModules();
+    await import("../src/main");
+    await Promise.resolve();
+    const btn = document.querySelector<HTMLButtonElement>("#debug-toggle")!;
+    expect(btn.textContent?.trim()).toBe("Debug: on");
+  });
+});

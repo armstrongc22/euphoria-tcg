@@ -25,6 +25,7 @@ import { mountDeckBuilder } from "./deck-builder-view";
 import { mountRules } from "./rules-view";
 import { mountLore } from "./lore-view";
 import { installDiagnostics, setBuildStamp } from "./debug-log";
+import { FLAG_DEBUG, flag, setFlag } from "./debug-flags";
 import type { StarterFaction } from "./starter";
 
 // Build stamp (set by vite.config define): the deployed commit/timestamp, shown
@@ -72,7 +73,12 @@ app.innerHTML = `
   <div id="view-viewer" class="view" hidden></div>
   <div id="view-rules" class="view" hidden></div>
   <div id="view-lore" class="view" hidden></div>
-  <footer class="site-footer">Euphoria TCG · beta · build ${BUILD_STAMP}</footer>
+  <footer class="site-footer">
+    <span class="site-footer__text">Euphoria TCG · beta · build ${BUILD_STAMP}</span>
+    <button type="button" id="debug-toggle" class="site-footer__debug" aria-pressed="false">
+      Debug: off
+    </button>
+  </footer>
 `;
 
 const signupEl = document.querySelector<HTMLElement>("#view-signup")!;
@@ -85,6 +91,31 @@ const loreEl = document.querySelector<HTMLElement>("#view-lore")!;
 const tabs = Array.from(
   document.querySelectorAll<HTMLButtonElement>(".site-nav__tab"),
 );
+
+// Visible debug toggle (Feature A): lets a mobile tester turn the diagnostics +
+// in-app debug panel on/off without a console. Reflects the current flag, and
+// reloads so installDiagnostics() / the panel re-initialize consistently.
+const debugToggle = document.querySelector<HTMLButtonElement>("#debug-toggle");
+if (debugToggle !== null) {
+  const syncDebugToggle = (): void => {
+    const on = flag(FLAG_DEBUG);
+    debugToggle.textContent = `Debug: ${on ? "on" : "off"}`;
+    debugToggle.classList.toggle("site-footer__debug--on", on);
+    debugToggle.setAttribute("aria-pressed", on ? "true" : "false");
+  };
+  debugToggle.addEventListener("click", () => {
+    setFlag(FLAG_DEBUG, !flag(FLAG_DEBUG));
+    syncDebugToggle();
+    // Reload so diagnostics capture + the panel mount cleanly for the new state.
+    // Guarded: jsdom (tests) has no navigation, so swallow the "not implemented".
+    try {
+      location.reload();
+    } catch {
+      /* no navigation available (test env) — the flag change still applies */
+    }
+  });
+  syncDebugToggle();
+}
 
 function showView(view: ViewId): void {
   signupEl.hidden = view !== "signup";
