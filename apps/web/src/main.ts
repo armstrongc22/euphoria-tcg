@@ -27,6 +27,11 @@ import { mountLore } from "./lore-view";
 import { installDiagnostics, setBuildStamp } from "./debug-log";
 import { FLAG_DEBUG, flag, setFlag } from "./debug-flags";
 import { clearActiveMatch, getRecoveryStore } from "./match-recovery";
+import {
+  clearPendingClaim,
+  getPendingStore,
+  syncPendingReward,
+} from "./pending-reward";
 import type { StarterFaction } from "./starter";
 
 // Build stamp (set by vite.config define): the deployed commit/timestamp, shown
@@ -232,6 +237,9 @@ function mountStarter(initialFaction: StarterFaction | null): void {
             });
             const recovery = getRecoveryStore();
             if (recovery !== null) clearActiveMatch(recovery);
+            // A queued reward for the old faction is progression too — drop it.
+            const pending = getPendingStore();
+            if (pending !== null) clearPendingClaim(pending);
           }
           await auth.saveFaction(s, faction).catch(() => {});
           currentFaction = faction;
@@ -252,6 +260,10 @@ mountLore(loreEl);
 void (async () => {
   session = await auth.getSession().catch(() => null);
   const profile = session ? await auth.getProfile(session).catch(() => null) : null;
+  // Retry a reward that failed to save in a previous session (best-effort).
+  if (session !== null) {
+    await syncPendingReward(auth, session, getPendingStore()).catch(() => false);
+  }
   await renderSignup();
   mountStarter(profile?.selected_faction ?? null);
   // Signup / Start is the default landing view.

@@ -1152,6 +1152,31 @@ body {
   outline: 1px solid var(--dwarf);
   border-radius: 12px;
 }
+.reward-choice__pending {
+  color: var(--sonic);
+  font-weight: 700;
+}
+.reward-choice--pending {
+  outline: 1px solid var(--sonic);
+  border-radius: 12px;
+}
+
+/* "Reward pending sync" banner on the account page. */
+.account__pending-reward {
+  border: 1px solid var(--sonic);
+  border-left: 4px solid var(--sonic);
+  background: linear-gradient(180deg, rgba(74, 163, 224, 0.12), rgba(0, 0, 0, 0.15));
+}
+.account__pending-reward-error {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+.account__pending-reward-retry {
+  width: auto;
+  margin-top: 0.7rem;
+}
 
 /* Starter-switch confirmation dialog (destructive reset). */
 .starter-confirm {

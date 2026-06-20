@@ -15,14 +15,20 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * The outcome of persisting a chosen reward, returned by `onChoose` so the modal
- * can confirm the claim (or surface a failure + let the player retry). `ok:false`
- * means neither Supabase nor the local fallback saved the card — the modal then
- * re-enables so the player can try again instead of silently losing the reward.
+ * The outcome of persisting a chosen reward, returned by `onChoose`:
+ *   - `ok: true`            — saved to the source of truth; show "claimed".
+ *   - `pending: true`       — the Supabase save failed but the choice was parked
+ *                             as a pending claim to retry; the modal keeps the
+ *                             card chosen (so a DIFFERENT reward can't be claimed
+ *                             for this milestone) and shows a "pending sync" note.
+ *   - neither (`ok: false`) — a hard failure (couldn't even queue it); the modal
+ *                             re-enables so the player can pick again.
  */
 export interface RewardClaimResult {
   readonly ok: boolean;
-  /** A short message shown to the player (success confirmation or error). */
+  /** True when parked as a pending claim after a Supabase failure. */
+  readonly pending?: boolean;
+  /** A short message shown to the player (success / pending / error). */
   readonly message?: string;
 }
 
@@ -80,10 +86,19 @@ export function renderRewardChoice(
       for (const b of grid.querySelectorAll("button")) b.disabled = true;
       button.classList.add("reward-choice__option--chosen");
       body.textContent = `Claiming ${card.name}…`;
-      // Await the save so the modal only confirms "claimed" once it actually
-      // persisted; on failure it re-enables so the reward isn't silently lost.
+      // Await the save so the modal only confirms "claimed" once it persisted.
       void Promise.resolve(onChoose(card)).then((result) => {
-        if (result && result.ok === false) {
+        if (result && result.pending === true) {
+          // Parked as a pending claim: keep THIS card chosen (so a different
+          // reward can't be claimed for the same milestone) and show the note.
+          panel.classList.add("reward-choice--pending");
+          body.className = "account__panel-body reward-choice__pending";
+          body.setAttribute("role", "status");
+          body.textContent =
+            result.message ??
+            "Reward pending sync — we'll retry when your account reconnects.";
+        } else if (result && result.ok === false) {
+          // Hard failure (couldn't even queue): re-enable so the player retries.
           claimed = false;
           panel.classList.remove("reward-choice--claimed");
           panel.classList.add("reward-choice--failed");
