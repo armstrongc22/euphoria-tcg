@@ -2802,3 +2802,132 @@ body {
 .play-match__tutorial-hint-never {
   color: var(--text-dim);
 }
+
+/* ============================================================================
+ * Onboarding v2 — prominent "Getting Started" checklist (Feature I). Mobile-
+ * friendly, clearly more than helper text.
+ * ========================================================================== */
+.onboarding {
+  border: 1px solid var(--surfer);
+  border-top: 3px solid var(--surfer);
+  background: linear-gradient(180deg, rgba(54, 198, 168, 0.14), rgba(0, 0, 0, 0.18));
+}
+.onboarding__heading {
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
+  letter-spacing: 0.01em;
+}
+.onboarding__count {
+  margin: 0 0 0.4rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.onboarding__progress {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  margin-bottom: 0.8rem;
+}
+.onboarding__progress-fill {
+  height: 100%;
+  background: var(--surfer);
+  transition: width 0.3s ease;
+}
+.onboarding__list {
+  list-style: none;
+  margin: 0 0 0.7rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.onboarding__item {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+}
+.onboarding__item--current {
+  background: rgba(54, 198, 168, 0.12);
+  border: 1px solid rgba(54, 198, 168, 0.4);
+}
+.onboarding__item--upcoming {
+  opacity: 0.6;
+}
+.onboarding__mark {
+  flex: 0 0 1.4rem;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.1);
+}
+.onboarding__item--done .onboarding__mark {
+  background: var(--surfer);
+  color: #06231d;
+}
+.onboarding__item--current .onboarding__mark {
+  background: var(--sonic);
+  color: #04121f;
+}
+.onboarding__item-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.onboarding__label {
+  font-weight: 700;
+}
+.onboarding__item--done .onboarding__label {
+  text-decoration: line-through;
+  color: var(--text-dim);
+}
+.onboarding__body {
+  margin: 0.3rem 0 0;
+  color: var(--text);
+  line-height: 1.5;
+}
+.onboarding__cta {
+  width: auto;
+  margin-top: 0.55rem;
+}
+.onboarding__collapse,
+.onboarding__expand,
+.onboarding__dismiss {
+  margin-top: 0.4rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.onboarding--complete {
+  text-align: center;
+}
+.onboarding--complete .onboarding__dismiss {
+  margin-top: 0.6rem;
+}
+
+.match-result__onboard-note {
+  margin-top: 0.6rem;
+  font-weight: 700;
+  color: var(--surfer);
+}
+
+@media (max-width: 560px) {
+  .onboarding__heading {
+    font-size: 1.1rem;
+  }
+  .onboarding__cta {
+    width: 100%;
+  }
+}

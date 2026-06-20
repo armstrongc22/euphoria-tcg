@@ -178,13 +178,15 @@ describe("mountAccount match stats", () => {
     return { container };
   }
 
-  it("shows a contextual next-step card and a Reset tutorial tips button", async () => {
+  it("shows the Getting Started checklist and a Reset tutorial tips button", async () => {
     window.localStorage.clear();
     const { container } = await signedInAccount();
-    // Faction chosen, no matches → "play your first live match".
-    const next = container.querySelector(".account__nextstep");
-    expect(next).not.toBeNull();
-    expect(next?.textContent?.toLowerCase()).toContain("play your first live match");
+    // Faction chosen, no matches → the checklist's current step is "Play first match".
+    const onboarding = container.querySelector(".onboarding");
+    expect(onboarding).not.toBeNull();
+    expect(onboarding?.textContent).toContain("Getting Started");
+    const current = onboarding!.querySelector<HTMLElement>(".onboarding__item--current");
+    expect(current?.dataset.step).toBe("play-first-match");
     expect(container.querySelector(".account__reset-tutorial")).not.toBeNull();
   });
 
@@ -225,6 +227,41 @@ describe("mountAccount match stats", () => {
     expect(stats?.textContent).not.toContain("no matches yet");
     // One match recorded; a recent-match row is now listed.
     expect(container.querySelectorAll(".account__recent-row")).toHaveLength(1);
+  });
+
+  it("advances the checklist + shows a completion nudge after a match", async () => {
+    const { container } = await signedInAccount();
+    container.querySelector<HTMLButtonElement>(".account__play--sim")!.click();
+    await flush();
+    // Feature D: the result screen carries an onboarding nudge.
+    expect(
+      container.querySelector(".match-result__onboard-note")?.textContent ?? "",
+    ).toMatch(/win|completed a match/i);
+    container.querySelector<HTMLButtonElement>(".match-result__back")!.click();
+    await flush();
+    // The checklist's "play first match" step is now done; current advanced past it.
+    const playStep = container.querySelector<HTMLElement>(
+      '.onboarding__item[data-step="play-first-match"]',
+    );
+    expect(playStep?.className).toContain("onboarding__item--done");
+  });
+
+  it("Skip collapses the checklist but keeps the current next-step CTA", async () => {
+    window.localStorage.clear();
+    const { container } = await signedInAccount();
+    container.querySelector<HTMLButtonElement>(".onboarding__collapse")!.click();
+    await flush();
+    const onboarding = container.querySelector(".onboarding");
+    expect(onboarding?.classList.contains("onboarding--collapsed")).toBe(true);
+    // Collapsed: full rows hidden, but the derived next-step CTA still present.
+    expect(onboarding!.querySelectorAll(".onboarding__item")).toHaveLength(0);
+    expect(onboarding!.querySelector(".onboarding__cta")).not.toBeNull();
+    // Expand brings the full list back.
+    onboarding!.querySelector<HTMLButtonElement>(".onboarding__expand")!.click();
+    await flush();
+    expect(
+      container.querySelectorAll(".onboarding__item").length,
+    ).toBeGreaterThan(0);
   });
 
   it("shows an empty reward inventory before any rewards are earned", async () => {
