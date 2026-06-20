@@ -11,6 +11,7 @@
  */
 import type { Card } from "@euphoria/card-data/schema";
 import type { Auth } from "./auth";
+import { describeError } from "./errors";
 import { renderMatchResult } from "./match-view";
 import { runTestMatch, type MatchSummary } from "./match";
 import { createPlayableMatch, ReplayError, type PlayableMatch } from "./play-match";
@@ -527,7 +528,9 @@ export async function mountAccount(
       try {
         await auth.saveReward(session, owned, event);
       } catch (error) {
-        const lastError = error instanceof Error ? error.message : String(error);
+        // Supabase throws a plain error object, not an Error — describeError
+        // pulls out the real Postgres message/code instead of "[object Object]".
+        const lastError = describeError(error);
         logDebug("rewardClaimFailed", { slug: card.slug, error: lastError });
         if (auth.isRemote && pendingStore !== null) {
           const queued = appendPendingClaim(pendingStore, {
