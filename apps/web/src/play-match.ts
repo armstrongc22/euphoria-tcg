@@ -33,7 +33,7 @@ import {
   type MatchSummary,
 } from "./match";
 import { expandDeckEntries } from "./deck-builder";
-import type { DeckEntry, StarterFaction } from "./starter";
+import type { DeckEntry, StarterFaction } from "@euphoria/core/starter";
 
 /** Options for {@link createPlayableMatch}. */
 export interface PlayableMatchOptions {

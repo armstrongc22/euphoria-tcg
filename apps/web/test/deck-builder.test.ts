@@ -5,8 +5,8 @@
  * localStorage fallback. Pure/node — no DOM, no network.
  */
 import { describe, expect, it } from "vitest";
-import { cards } from "../src/cards";
-import { getRecipe, type DeckEntry } from "../src/starter";
+import { cards } from "@euphoria/core/cards";
+import { getRecipe, type DeckEntry } from "@euphoria/core/starter";
 import {
   ACTIVE_DECK_STORAGE_KEY,
   availableCards,

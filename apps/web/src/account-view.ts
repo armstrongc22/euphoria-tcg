@@ -11,7 +11,7 @@
  */
 import type { Card } from "@euphoria/card-data/schema";
 import type { Auth } from "./auth";
-import { describeError } from "./errors";
+import { describeError } from "@euphoria/core/errors";
 import { renderMatchResult } from "./match-view";
 import { runTestMatch, type MatchSummary } from "./match";
 import { createPlayableMatch, ReplayError, type PlayableMatch } from "./play-match";
@@ -25,7 +25,7 @@ import {
   snapshotInfo,
   type SavedMatch,
 } from "./match-recovery";
-import { logDebug, noteSnapshotSaved } from "./debug-log";
+import { logDebug, noteSnapshotSaved } from "@euphoria/core/debug-log";
 import { noSnapshot, snapshotThrottleMs } from "./debug-flags";
 import { createDebugPanel } from "./debug-panel";
 import {
@@ -40,7 +40,7 @@ import {
   deckCardCount,
   getRecipe,
   type StarterFaction,
-} from "./starter";
+} from "@euphoria/core/starter";
 import { chooseActiveDeck, type ChosenActiveDeck } from "./deck-builder";
 import { renderRewardModal, type RewardClaimResult } from "./reward-view";
 import {

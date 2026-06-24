@@ -50,7 +50,7 @@ import {
   recordSignup,
   type KeyValueStore,
 } from "./signup";
-import { STARTER_FACTIONS, type StarterFaction } from "./starter";
+import { STARTER_FACTIONS, type StarterFaction } from "@euphoria/core/starter";
 
 /** A signed-in user, reduced to what the UI needs. */
 export interface AuthSession {

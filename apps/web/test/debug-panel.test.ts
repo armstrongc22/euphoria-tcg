@@ -6,7 +6,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDebugPanel, buildDebugDump } from "../src/debug-panel";
-import { setBuildStamp, setMetricsProvider } from "../src/debug-log";
+import { setBuildStamp, setMetricsProvider } from "@euphoria/core/debug-log";
 import { FLAG_DEBUG, FLAG_NO_ANIM } from "../src/debug-flags";
 import { saveActiveMatch } from "../src/match-recovery";
 import type { KeyValueStore } from "../src/signup";

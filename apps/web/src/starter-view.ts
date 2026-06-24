@@ -6,7 +6,7 @@
  * is regenerated at runtime.
  */
 import type { Card } from "@euphoria/card-data/schema";
-import { cardImageUrl } from "./cards";
+import { cardImageUrl } from "@euphoria/core/cards";
 import {
   STARTER_FACTIONS,
   deckCardCount,
@@ -15,7 +15,7 @@ import {
   resolveFeatured,
   type StarterFaction,
   type StarterRecipe,
-} from "./starter";
+} from "@euphoria/core/starter";
 import {
   dismissTutorial,
   getTutorialStore,

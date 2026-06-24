@@ -12,7 +12,7 @@
  */
 import type { Card } from "@euphoria/card-data/schema";
 import type { Auth } from "./auth";
-import { cardImageUrl } from "./cards";
+import { cardImageUrl } from "@euphoria/core/cards";
 import { createCardDetail } from "./detail";
 import { getPendingStore, syncPendingRewards } from "./pending-reward";
 import {
@@ -22,7 +22,7 @@ import {
 } from "./tutorial";
 import { markOnboardingProgress } from "./onboarding-checklist";
 import type { OwnedCardRecord } from "./rewards";
-import type { DeckEntry, StarterFaction } from "./starter";
+import type { DeckEntry, StarterFaction } from "@euphoria/core/starter";
 import {
   availableCards,
   buildActiveDeckPayload,

@@ -23,10 +23,10 @@ import {
   getRecipe,
   type DeckEntry,
   type StarterFaction,
-} from "./starter";
+} from "@euphoria/core/starter";
 
 /** Re-exported so views can show the target without reaching into ./starter. */
-export { STARTER_DECK_SIZE } from "./starter";
+export { STARTER_DECK_SIZE } from "@euphoria/core/starter";
 
 /** A saved active deck: the faction it belongs to and its card list. */
 export interface ActiveDeck {

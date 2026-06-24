@@ -10,7 +10,7 @@ import {
   uniqueFactions,
   uniqueTypes,
   type CardFilters,
-} from "./filters";
+} from "@euphoria/core/filters";
 
 export function renderControls(
   container: HTMLElement,

@@ -14,7 +14,7 @@
  */
 import type { MatchOutcome, MatchSummary } from "./match";
 import type { KeyValueStore } from "./signup";
-import { STARTER_FACTIONS, type StarterFaction } from "./starter";
+import { STARTER_FACTIONS, type StarterFaction } from "@euphoria/core/starter";
 
 /** localStorage key. Versioned so the shape can change later without clashes. */
 export const MATCH_STORAGE_KEY = "euphoria.matches.v1";

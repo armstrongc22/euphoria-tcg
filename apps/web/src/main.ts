@@ -13,24 +13,24 @@
 import "./styles.css";
 import { mountAccount } from "./account-view";
 import { createAuth, type AuthSession } from "./auth";
-import { cards } from "./cards";
+import { cards } from "@euphoria/core/cards";
 import { renderControls } from "./controls";
 import { createCardDetail } from "./detail";
-import { DEFAULT_FILTERS, filterCards, type CardFilters } from "./filters";
+import { DEFAULT_FILTERS, filterCards, type CardFilters } from "@euphoria/core/filters";
 import { renderGrid } from "./grid";
 import { mountSignup } from "./signup-view";
-import { sortCards } from "./sort";
+import { sortCards } from "@euphoria/core/sort";
 import { mountStarterDecks } from "./starter-view";
 import { mountDeckBuilder } from "./deck-builder-view";
 import { mountRules } from "./rules-view";
 import { mountLore } from "./lore-view";
-import { installDiagnostics, setBuildStamp } from "./debug-log";
+import { installDiagnostics, setBuildStamp } from "@euphoria/core/debug-log";
 import { openFeedbackModal } from "./feedback-view";
 import { FLAG_DEBUG, flag, setFlag } from "./debug-flags";
 import { getRecoveryStore } from "./match-recovery";
 import { getPendingStore, syncPendingRewards } from "./pending-reward";
 import { resetAllProgression } from "./progression";
-import type { StarterFaction } from "./starter";
+import type { StarterFaction } from "@euphoria/core/starter";
 
 // Build stamp (set by vite.config define): the deployed commit/timestamp, shown
 // in the footer, on window, and in the debug panel so a tester can confirm the

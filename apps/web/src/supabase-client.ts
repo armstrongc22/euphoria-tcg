@@ -11,7 +11,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   readSupabaseConfig,
   type SupabaseConfig,
-} from "./supabase-config";
+} from "@euphoria/core/supabase-config";
 
 /** Builds a Supabase client from an explicit config. */
 export function createSupabaseClient(config: SupabaseConfig): SupabaseClient {

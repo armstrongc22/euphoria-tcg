@@ -8,14 +8,14 @@
  * again / Back to account work.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cards } from "../src/cards";
+import { cards } from "@euphoria/core/cards";
 import { mountAccount } from "../src/account-view";
 import { createLocalAuth } from "../src/auth";
 import { appendLocalMatch } from "../src/match-history";
 import { renderMatchResult } from "../src/match-view";
 import { runTestMatch } from "../src/match";
 import type { KeyValueStore } from "../src/signup";
-import type { StarterFaction } from "../src/starter";
+import type { StarterFaction } from "@euphoria/core/starter";
 
 function memoryStore(): KeyValueStore {
   const map = new Map<string, string>();

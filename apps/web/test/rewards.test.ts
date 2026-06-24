@@ -5,8 +5,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { createRng } from "@euphoria/game-engine";
-import { cards } from "../src/cards";
-import { FACTION_SPECIFIC_ITEMS, STARTER_FACTIONS } from "../src/starter";
+import { cards } from "@euphoria/core/cards";
+import { FACTION_SPECIFIC_ITEMS, STARTER_FACTIONS } from "@euphoria/core/starter";
 import {
   appendLocalOwned,
   appendLocalRewardEvent,

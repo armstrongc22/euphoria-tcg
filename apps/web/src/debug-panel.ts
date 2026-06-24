@@ -13,7 +13,7 @@ import {
   lastErrorText,
   lastLifecycleEvent,
   readDebugLog,
-} from "./debug-log";
+} from "@euphoria/core/debug-log";
 import {
   FLAG_DEBUG,
   STABILITY_FLAGS,

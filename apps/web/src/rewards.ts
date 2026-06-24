@@ -19,7 +19,7 @@
  */
 import type { Card, CardType, Faction } from "@euphoria/card-data/schema";
 import type { KeyValueStore } from "./signup";
-import { FACTION_SPECIFIC_ITEMS, type StarterFaction } from "./starter";
+import { FACTION_SPECIFIC_ITEMS, type StarterFaction } from "@euphoria/core/starter";
 
 /** How many reward options a player chooses between after a match. */
 export const REWARD_OPTION_COUNT = 3;

@@ -4,7 +4,7 @@
  * plus the pure availability/inventory functions. Node — no DOM.
  */
 import { describe, expect, it } from "vitest";
-import { cards } from "../src/cards";
+import { cards } from "@euphoria/core/cards";
 import {
   createLocalAuth,
   LOCAL_USER_ID,

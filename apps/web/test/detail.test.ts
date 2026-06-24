@@ -3,7 +3,7 @@
  * these cover the pure `cardDetailFields` derivation.
  */
 import { describe, expect, it } from "vitest";
-import { cards } from "../src/cards";
+import { cards } from "@euphoria/core/cards";
 import { cardDetailFields } from "../src/detail";
 
 function bySlug(slug: string) {

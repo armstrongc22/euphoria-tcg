@@ -5,13 +5,13 @@
  */
 import { describe, expect, it } from "vitest";
 import { createRng } from "@euphoria/game-engine";
-import { cards } from "../src/cards";
+import { cards } from "@euphoria/core/cards";
 import {
   expandStarterDeck,
   pickOpponentFaction,
   runTestMatch,
 } from "../src/match";
-import { STARTER_DECK_SIZE, STARTER_FACTIONS } from "../src/starter";
+import { STARTER_DECK_SIZE, STARTER_FACTIONS } from "@euphoria/core/starter";
 import { expandDeckEntries, starterActiveDeck } from "../src/deck-builder";
 
 describe("expandStarterDeck", () => {

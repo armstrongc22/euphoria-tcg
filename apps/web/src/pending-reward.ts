@@ -12,8 +12,8 @@
  * Demo/local-mode accounts never use this (their saveReward can't fail), so their
  * behavior is unchanged.
  */
-import { logDebug } from "./debug-log";
-import { describeError } from "./errors";
+import { logDebug } from "@euphoria/core/debug-log";
+import { describeError } from "@euphoria/core/errors";
 import type { Auth, AuthSession } from "./auth";
 import type { OwnedCardInsert, RewardEventInsert } from "./rewards";
 import type { KeyValueStore } from "./signup";

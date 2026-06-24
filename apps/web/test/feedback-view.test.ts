@@ -9,7 +9,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFeedbackButton, openFeedbackModal } from "../src/feedback-view";
-import { setBuildStamp } from "../src/debug-log";
+import { setBuildStamp } from "@euphoria/core/debug-log";
 import { pendingFeedbackCount } from "../src/feedback";
 import type { Auth } from "../src/auth";
 import type { KeyValueStore } from "../src/signup";

@@ -6,7 +6,7 @@
  * can't be double-claimed.
  */
 import type { Card } from "@euphoria/card-data/schema";
-import { cardImageUrl } from "./cards";
+import { cardImageUrl } from "@euphoria/core/cards";
 
 function escapeHtml(text: string): string {
   const div = document.createElement("div");

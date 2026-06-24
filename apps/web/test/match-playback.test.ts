@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { GameEvent, GameState } from "@euphoria/game-engine";
-import { cards } from "../src/cards";
+import { cards } from "@euphoria/core/cards";
 import type { MatchFrame } from "../src/play-match";
 import { battleLogLines, toPlaybackSteps } from "../src/match-playback";
 

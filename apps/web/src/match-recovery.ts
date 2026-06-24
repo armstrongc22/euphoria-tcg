@@ -14,7 +14,7 @@
  * cleared on match end, concede, explicit discard, or a proven-invalid replay.
  */
 import type { GameAction } from "@euphoria/game-engine";
-import { STARTER_FACTIONS, type DeckEntry, type StarterFaction } from "./starter";
+import { STARTER_FACTIONS, type DeckEntry, type StarterFaction } from "@euphoria/core/starter";
 import type { KeyValueStore } from "./signup";
 
 /** localStorage key. Versioned so the shape can change without clashing. */

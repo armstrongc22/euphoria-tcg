@@ -10,7 +10,7 @@ import {
   LORE_TITLE,
   type LoreSection,
   type LoreSubsection,
-} from "./lore";
+} from "@euphoria/core/lore";
 
 function paragraphs(parent: HTMLElement, body: readonly string[]): void {
   for (const text of body) {

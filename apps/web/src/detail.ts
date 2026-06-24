@@ -4,7 +4,7 @@
  * so it can be unit-tested without the DOM.
  */
 import type { Card } from "@euphoria/card-data/schema";
-import { cardImageUrl } from "./cards";
+import { cardImageUrl } from "@euphoria/core/cards";
 
 export interface DetailField {
   label: string;

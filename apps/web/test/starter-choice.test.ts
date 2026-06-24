@@ -7,13 +7,13 @@
  * which still resolves to a valid deck.
  */
 import { describe, expect, it, vi } from "vitest";
-import { cards } from "../src/cards";
+import { cards } from "@euphoria/core/cards";
 import { mountStarterDecks, renderFactionChoice } from "../src/starter-view";
 import {
   STARTER_DECK_SIZE,
   STARTER_FACTIONS,
   getRecipe,
-} from "../src/starter";
+} from "@euphoria/core/starter";
 
 describe("renderFactionChoice", () => {
   for (const faction of STARTER_FACTIONS) {

@@ -18,7 +18,7 @@ import {
   STARTER_FACTIONS,
   type DeckEntry,
   type StarterFaction,
-} from "./starter";
+} from "@euphoria/core/starter";
 import { expandDeckEntries } from "./deck-builder";
 
 /** The player is always seat player1; the AI opponent is player2. */

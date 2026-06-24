@@ -38,7 +38,7 @@ import {
   isOutDeckReviveItem,
   isStealHandItem,
 } from "@euphoria/game-engine";
-import { cardImageUrl } from "./cards";
+import { cardImageUrl } from "@euphoria/core/cards";
 import type { MatchSummary } from "./match";
 import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "./play-match";
 import {
@@ -48,7 +48,7 @@ import {
   type MatchAnimDetail,
   type PlaybackStep,
 } from "./match-playback";
-import { recordMatchMetrics, setMatchActive, setMetricsProvider } from "./debug-log";
+import { recordMatchMetrics, setMatchActive, setMetricsProvider } from "@euphoria/core/debug-log";
 import {
   dismissTutorial,
   getTutorialStore,

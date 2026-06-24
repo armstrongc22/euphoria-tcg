@@ -7,11 +7,11 @@
 import { describe, expect, it } from "vitest";
 import type { GameAction } from "@euphoria/game-engine";
 import { smartAgent } from "@euphoria/simulator";
-import { cards } from "../src/cards";
+import { cards } from "@euphoria/core/cards";
 import { createPlayableMatch, ReplayError } from "../src/play-match";
 import { buildMatchHistoryInsert } from "../src/match-history";
 import { starterActiveDeck } from "../src/deck-builder";
-import { STARTER_DECK_SIZE } from "../src/starter";
+import { STARTER_DECK_SIZE } from "@euphoria/core/starter";
 
 describe("createPlayableMatch — starting a match", () => {
   it("starts from the starter deck with the human as player1 to move", () => {

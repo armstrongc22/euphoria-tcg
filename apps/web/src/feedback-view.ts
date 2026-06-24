@@ -15,7 +15,7 @@
  */
 import type { Auth } from "./auth";
 import type { KeyValueStore } from "./signup";
-import { getBuildStamp, readDebugLog } from "./debug-log";
+import { getBuildStamp, readDebugLog } from "@euphoria/core/debug-log";
 import { isLikelyMobile } from "./debug-flags";
 import {
   FEEDBACK_TYPES,

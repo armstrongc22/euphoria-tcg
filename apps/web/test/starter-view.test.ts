@@ -6,9 +6,9 @@
  * image for each card, plus the featured spotlight and the upgrades teaser.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { cards } from "../src/cards";
+import { cards } from "@euphoria/core/cards";
 import { mountStarterDecks, renderDeckPanel } from "../src/starter-view";
-import { STARTER_FACTIONS, getRecipe } from "../src/starter";
+import { STARTER_FACTIONS, getRecipe } from "@euphoria/core/starter";
 
 describe("renderDeckPanel", () => {
   for (const faction of STARTER_FACTIONS) {
