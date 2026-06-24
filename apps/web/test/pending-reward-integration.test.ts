@@ -66,6 +66,7 @@ function fakeRemoteAuth(failSave: { value: boolean }) {
     resetProgression: async () => {
       owned.length = 0;
     },
+    saveFeedback: async () => {},
   };
   return { auth, owned };
 }

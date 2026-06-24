@@ -200,6 +200,12 @@ export interface PlayableMatchActions {
    * wired (e.g. pure tests).
    */
   readonly onAction?: () => void;
+  /**
+   * Fired when the player taps "Report issue" in the live match (Feature A). The
+   * mount (account-view) opens the feedback modal and attaches a compact match
+   * summary. Omitted in pure tests.
+   */
+  readonly onReportIssue?: () => void;
 }
 
 /**
@@ -1166,6 +1172,14 @@ export function renderPlayableMatch(
     concede.textContent = "Concede";
     concede.addEventListener("click", actions.onQuit);
     header.append(concede);
+    if (actions.onReportIssue !== undefined) {
+      const report = document.createElement("button");
+      report.type = "button";
+      report.className = "account__signout play-match__report";
+      report.textContent = "Report issue";
+      report.addEventListener("click", actions.onReportIssue);
+      header.append(report);
+    }
     frag.append(header);
 
     // Prominent turn/phase banner (Feature E): names what's expected of the

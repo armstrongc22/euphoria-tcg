@@ -25,6 +25,7 @@ import { mountDeckBuilder } from "./deck-builder-view";
 import { mountRules } from "./rules-view";
 import { mountLore } from "./lore-view";
 import { installDiagnostics, setBuildStamp } from "./debug-log";
+import { openFeedbackModal } from "./feedback-view";
 import { FLAG_DEBUG, flag, setFlag } from "./debug-flags";
 import { getRecoveryStore } from "./match-recovery";
 import { getPendingStore, syncPendingRewards } from "./pending-reward";
@@ -79,6 +80,7 @@ app.innerHTML = `
   <footer class="site-footer">
     Euphoria TCG · beta · <button type="button" id="build-stamp" class="site-footer__stamp"
       title="Build version">build ${BUILD_STAMP}</button>
+    · <button type="button" id="footer-feedback" class="site-footer__feedback">Send feedback</button>
   </footer>
 `;
 
@@ -133,7 +135,11 @@ if (buildStamp !== null) {
   syncStamp();
 }
 
+// The view currently on screen — read by the footer feedback context.
+let currentView: ViewId = "signup";
+
 function showView(view: ViewId): void {
+  currentView = view;
   signupEl.hidden = view !== "signup";
   starterEl.hidden = view !== "starter";
   deckBuilderEl.hidden = view !== "deckbuilder";
@@ -249,6 +255,24 @@ function mountStarter(initialFaction: StarterFaction | null): void {
         showView("account");
       })();
     },
+  });
+}
+
+// Footer "Send feedback" — available on every view; gathers a lightweight
+// context from the live app state when opened.
+const footerFeedback =
+  document.querySelector<HTMLButtonElement>("#footer-feedback");
+if (footerFeedback !== null) {
+  footerFeedback.addEventListener("click", () => {
+    openFeedbackModal({
+      auth,
+      context: () => ({
+        view: currentView,
+        userId: session?.userId ?? null,
+        email: session?.email ?? null,
+        selectedFaction: currentFaction,
+      }),
+    });
   });
 }
 

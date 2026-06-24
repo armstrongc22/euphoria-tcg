@@ -313,6 +313,78 @@ the static site still works with no backend.
   If Supabase is unavailable or unconfigured, the active deck persists to
   localStorage (per faction) instead, so the deck builder still works offline.
 
+- **`public.feedback_reports`** table — one row per beta feedback / bug report
+  submitted from the in-app "Send feedback" button. Lightweight by design: a
+  type + message plus a compact debug context (build, view, user agent, mobile
+  flag, faction, and a small `context` jsonb), never full deck or match state.
+
+  | Column             | Type          | Notes                                          |
+  | ------------------ | ------------- | ---------------------------------------------- |
+  | `id`               | `uuid` PK     | `default gen_random_uuid()`                    |
+  | `user_id`          | `uuid` (null) | references `auth.users(id)`, `on delete set null` |
+  | `email`            | `text` (null) | optional contact (signed-out reporters)        |
+  | `type`             | `text`        | bug / confusing-ux / balance / card-issue / mobile / general |
+  | `message`          | `text`        | the report body                                |
+  | `view`             | `text` (null) | which view the reporter was on                 |
+  | `build`            | `text` (null) | build stamp / commit                           |
+  | `user_agent`       | `text` (null) | browser UA string                              |
+  | `mobile`           | `boolean`     | `default false`                                |
+  | `selected_faction` | `text` (null) | the reporter's starter faction                 |
+  | `context`          | `jsonb`       | `default '{}'::jsonb` — onboarding/match/reward/debug summary |
+  | `created_at`       | `timestamptz` | DB default on insert                           |
+
+  **RLS**: signed-in users may `insert` only rows tagged with their own id
+  (`auth.uid() = user_id`) and may `select` their own rows; nobody can read the
+  whole table. Anonymous (signed-out) inserts are **off by default** for the
+  beta — if a report can't be sent it is kept in localStorage and retried from
+  the Account page, so feedback is never silently lost. To allow anonymous
+  reports, add the optional `anon` insert policy noted below. The client only
+  ever uses the anon key; **no `service_role` key is in client code.** Run once
+  in the SQL editor:
+
+  ```sql
+  -- feedback_reports: beta feedback / bug reports --------------------------
+  create table if not exists public.feedback_reports (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid references auth.users (id) on delete set null,
+    email text,
+    type text not null,
+    message text not null,
+    view text,
+    build text,
+    user_agent text,
+    mobile boolean not null default false,
+    selected_faction text,
+    context jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null default now()
+  );
+
+  alter table public.feedback_reports enable row level security;
+
+  -- Signed-in users insert reports tagged with their own id.
+  create policy "feedback_reports_insert_own"
+    on public.feedback_reports for insert
+    to authenticated
+    with check (auth.uid() = user_id);
+
+  -- Signed-in users may read back only their own reports (no select-all).
+  create policy "feedback_reports_select_own"
+    on public.feedback_reports for select
+    to authenticated
+    using (auth.uid() = user_id);
+
+  create index if not exists feedback_reports_user_created_idx
+    on public.feedback_reports (user_id, created_at desc);
+
+  -- OPTIONAL — allow anonymous (signed-out) reports. Only enable if you are
+  -- comfortable with unauthenticated inserts (rate-limit / abuse considered).
+  -- The check pins user_id to null so anon rows can never spoof a real user.
+  --   create policy "feedback_reports_insert_anon"
+  --     on public.feedback_reports for insert
+  --     to anon
+  --     with check (user_id is null);
+  ```
+
 ### Schema verification (run this if rewards/progression misbehave)
 
 Paste this in the Supabase SQL editor to confirm every table, the required

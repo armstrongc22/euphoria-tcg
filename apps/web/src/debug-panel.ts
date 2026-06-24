@@ -42,6 +42,8 @@ export interface DebugPanelHooks {
    * answer "why aren't rewards showing" without devtools.
    */
   readonly reward?: () => Record<string, unknown>;
+  /** Opens the feedback / bug-report modal (debug-panel entry point, Feature A). */
+  readonly onFeedback?: () => void;
 }
 
 /** Builds the full debug dump object (also what "Copy" serializes). */
@@ -243,6 +245,15 @@ export function createDebugPanel(
     refreshBtn.textContent = "Refresh";
     refreshBtn.addEventListener("click", () => refresh());
     actions.append(refreshBtn);
+
+    if (hooks.onFeedback !== undefined) {
+      const feedback = document.createElement("button");
+      feedback.type = "button";
+      feedback.className = "debug-panel__btn";
+      feedback.textContent = "Send feedback";
+      feedback.addEventListener("click", () => hooks.onFeedback!());
+      actions.append(feedback);
+    }
 
     body.append(actions);
 

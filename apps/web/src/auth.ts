@@ -41,6 +41,7 @@ import {
   type ActiveDeckPayload,
   type ActiveDeckRecord,
 } from "./deck-builder";
+import type { FeedbackInsert } from "./feedback";
 import {
   clearSignup,
   getLocalStore,
@@ -142,6 +143,13 @@ export interface Auth {
    * clears (it lives in a separate recovery store).
    */
   resetProgression(session: AuthSession): Promise<void>;
+  /**
+   * Persist one beta feedback / bug report. Takes no session — the report's
+   * user_id (or null for anonymous) is already on the insert, so the footer can
+   * send feedback whether or not someone is signed in. Throws on failure so the
+   * caller can fall back to the local pending queue (feedback.ts).
+   */
+  saveFeedback(insert: FeedbackInsert): Promise<void>;
 }
 
 /** Columns selected from match_history; mirrors {@link MatchRecord}. */
@@ -415,6 +423,13 @@ export function createSupabaseAuth(client: SupabaseClient): Auth {
         }
       }
     },
+
+    async saveFeedback(insert) {
+      // created_at/id are DB defaults. RLS allows a user to insert their own
+      // report (auth.uid() = user_id); see apps/web/README.md for the SQL.
+      const { error } = await client.from("feedback_reports").insert(insert);
+      if (error) throw error;
+    },
   };
 }
 
@@ -422,6 +437,9 @@ export function createSupabaseAuth(client: SupabaseClient): Auth {
 
 /** Synthetic user id for the no-backend demo flow. */
 export const LOCAL_USER_ID = "local-demo";
+
+/** localStorage key for demo-mode feedback (no backend). */
+export const LOCAL_FEEDBACK_KEY = "euphoria.feedback.v1";
 
 /**
  * localStorage-only fallback used when Supabase isn't configured. Password is
@@ -523,6 +541,24 @@ export function createLocalAuth(store: KeyValueStore | null): Auth {
       store.removeItem(REWARD_EVENTS_STORAGE_KEY);
       store.removeItem(MATCH_STORAGE_KEY);
       store.removeItem(ACTIVE_DECK_STORAGE_KEY);
+    },
+
+    async saveFeedback(insert) {
+      // Demo mode has no backend; append to a local log so the flow "succeeds"
+      // (mirroring the other local writes). Never throws when storage is present.
+      if (store === null) return;
+      let all: unknown[] = [];
+      const raw = store.getItem(LOCAL_FEEDBACK_KEY);
+      if (raw !== null) {
+        try {
+          const parsed: unknown = JSON.parse(raw);
+          if (Array.isArray(parsed)) all = parsed;
+        } catch {
+          all = [];
+        }
+      }
+      all.push({ ...insert, created_at: new Date().toISOString() });
+      store.setItem(LOCAL_FEEDBACK_KEY, JSON.stringify(all));
     },
   };
 }
