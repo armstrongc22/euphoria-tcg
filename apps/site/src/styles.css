@@ -810,3 +810,98 @@ code {
     margin: 0 auto;
   }
 }
+
+/* ---- Manga support / pre-launch page ---------------------------------- */
+.eu-manga__hero {
+  padding: 3rem 0 2.5rem;
+  background: radial-gradient(
+      120% 90% at 85% -10%,
+      rgba(155, 92, 255, 0.22),
+      transparent 60%
+    ),
+    radial-gradient(90% 80% at 0% 0%, rgba(255, 46, 77, 0.14), transparent 55%);
+  border-radius: 18px;
+}
+
+.eu-manga__title {
+  font-size: clamp(2.2rem, 6vw, 4rem);
+  line-height: 1.03;
+  margin: 0 0 1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.eu-manga__accent {
+  background: linear-gradient(90deg, var(--c-purple), var(--c-red));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.eu-manga__lede {
+  max-width: 44rem;
+  color: var(--c-ink-dim);
+  font-size: 1.12rem;
+  margin: 0 0 1.75rem;
+}
+
+.eu-manga__section {
+  padding: 2rem 0;
+  border-top: 1px solid var(--c-line);
+  margin-top: 1.5rem;
+}
+
+.eu-manga__body {
+  max-width: 46rem;
+  color: var(--c-ink-dim);
+  font-size: 1.02rem;
+  margin: 0 0 1.25rem;
+}
+
+.eu-manga__body:last-child {
+  margin-bottom: 0;
+}
+
+.eu-manga__card-cta {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--c-ink);
+}
+
+/* Kickstarter "coming soon" banner — clearly pre-launch. */
+.eu-manga__kickstarter {
+  margin: 2.5rem 0 1.5rem;
+  padding: 2.25rem 1.75rem;
+  border: 1px solid var(--c-line);
+  border-left: 4px solid var(--c-purple);
+  border-radius: 15px;
+  background: linear-gradient(
+    100deg,
+    rgba(155, 92, 255, 0.12),
+    rgba(255, 46, 77, 0.06)
+  );
+}
+
+.eu-manga__ks-eyebrow {
+  display: inline-block;
+  margin: 0 0 0.6rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-purple);
+  border: 1px solid var(--c-purple);
+}
+
+.eu-manga__ks-title {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 800;
+  margin: 0 0 1rem;
+}
+
+.eu-manga__proof {
+  margin-top: 1.5rem;
+}
