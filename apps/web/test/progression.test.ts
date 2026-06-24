@@ -21,7 +21,7 @@ import { availableCards, starterActiveDeck } from "../src/deck-builder";
 import { resetAllProgression } from "../src/progression";
 import { loadActiveMatch, saveActiveMatch } from "../src/match-recovery";
 import { appendPendingClaim, loadPendingClaims } from "../src/pending-reward";
-import type { KeyValueStore } from "../src/signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 import type { Card } from "@euphoria/card-data/schema";
 
 function memoryStore(): KeyValueStore & { map: Map<string, string> } {

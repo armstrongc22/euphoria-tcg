@@ -8,7 +8,7 @@
  * the right helper copy. Email confirmation is OFF for the beta, so a successful
  * signup advances the user immediately.
  */
-import { isValidEmail } from "./signup";
+import { isValidEmail } from "@euphoria/core/signup";
 import { signUpOrSignIn, type Auth, type AuthSession } from "./auth";
 
 /** Supabase's default minimum password length. */

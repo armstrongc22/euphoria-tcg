@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { Auth } from "../src/auth";
-import type { KeyValueStore } from "../src/signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 import {
   buildFeedbackInsert,
   isValidFeedback,

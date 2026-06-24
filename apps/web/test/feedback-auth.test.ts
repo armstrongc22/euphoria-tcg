@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createLocalAuth, createSupabaseAuth, LOCAL_FEEDBACK_KEY } from "../src/auth";
 import { buildFeedbackInsert, type FeedbackInsert } from "../src/feedback";
-import type { KeyValueStore } from "../src/signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 const INSERT: FeedbackInsert = buildFeedbackInsert({
   type: "bug",

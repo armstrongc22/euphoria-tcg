@@ -15,7 +15,7 @@
  */
 import type { GameAction } from "@euphoria/game-engine";
 import { STARTER_FACTIONS, type DeckEntry, type StarterFaction } from "@euphoria/core/starter";
-import type { KeyValueStore } from "./signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 /** localStorage key. Versioned so the shape can change without clashing. */
 export const ACTIVE_MATCH_KEY = "euphoria.activeMatch.v1";

@@ -23,7 +23,7 @@ import {
   type ActiveDeckRecord,
 } from "../src/deck-builder";
 import type { OwnedCardRecord } from "../src/rewards";
-import type { KeyValueStore } from "../src/signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 const LAHKT = "lahkt-brand-family-products"; // Neutral Item, Dwarf starter ×1
 

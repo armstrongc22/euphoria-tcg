@@ -11,7 +11,7 @@
  * owned/pending rewards, the active deck — per the milestone's Feature H.
  */
 import { WIN_MILESTONE_INTERVAL } from "./rewards";
-import type { KeyValueStore } from "./signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 /** localStorage keys: progress markers (actions) and the dismissed/collapsed bit. */
 export const ONBOARDING_PROGRESS_KEY = "euphoria.onboardingProgress.v1";

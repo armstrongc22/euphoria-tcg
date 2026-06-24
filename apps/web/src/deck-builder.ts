@@ -16,7 +16,7 @@
  */
 import type { Card } from "@euphoria/card-data/schema";
 import { groupOwnedBySlug, isRewardEligible, type OwnedCardRecord } from "./rewards";
-import type { KeyValueStore } from "./signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 import {
   STARTER_DECK_SIZE,
   STARTER_FACTIONS,

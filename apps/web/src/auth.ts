@@ -12,7 +12,7 @@
  * concerns signup/account state in the web app.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSupabaseClient } from "./supabase-client";
+import { getSupabaseClient } from "@euphoria/core/supabase-client";
 import {
   appendLocalMatch,
   computeAccountStats,
@@ -49,7 +49,7 @@ import {
   recordFaction,
   recordSignup,
   type KeyValueStore,
-} from "./signup";
+} from "@euphoria/core/signup";
 import { STARTER_FACTIONS, type StarterFaction } from "@euphoria/core/starter";
 
 /** A signed-in user, reduced to what the UI needs. */

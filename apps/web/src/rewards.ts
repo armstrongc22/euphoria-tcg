@@ -18,7 +18,7 @@
  * decks (FACTION_SPECIFIC_ITEMS in ./starter).
  */
 import type { Card, CardType, Faction } from "@euphoria/card-data/schema";
-import type { KeyValueStore } from "./signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 import { FACTION_SPECIFIC_ITEMS, type StarterFaction } from "@euphoria/core/starter";
 
 /** How many reward options a player chooses between after a match. */

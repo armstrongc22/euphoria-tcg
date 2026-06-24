@@ -12,7 +12,7 @@ import { createFeedbackButton, openFeedbackModal } from "../src/feedback-view";
 import { setBuildStamp } from "@euphoria/core/debug-log";
 import { pendingFeedbackCount } from "../src/feedback";
 import type { Auth } from "../src/auth";
-import type { KeyValueStore } from "../src/signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 function memoryStore(): KeyValueStore {
   const map = new Map<string, string>();

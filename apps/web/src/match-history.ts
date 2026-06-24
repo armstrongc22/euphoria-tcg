@@ -13,7 +13,7 @@
  * table; nothing here imports the Supabase SDK.
  */
 import type { MatchOutcome, MatchSummary } from "./match";
-import type { KeyValueStore } from "./signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 import { STARTER_FACTIONS, type StarterFaction } from "@euphoria/core/starter";
 
 /** localStorage key. Versioned so the shape can change later without clashes. */

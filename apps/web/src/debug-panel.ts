@@ -22,7 +22,7 @@ import {
   setFlag,
 } from "./debug-flags";
 import { snapshotInfo, type SnapshotInfo } from "./match-recovery";
-import type { KeyValueStore } from "./signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 /** Hooks the panel needs from the app to inspect/drive the active match. */
 export interface DebugPanelHooks {

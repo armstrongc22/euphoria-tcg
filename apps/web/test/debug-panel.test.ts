@@ -9,7 +9,7 @@ import { createDebugPanel, buildDebugDump } from "../src/debug-panel";
 import { setBuildStamp, setMetricsProvider } from "@euphoria/core/debug-log";
 import { FLAG_DEBUG, FLAG_NO_ANIM } from "../src/debug-flags";
 import { saveActiveMatch } from "../src/match-recovery";
-import type { KeyValueStore } from "../src/signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 function memoryStore(): KeyValueStore {
   const map = new Map<string, string>();

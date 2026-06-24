@@ -12,7 +12,7 @@
  * Storage is injected via {@link KeyValueStore}, so it's fully unit-testable.
  */
 import type { Auth } from "./auth";
-import type { KeyValueStore } from "./signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 /** The feedback categories the form offers. */
 export type FeedbackType =

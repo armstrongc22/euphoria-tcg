@@ -14,7 +14,7 @@ import {
   snapshotInfo,
   type SavedMatchInput,
 } from "../src/match-recovery";
-import type { KeyValueStore } from "../src/signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 function memoryStore(): KeyValueStore & { map: Map<string, string> } {
   const map = new Map<string, string>();

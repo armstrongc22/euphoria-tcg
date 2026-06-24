@@ -28,7 +28,7 @@ import {
   type OwnedCardRecord,
   type RewardMilestone,
 } from "../src/rewards";
-import type { KeyValueStore } from "../src/signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 function memoryStore(): KeyValueStore {
   const map = new Map<string, string>();

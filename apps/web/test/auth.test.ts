@@ -12,7 +12,7 @@ import {
   type Auth,
   type AuthSession,
 } from "../src/auth";
-import { loadSignup, type KeyValueStore } from "../src/signup";
+import { loadSignup, type KeyValueStore } from "@euphoria/core/signup";
 
 function memoryStore(): KeyValueStore & { map: Map<string, string> } {
   const map = new Map<string, string>();

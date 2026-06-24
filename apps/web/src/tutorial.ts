@@ -12,7 +12,7 @@
  *
  * This changes no gameplay — it's guidance copy + visibility state only.
  */
-import type { KeyValueStore } from "./signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 /** localStorage key holding the dismissal flags. Versioned. */
 export const TUTORIAL_STORAGE_KEY = "euphoria.tutorial.v1";

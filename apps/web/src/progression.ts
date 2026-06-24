@@ -11,7 +11,7 @@
 import type { Auth, AuthSession } from "./auth";
 import { clearActiveMatch } from "./match-recovery";
 import { clearPendingClaims } from "./pending-reward";
-import type { KeyValueStore } from "./signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 /** The local stores a reset must also clear (null when storage is unavailable). */
 export interface ProgressionStores {

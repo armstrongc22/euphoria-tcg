@@ -14,7 +14,7 @@
  * user, faction, and any match/reward/onboarding summary).
  */
 import type { Auth } from "./auth";
-import type { KeyValueStore } from "./signup";
+import type { KeyValueStore } from "@euphoria/core/signup";
 import { getBuildStamp, readDebugLog } from "@euphoria/core/debug-log";
 import { isLikelyMobile } from "./debug-flags";
 import {
