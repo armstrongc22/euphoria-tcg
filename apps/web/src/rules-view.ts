@@ -3,7 +3,7 @@
  * rules.ts, so it can be unit-tested with jsdom and mounted by main.ts. Matches
  * the dark Euphoria style via the shared `.page` classes (styles.css).
  */
-import { RULES_SECTIONS, RULES_SUBTITLE, RULES_TITLE, type RulesSection } from "./rules";
+import { RULES_SECTIONS, RULES_SUBTITLE, RULES_TITLE, type RulesSection } from "@euphoria/core/rules";
 
 function sectionEl(section: RulesSection): HTMLElement {
   const el = document.createElement("section");

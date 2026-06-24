@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { renderLore } from "../src/lore-view";
-import { LORE_SECTIONS, LORE_SUBTITLE, LORE_TITLE } from "../src/lore";
+import { LORE_SECTIONS, LORE_SUBTITLE, LORE_TITLE } from "@euphoria/core/lore";
 
 describe("renderLore", () => {
   it("renders the title and subtitle", () => {

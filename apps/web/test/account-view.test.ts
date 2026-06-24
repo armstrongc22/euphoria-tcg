@@ -6,13 +6,13 @@
  * mountAccount loader against the localStorage demo backend.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { cards } from "../src/cards";
+import { cards } from "@euphoria/core/cards";
 import { renderAccount, mountAccount, type AccountInfo } from "../src/account-view";
-import { createLocalAuth, type Auth, type AuthSession } from "../src/auth";
-import type { MatchHistoryInsert } from "../src/match-history";
-import { ACTIVE_MATCH_KEY, saveActiveMatch } from "../src/match-recovery";
-import { deckCardCount, getRecipe } from "../src/starter";
-import type { KeyValueStore } from "../src/signup";
+import { createLocalAuth, type Auth, type AuthSession } from "@euphoria/core/auth";
+import type { MatchHistoryInsert } from "@euphoria/core/match-history";
+import { ACTIVE_MATCH_KEY, saveActiveMatch } from "@euphoria/core/match-recovery";
+import { deckCardCount, getRecipe } from "@euphoria/core/starter";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 function memoryStore(): KeyValueStore {
   const map = new Map<string, string>();

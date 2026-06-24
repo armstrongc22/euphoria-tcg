@@ -4,7 +4,7 @@
  * later filters and styling hook into.
  */
 import type { Card } from "@euphoria/card-data";
-import { cardImageUrl } from "./cards";
+import { cardImageUrl } from "@euphoria/core/cards";
 
 const BASE = import.meta.env.BASE_URL;
 

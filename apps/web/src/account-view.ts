@@ -10,11 +10,11 @@
  *     backend and renders into the container; handles the signed-out case.
  */
 import type { Card } from "@euphoria/card-data/schema";
-import type { Auth } from "./auth";
-import { describeError } from "./errors";
+import type { Auth } from "@euphoria/core/auth";
+import { describeError } from "@euphoria/core/errors";
 import { renderMatchResult } from "./match-view";
-import { runTestMatch, type MatchSummary } from "./match";
-import { createPlayableMatch, ReplayError, type PlayableMatch } from "./play-match";
+import { runTestMatch, type MatchSummary } from "@euphoria/core/match";
+import { createPlayableMatch, ReplayError, type PlayableMatch } from "@euphoria/core/play-match";
 import { renderPlayableMatch, type PlayableMatchBoard } from "./play-match-view";
 import { createCardDetail } from "./detail";
 import {
@@ -24,8 +24,8 @@ import {
   saveActiveMatch,
   snapshotInfo,
   type SavedMatch,
-} from "./match-recovery";
-import { logDebug, noteSnapshotSaved } from "./debug-log";
+} from "@euphoria/core/match-recovery";
+import { logDebug, noteSnapshotSaved } from "@euphoria/core/debug-log";
 import { noSnapshot, snapshotThrottleMs } from "./debug-flags";
 import { createDebugPanel } from "./debug-panel";
 import {
@@ -35,13 +35,13 @@ import {
   recentMatches,
   type AccountStats,
   type MatchRecord,
-} from "./match-history";
+} from "@euphoria/core/match-history";
 import {
   deckCardCount,
   getRecipe,
   type StarterFaction,
-} from "./starter";
-import { chooseActiveDeck, type ChosenActiveDeck } from "./deck-builder";
+} from "@euphoria/core/starter";
+import { chooseActiveDeck, type ChosenActiveDeck } from "@euphoria/core/deck-builder";
 import { renderRewardModal, type RewardClaimResult } from "./reward-view";
 import {
   appendPendingClaim,
@@ -49,8 +49,15 @@ import {
   loadPendingClaims,
   syncPendingRewards,
   type PendingRewardClaim,
-} from "./pending-reward";
-import { getTutorialStore, resetTutorial, type NextStep } from "./tutorial";
+} from "@euphoria/core/pending-reward";
+import { getTutorialStore, resetTutorial, type NextStep } from "@euphoria/core/tutorial";
+import { openFeedbackModal } from "./feedback-view";
+import {
+  getFeedbackStore,
+  loadPendingFeedback,
+  pendingFeedbackCount,
+  syncPendingFeedback,
+} from "@euphoria/core/feedback";
 import {
   buildChecklist,
   hasOnboardingProgress,
@@ -58,7 +65,7 @@ import {
   markOnboardingProgress,
   setOnboardingDismissed,
   type ChecklistItem,
-} from "./onboarding-checklist";
+} from "@euphoria/core/onboarding-checklist";
 import { renderChecklistCard, renderShowGuide } from "./onboarding-checklist-view";
 import { createRng } from "@euphoria/game-engine";
 import {
@@ -74,7 +81,7 @@ import {
   type OwnedCardRecord,
   type OwnedGroup,
   type RewardMilestone,
-} from "./rewards";
+} from "@euphoria/core/rewards";
 
 /** Everything the account card needs, already resolved from the backend. */
 export interface AccountInfo {
@@ -439,6 +446,8 @@ export async function mountAccount(
   const pendingStore = getPendingStore();
   // Tutorial dismissal flags (local only, beta) — backs "Reset tutorial tips".
   const tutorialStore = getTutorialStore();
+  // Unsent feedback queue (Feature F): parked reports awaiting retry.
+  const feedbackStore = getFeedbackStore();
   // Getting Started card: expanded is session/mount-scoped (compact by default on
   // each visit); the "hidden" state persists in localStorage (isOnboardingDismissed).
   let onboardingExpanded = false;
@@ -740,6 +749,37 @@ export async function mountAccount(
       },
       onInspect: (card) => detail.open(card),
       onAction: () => persistMatch(match, chosen),
+      onReportIssue: () =>
+        openFeedbackModal({
+          auth,
+          store: feedbackStore,
+          defaultType: "bug",
+          context: () => {
+            // Compact live-match summary (Feature C): counts only, never the
+            // full deck/board state.
+            const s = match.state();
+            const me = s.players.player1;
+            const them = s.players.player2;
+            return {
+              view: "live-match",
+              userId: session.userId,
+              email: info0.email,
+              selectedFaction: faction,
+              match: {
+                turn: s.turn,
+                phase: s.phase,
+                activePlayer: s.activePlayer,
+                playerLives: me.lives,
+                opponentLives: them.lives,
+                handCount: me.hand.length,
+                fieldCount: me.field.length,
+                opponentFieldCount: them.field.length,
+                eventCount: s.events.length,
+                winner: s.winner,
+              },
+            };
+          },
+        }),
     });
     const note = deckNote(chosen);
     swapMain(...(note ? [note, board] : [board]), detail.element);
@@ -877,6 +917,52 @@ export async function mountAccount(
     return banner;
   };
 
+  // Unsent feedback banner (Feature F): a count + a retry that re-syncs the queue
+  // against the backend. Mirrors the pending-reward banner; never discards.
+  const renderPendingFeedbackBanner = (): HTMLElement => {
+    const count =
+      feedbackStore !== null ? pendingFeedbackCount(feedbackStore) : 0;
+    const banner = document.createElement("section");
+    banner.className = "account__panel account__pending-feedback";
+    banner.setAttribute("role", "status");
+    const heading = document.createElement("h3");
+    heading.className = "account__panel-heading";
+    heading.textContent =
+      count === 1 ? "1 feedback report pending" : `${count} feedback reports pending`;
+    banner.append(heading);
+    const body = document.createElement("p");
+    body.className = "account__panel-body";
+    body.textContent =
+      "Your feedback couldn't be sent yet — we kept it on this device and will " +
+      "retry. It won't be lost.";
+    banner.append(body);
+    const lastErr =
+      feedbackStore !== null
+        ? loadPendingFeedback(feedbackStore)
+            .map((f) => f.lastError)
+            .find((e) => e.length > 0)
+        : undefined;
+    if (lastErr !== undefined) {
+      const err = document.createElement("p");
+      err.className = "account__pending-reward-error";
+      err.textContent = `Last error: ${lastErr}.`;
+      banner.append(err);
+    }
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "account__play account__pending-feedback-retry";
+    retry.textContent = "Retry now";
+    retry.addEventListener("click", () => {
+      retry.disabled = true;
+      retry.textContent = "Retrying…";
+      void syncPendingFeedback(auth, feedbackStore).finally(
+        () => void showAccount(),
+      );
+    });
+    banner.append(retry);
+    return banner;
+  };
+
   // A live snapshot of the reward/owned pipeline for the debug panel, refreshed
   // each showAccount. Lets a dump answer "why aren't rewards showing": the auth
   // mode, win count, owned count, and any pending-claim errors.
@@ -892,6 +978,19 @@ export async function mountAccount(
       currentView: () => currentView,
       store: recoveryStore,
       reward: () => rewardDiag,
+      onFeedback: () =>
+        openFeedbackModal({
+          auth,
+          store: feedbackStore,
+          defaultType: "bug",
+          context: () => ({
+            view: currentView,
+            userId: session.userId,
+            email: info0.email,
+            selectedFaction: info0.faction,
+            reward: rewardDiag,
+          }),
+        }),
       forceSave: () => {
         if (activeMatch === null || activeChosen === null) return false;
         return persistMatch(activeMatch, activeChosen, true);
@@ -956,8 +1055,33 @@ export async function mountAccount(
       });
       accountEl.append(reset);
     }
+    // "Send feedback" (Feature A): an account-level entry point. Attaches the
+    // signed-in user, faction, active deck mode, and reward snapshot.
+    const feedbackBtn = document.createElement("button");
+    feedbackBtn.type = "button";
+    feedbackBtn.className = "account__feedback";
+    feedbackBtn.textContent = "Send feedback";
+    feedbackBtn.addEventListener("click", () =>
+      openFeedbackModal({
+        auth,
+        store: feedbackStore,
+        context: () => ({
+          view: "account",
+          userId: session.userId,
+          email: info.email,
+          selectedFaction: info0.faction,
+          deckMode: info.deckMode,
+          reward: rewardDiag,
+        }),
+      }),
+    );
+    accountEl.append(feedbackBtn);
     // A one-time notice if the last resume attempt failed validation (D.6).
     const nodes: Node[] = [];
+    // Unsent feedback (Feature F): keep it visible with a retry until it sends.
+    if (feedbackStore !== null && pendingFeedbackCount(feedbackStore) > 0) {
+      nodes.push(renderPendingFeedbackBanner());
+    }
     if (invalidResumeMessage !== null) {
       const warn = document.createElement("p");
       warn.className = "account__panel-body account__resume-invalid";

@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { renderRules } from "../src/rules-view";
-import { RULES_SECTIONS, RULES_SUBTITLE, RULES_TITLE } from "../src/rules";
+import { RULES_SECTIONS, RULES_SUBTITLE, RULES_TITLE } from "@euphoria/core/rules";
 
 describe("renderRules", () => {
   it("renders the title and subtitle", () => {

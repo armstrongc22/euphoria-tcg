@@ -38,22 +38,22 @@ import {
   isOutDeckReviveItem,
   isStealHandItem,
 } from "@euphoria/game-engine";
-import { cardImageUrl } from "./cards";
-import type { MatchSummary } from "./match";
-import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "./play-match";
+import { cardImageUrl } from "@euphoria/core/cards";
+import type { MatchSummary } from "@euphoria/core/match";
+import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "@euphoria/core/play-match";
 import {
   battleLogEntries,
   toPlaybackSteps,
   MATCH_ANIM_EVENT,
   type MatchAnimDetail,
   type PlaybackStep,
-} from "./match-playback";
-import { recordMatchMetrics, setMatchActive, setMetricsProvider } from "./debug-log";
+} from "@euphoria/core/match-playback";
+import { recordMatchMetrics, setMatchActive, setMetricsProvider } from "@euphoria/core/debug-log";
 import {
   dismissTutorial,
   getTutorialStore,
   isTutorialDismissed,
-} from "./tutorial";
+} from "@euphoria/core/tutorial";
 import {
   artCacheCap,
   lowPowerActive,
@@ -67,7 +67,7 @@ import {
 const LIVE_ART_BASE = import.meta.env.BASE_URL;
 
 /** Re-exported so existing callers keep importing it from the view. */
-export { battleLogLines } from "./match-playback";
+export { battleLogLines } from "@euphoria/core/match-playback";
 
 /**
  * How many battle-log rows the live board keeps in the DOM. The full history is
@@ -78,7 +78,7 @@ export { battleLogLines } from "./match-playback";
  */
 export const MAX_RENDERED_LOG_ENTRIES = 60;
 /** Re-exported so callers (and later, a sound layer) can subscribe to moments. */
-export { MATCH_ANIM_EVENT, type MatchAnimDetail } from "./match-playback";
+export { MATCH_ANIM_EVENT, type MatchAnimDetail } from "@euphoria/core/match-playback";
 
 /**
  * Runs a Web Animations API keyframe effect when supported, and never throws
@@ -200,6 +200,12 @@ export interface PlayableMatchActions {
    * wired (e.g. pure tests).
    */
   readonly onAction?: () => void;
+  /**
+   * Fired when the player taps "Report issue" in the live match (Feature A). The
+   * mount (account-view) opens the feedback modal and attaches a compact match
+   * summary. Omitted in pure tests.
+   */
+  readonly onReportIssue?: () => void;
 }
 
 /**
@@ -1166,6 +1172,14 @@ export function renderPlayableMatch(
     concede.textContent = "Concede";
     concede.addEventListener("click", actions.onQuit);
     header.append(concede);
+    if (actions.onReportIssue !== undefined) {
+      const report = document.createElement("button");
+      report.type = "button";
+      report.className = "account__signout play-match__report";
+      report.textContent = "Report issue";
+      report.addEventListener("click", actions.onReportIssue);
+      header.append(report);
+    }
     frag.append(header);
 
     // Prominent turn/phase banner (Feature E): names what's expected of the

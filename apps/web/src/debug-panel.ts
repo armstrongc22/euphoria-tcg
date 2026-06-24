@@ -13,7 +13,7 @@ import {
   lastErrorText,
   lastLifecycleEvent,
   readDebugLog,
-} from "./debug-log";
+} from "@euphoria/core/debug-log";
 import {
   FLAG_DEBUG,
   STABILITY_FLAGS,
@@ -21,8 +21,8 @@ import {
   isLikelyMobile,
   setFlag,
 } from "./debug-flags";
-import { snapshotInfo, type SnapshotInfo } from "./match-recovery";
-import type { KeyValueStore } from "./signup";
+import { snapshotInfo, type SnapshotInfo } from "@euphoria/core/match-recovery";
+import type { KeyValueStore } from "@euphoria/core/signup";
 
 /** Hooks the panel needs from the app to inspect/drive the active match. */
 export interface DebugPanelHooks {
@@ -42,6 +42,8 @@ export interface DebugPanelHooks {
    * answer "why aren't rewards showing" without devtools.
    */
   readonly reward?: () => Record<string, unknown>;
+  /** Opens the feedback / bug-report modal (debug-panel entry point, Feature A). */
+  readonly onFeedback?: () => void;
 }
 
 /** Builds the full debug dump object (also what "Copy" serializes). */
@@ -243,6 +245,15 @@ export function createDebugPanel(
     refreshBtn.textContent = "Refresh";
     refreshBtn.addEventListener("click", () => refresh());
     actions.append(refreshBtn);
+
+    if (hooks.onFeedback !== undefined) {
+      const feedback = document.createElement("button");
+      feedback.type = "button";
+      feedback.className = "debug-panel__btn";
+      feedback.textContent = "Send feedback";
+      feedback.addEventListener("click", () => hooks.onFeedback!());
+      actions.append(feedback);
+    }
 
     body.append(actions);
 

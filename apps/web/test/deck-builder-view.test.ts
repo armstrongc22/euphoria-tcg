@@ -6,12 +6,12 @@
  * quantity and the count, Reset, and the Save callback (fired only when valid).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { cards } from "../src/cards";
+import { cards } from "@euphoria/core/cards";
 import { mountDeckBuilder, renderDeckBuilder } from "../src/deck-builder-view";
-import { starterActiveDeck, deckSize } from "../src/deck-builder";
-import { createLocalAuth } from "../src/auth";
-import type { KeyValueStore } from "../src/signup";
-import type { DeckEntry } from "../src/starter";
+import { starterActiveDeck, deckSize } from "@euphoria/core/deck-builder";
+import { createLocalAuth } from "@euphoria/core/auth";
+import type { KeyValueStore } from "@euphoria/core/signup";
+import type { DeckEntry } from "@euphoria/core/starter";
 
 const BASE = "/";
 

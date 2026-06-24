@@ -12,24 +12,25 @@
  */
 import "./styles.css";
 import { mountAccount } from "./account-view";
-import { createAuth, type AuthSession } from "./auth";
-import { cards } from "./cards";
+import { createAuth, type AuthSession } from "@euphoria/core/auth";
+import { cards } from "@euphoria/core/cards";
 import { renderControls } from "./controls";
 import { createCardDetail } from "./detail";
-import { DEFAULT_FILTERS, filterCards, type CardFilters } from "./filters";
+import { DEFAULT_FILTERS, filterCards, type CardFilters } from "@euphoria/core/filters";
 import { renderGrid } from "./grid";
 import { mountSignup } from "./signup-view";
-import { sortCards } from "./sort";
+import { sortCards } from "@euphoria/core/sort";
 import { mountStarterDecks } from "./starter-view";
 import { mountDeckBuilder } from "./deck-builder-view";
 import { mountRules } from "./rules-view";
 import { mountLore } from "./lore-view";
-import { installDiagnostics, setBuildStamp } from "./debug-log";
+import { installDiagnostics, setBuildStamp } from "@euphoria/core/debug-log";
+import { openFeedbackModal } from "./feedback-view";
 import { FLAG_DEBUG, flag, setFlag } from "./debug-flags";
-import { getRecoveryStore } from "./match-recovery";
-import { getPendingStore, syncPendingRewards } from "./pending-reward";
-import { resetAllProgression } from "./progression";
-import type { StarterFaction } from "./starter";
+import { getRecoveryStore } from "@euphoria/core/match-recovery";
+import { getPendingStore, syncPendingRewards } from "@euphoria/core/pending-reward";
+import { resetAllProgression } from "@euphoria/core/progression";
+import type { StarterFaction } from "@euphoria/core/starter";
 
 // Build stamp (set by vite.config define): the deployed commit/timestamp, shown
 // in the footer, on window, and in the debug panel so a tester can confirm the
@@ -79,6 +80,7 @@ app.innerHTML = `
   <footer class="site-footer">
     Euphoria TCG · beta · <button type="button" id="build-stamp" class="site-footer__stamp"
       title="Build version">build ${BUILD_STAMP}</button>
+    · <button type="button" id="footer-feedback" class="site-footer__feedback">Send feedback</button>
   </footer>
 `;
 
@@ -133,7 +135,11 @@ if (buildStamp !== null) {
   syncStamp();
 }
 
+// The view currently on screen — read by the footer feedback context.
+let currentView: ViewId = "signup";
+
 function showView(view: ViewId): void {
+  currentView = view;
   signupEl.hidden = view !== "signup";
   starterEl.hidden = view !== "starter";
   deckBuilderEl.hidden = view !== "deckbuilder";
@@ -249,6 +255,24 @@ function mountStarter(initialFaction: StarterFaction | null): void {
         showView("account");
       })();
     },
+  });
+}
+
+// Footer "Send feedback" — available on every view; gathers a lightweight
+// context from the live app state when opened.
+const footerFeedback =
+  document.querySelector<HTMLButtonElement>("#footer-feedback");
+if (footerFeedback !== null) {
+  footerFeedback.addEventListener("click", () => {
+    openFeedbackModal({
+      auth,
+      context: () => ({
+        view: currentView,
+        userId: session?.userId ?? null,
+        email: session?.email ?? null,
+        selectedFaction: currentFaction,
+      }),
+    });
   });
 }
 

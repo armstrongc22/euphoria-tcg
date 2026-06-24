@@ -7,14 +7,14 @@
  * both the Account inventory and the Deck Builder pick it up.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cards } from "../src/cards";
+import { cards } from "@euphoria/core/cards";
 import { mountAccount } from "../src/account-view";
 import { mountDeckBuilder } from "../src/deck-builder-view";
-import { runTestMatch } from "../src/match";
-import { PENDING_REWARD_KEY, loadPendingClaims } from "../src/pending-reward";
-import type { Auth, AuthSession } from "../src/auth";
-import type { OwnedCardRecord } from "../src/rewards";
-import type { StarterFaction } from "../src/starter";
+import { runTestMatch } from "@euphoria/core/match";
+import { PENDING_REWARD_KEY, loadPendingClaims } from "@euphoria/core/pending-reward";
+import type { Auth, AuthSession } from "@euphoria/core/auth";
+import type { OwnedCardRecord } from "@euphoria/core/rewards";
+import type { StarterFaction } from "@euphoria/core/starter";
 
 const SESSION: AuthSession = { userId: "remote-user", email: "p@example.com" };
 
@@ -66,6 +66,7 @@ function fakeRemoteAuth(failSave: { value: boolean }) {
     resetProgression: async () => {
       owned.length = 0;
     },
+    saveFeedback: async () => {},
   };
   return { auth, owned };
 }

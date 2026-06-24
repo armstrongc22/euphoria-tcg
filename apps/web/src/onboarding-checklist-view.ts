@@ -12,7 +12,7 @@
  * button shown after the guide is hidden. All behavior is the injected
  * callbacks; no auth/network/state — the checklist logic lives elsewhere.
  */
-import type { Checklist, ChecklistItem } from "./onboarding-checklist";
+import type { Checklist, ChecklistItem } from "@euphoria/core/onboarding-checklist";
 
 /** Which shape to render. */
 export type ChecklistView = "compact" | "expanded";

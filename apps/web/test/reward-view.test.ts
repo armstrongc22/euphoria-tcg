@@ -5,7 +5,7 @@
  * renderRewardModal. Covers choosing, inspecting, and the modal overlay shape.
  */
 import { describe, expect, it, vi } from "vitest";
-import { cards } from "../src/cards";
+import { cards } from "@euphoria/core/cards";
 import { renderRewardChoice, renderRewardModal } from "../src/reward-view";
 
 const options = cards.slice(0, 3);

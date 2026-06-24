@@ -11,18 +11,18 @@
  * reward-eligibility rules); this module is presentation + wiring only.
  */
 import type { Card } from "@euphoria/card-data/schema";
-import type { Auth } from "./auth";
-import { cardImageUrl } from "./cards";
+import type { Auth } from "@euphoria/core/auth";
+import { cardImageUrl } from "@euphoria/core/cards";
 import { createCardDetail } from "./detail";
-import { getPendingStore, syncPendingRewards } from "./pending-reward";
+import { getPendingStore, syncPendingRewards } from "@euphoria/core/pending-reward";
 import {
   dismissTutorial,
   getTutorialStore,
   isTutorialDismissed,
-} from "./tutorial";
-import { markOnboardingProgress } from "./onboarding-checklist";
-import type { OwnedCardRecord } from "./rewards";
-import type { DeckEntry, StarterFaction } from "./starter";
+} from "@euphoria/core/tutorial";
+import { markOnboardingProgress } from "@euphoria/core/onboarding-checklist";
+import type { OwnedCardRecord } from "@euphoria/core/rewards";
+import type { DeckEntry, StarterFaction } from "@euphoria/core/starter";
 import {
   availableCards,
   buildActiveDeckPayload,
@@ -32,7 +32,7 @@ import {
   STARTER_DECK_SIZE,
   type AvailableCard,
   type DeckError,
-} from "./deck-builder";
+} from "@euphoria/core/deck-builder";
 
 function escapeHtml(text: string): string {
   const div = document.createElement("div");
