@@ -21,7 +21,7 @@ import {
   isLikelyMobile,
   setFlag,
 } from "./debug-flags";
-import { snapshotInfo, type SnapshotInfo } from "./match-recovery";
+import { snapshotInfo, type SnapshotInfo } from "@euphoria/core/match-recovery";
 import type { KeyValueStore } from "@euphoria/core/signup";
 
 /** Hooks the panel needs from the app to inspect/drive the active match. */

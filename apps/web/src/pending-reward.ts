@@ -15,7 +15,7 @@
 import { logDebug } from "@euphoria/core/debug-log";
 import { describeError } from "@euphoria/core/errors";
 import type { Auth, AuthSession } from "./auth";
-import type { OwnedCardInsert, RewardEventInsert } from "./rewards";
+import type { OwnedCardInsert, RewardEventInsert } from "@euphoria/core/rewards";
 import type { KeyValueStore } from "@euphoria/core/signup";
 
 /** localStorage key holding the queue (a JSON array of claims). Versioned. */

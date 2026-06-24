@@ -15,7 +15,7 @@
  * are stored per faction so each faction's saved deck survives independently.
  */
 import type { Card } from "@euphoria/card-data/schema";
-import { groupOwnedBySlug, isRewardEligible, type OwnedCardRecord } from "./rewards";
+import { groupOwnedBySlug, isRewardEligible, type OwnedCardRecord } from "@euphoria/core/rewards";
 import type { KeyValueStore } from "@euphoria/core/signup";
 import {
   STARTER_DECK_SIZE,

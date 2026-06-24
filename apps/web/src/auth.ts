@@ -32,7 +32,7 @@ import {
   type OwnedCardInsert,
   type OwnedCardRecord,
   type RewardEventInsert,
-} from "./rewards";
+} from "@euphoria/core/rewards";
 import {
   ACTIVE_DECK_STORAGE_KEY,
   coerceActiveDeckRow,

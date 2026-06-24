@@ -10,7 +10,7 @@
  * real progress). Everything else derives from account data — match/win counts,
  * owned/pending rewards, the active deck — per the milestone's Feature H.
  */
-import { WIN_MILESTONE_INTERVAL } from "./rewards";
+import { WIN_MILESTONE_INTERVAL } from "@euphoria/core/rewards";
 import type { KeyValueStore } from "@euphoria/core/signup";
 
 /** localStorage keys: progress markers (actions) and the dismissed/collapsed bit. */

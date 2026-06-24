@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseAuth } from "../src/auth";
-import type { OwnedCardInsert, RewardEventInsert } from "../src/rewards";
+import type { OwnedCardInsert, RewardEventInsert } from "@euphoria/core/rewards";
 
 const OWNED: OwnedCardInsert = {
   user_id: "user-1",

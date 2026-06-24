@@ -27,7 +27,7 @@ import { mountLore } from "./lore-view";
 import { installDiagnostics, setBuildStamp } from "@euphoria/core/debug-log";
 import { openFeedbackModal } from "./feedback-view";
 import { FLAG_DEBUG, flag, setFlag } from "./debug-flags";
-import { getRecoveryStore } from "./match-recovery";
+import { getRecoveryStore } from "@euphoria/core/match-recovery";
 import { getPendingStore, syncPendingRewards } from "./pending-reward";
 import { resetAllProgression } from "./progression";
 import type { StarterFaction } from "@euphoria/core/starter";

@@ -10,7 +10,7 @@ import { cards } from "@euphoria/core/cards";
 import { renderAccount, mountAccount, type AccountInfo } from "../src/account-view";
 import { createLocalAuth, type Auth, type AuthSession } from "../src/auth";
 import type { MatchHistoryInsert } from "../src/match-history";
-import { ACTIVE_MATCH_KEY, saveActiveMatch } from "../src/match-recovery";
+import { ACTIVE_MATCH_KEY, saveActiveMatch } from "@euphoria/core/match-recovery";
 import { deckCardCount, getRecipe } from "@euphoria/core/starter";
 import type { KeyValueStore } from "@euphoria/core/signup";
 

@@ -20,7 +20,7 @@ import {
   dismissTutorial,
   getTutorialStore,
   isTutorialDismissed,
-} from "./tutorial";
+} from "@euphoria/core/tutorial";
 
 const BASE = import.meta.env.BASE_URL;
 

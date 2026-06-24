@@ -9,7 +9,7 @@
  * starter-switch caller and any future one, and so it's unit-testable.
  */
 import type { Auth, AuthSession } from "./auth";
-import { clearActiveMatch } from "./match-recovery";
+import { clearActiveMatch } from "@euphoria/core/match-recovery";
 import { clearPendingClaims } from "./pending-reward";
 import type { KeyValueStore } from "@euphoria/core/signup";
 

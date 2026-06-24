@@ -53,7 +53,7 @@ import {
   dismissTutorial,
   getTutorialStore,
   isTutorialDismissed,
-} from "./tutorial";
+} from "@euphoria/core/tutorial";
 import {
   artCacheCap,
   lowPowerActive,

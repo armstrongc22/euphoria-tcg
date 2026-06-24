@@ -16,7 +16,7 @@ import {
   type PendingRewardInput,
 } from "../src/pending-reward";
 import type { Auth, AuthSession } from "../src/auth";
-import type { OwnedCardInsert, RewardEventInsert } from "../src/rewards";
+import type { OwnedCardInsert, RewardEventInsert } from "@euphoria/core/rewards";
 import type { KeyValueStore } from "@euphoria/core/signup";
 
 function memoryStore(): KeyValueStore & { map: Map<string, string> } {

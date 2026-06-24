@@ -16,10 +16,10 @@ import {
   eligibleRewardCards,
   groupOwnedBySlug,
   type RewardMilestone,
-} from "../src/rewards";
+} from "@euphoria/core/rewards";
 import { availableCards, starterActiveDeck } from "../src/deck-builder";
 import { resetAllProgression } from "../src/progression";
-import { loadActiveMatch, saveActiveMatch } from "../src/match-recovery";
+import { loadActiveMatch, saveActiveMatch } from "@euphoria/core/match-recovery";
 import { appendPendingClaim, loadPendingClaims } from "../src/pending-reward";
 import type { KeyValueStore } from "@euphoria/core/signup";
 import type { Card } from "@euphoria/card-data/schema";

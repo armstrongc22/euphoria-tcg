@@ -19,9 +19,9 @@ import {
   dismissTutorial,
   getTutorialStore,
   isTutorialDismissed,
-} from "./tutorial";
+} from "@euphoria/core/tutorial";
 import { markOnboardingProgress } from "./onboarding-checklist";
-import type { OwnedCardRecord } from "./rewards";
+import type { OwnedCardRecord } from "@euphoria/core/rewards";
 import type { DeckEntry, StarterFaction } from "@euphoria/core/starter";
 import {
   availableCards,

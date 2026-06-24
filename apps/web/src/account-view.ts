@@ -24,7 +24,7 @@ import {
   saveActiveMatch,
   snapshotInfo,
   type SavedMatch,
-} from "./match-recovery";
+} from "@euphoria/core/match-recovery";
 import { logDebug, noteSnapshotSaved } from "@euphoria/core/debug-log";
 import { noSnapshot, snapshotThrottleMs } from "./debug-flags";
 import { createDebugPanel } from "./debug-panel";
@@ -50,7 +50,7 @@ import {
   syncPendingRewards,
   type PendingRewardClaim,
 } from "./pending-reward";
-import { getTutorialStore, resetTutorial, type NextStep } from "./tutorial";
+import { getTutorialStore, resetTutorial, type NextStep } from "@euphoria/core/tutorial";
 import { openFeedbackModal } from "./feedback-view";
 import {
   getFeedbackStore,
@@ -81,7 +81,7 @@ import {
   type OwnedCardRecord,
   type OwnedGroup,
   type RewardMilestone,
-} from "./rewards";
+} from "@euphoria/core/rewards";
 
 /** Everything the account card needs, already resolved from the backend. */
 export interface AccountInfo {
