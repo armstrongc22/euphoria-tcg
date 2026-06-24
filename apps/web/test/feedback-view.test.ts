@@ -10,8 +10,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFeedbackButton, openFeedbackModal } from "../src/feedback-view";
 import { setBuildStamp } from "@euphoria/core/debug-log";
-import { pendingFeedbackCount } from "../src/feedback";
-import type { Auth } from "../src/auth";
+import { pendingFeedbackCount } from "@euphoria/core/feedback";
+import type { Auth } from "@euphoria/core/auth";
 import type { KeyValueStore } from "@euphoria/core/signup";
 
 function memoryStore(): KeyValueStore {

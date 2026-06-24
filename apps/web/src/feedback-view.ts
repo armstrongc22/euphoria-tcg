@@ -13,7 +13,7 @@
  * here so each entry point only needs to supply its situational pieces (view,
  * user, faction, and any match/reward/onboarding summary).
  */
-import type { Auth } from "./auth";
+import type { Auth } from "@euphoria/core/auth";
 import type { KeyValueStore } from "@euphoria/core/signup";
 import { getBuildStamp, readDebugLog } from "@euphoria/core/debug-log";
 import { isLikelyMobile } from "./debug-flags";
@@ -25,7 +25,7 @@ import {
   savePendingFeedback,
   type FeedbackInput,
   type FeedbackType,
-} from "./feedback";
+} from "@euphoria/core/feedback";
 
 /**
  * The situational context an entry point supplies. Everything is optional — the

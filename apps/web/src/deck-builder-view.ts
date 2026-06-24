@@ -11,10 +11,10 @@
  * reward-eligibility rules); this module is presentation + wiring only.
  */
 import type { Card } from "@euphoria/card-data/schema";
-import type { Auth } from "./auth";
+import type { Auth } from "@euphoria/core/auth";
 import { cardImageUrl } from "@euphoria/core/cards";
 import { createCardDetail } from "./detail";
-import { getPendingStore, syncPendingRewards } from "./pending-reward";
+import { getPendingStore, syncPendingRewards } from "@euphoria/core/pending-reward";
 import {
   dismissTutorial,
   getTutorialStore,

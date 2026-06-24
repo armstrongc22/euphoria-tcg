@@ -10,7 +10,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cards } from "@euphoria/core/cards";
 import { mountAccount } from "../src/account-view";
-import { createLocalAuth } from "../src/auth";
+import { createLocalAuth } from "@euphoria/core/auth";
 import { appendLocalMatch } from "@euphoria/core/match-history";
 import { renderMatchResult } from "../src/match-view";
 import { runTestMatch } from "@euphoria/core/match";

@@ -10,7 +10,7 @@
  *     backend and renders into the container; handles the signed-out case.
  */
 import type { Card } from "@euphoria/card-data/schema";
-import type { Auth } from "./auth";
+import type { Auth } from "@euphoria/core/auth";
 import { describeError } from "@euphoria/core/errors";
 import { renderMatchResult } from "./match-view";
 import { runTestMatch, type MatchSummary } from "@euphoria/core/match";
@@ -49,7 +49,7 @@ import {
   loadPendingClaims,
   syncPendingRewards,
   type PendingRewardClaim,
-} from "./pending-reward";
+} from "@euphoria/core/pending-reward";
 import { getTutorialStore, resetTutorial, type NextStep } from "@euphoria/core/tutorial";
 import { openFeedbackModal } from "./feedback-view";
 import {
@@ -57,7 +57,7 @@ import {
   loadPendingFeedback,
   pendingFeedbackCount,
   syncPendingFeedback,
-} from "./feedback";
+} from "@euphoria/core/feedback";
 import {
   buildChecklist,
   hasOnboardingProgress,

@@ -12,7 +12,7 @@
  */
 import "./styles.css";
 import { mountAccount } from "./account-view";
-import { createAuth, type AuthSession } from "./auth";
+import { createAuth, type AuthSession } from "@euphoria/core/auth";
 import { cards } from "@euphoria/core/cards";
 import { renderControls } from "./controls";
 import { createCardDetail } from "./detail";
@@ -28,8 +28,8 @@ import { installDiagnostics, setBuildStamp } from "@euphoria/core/debug-log";
 import { openFeedbackModal } from "./feedback-view";
 import { FLAG_DEBUG, flag, setFlag } from "./debug-flags";
 import { getRecoveryStore } from "@euphoria/core/match-recovery";
-import { getPendingStore, syncPendingRewards } from "./pending-reward";
-import { resetAllProgression } from "./progression";
+import { getPendingStore, syncPendingRewards } from "@euphoria/core/pending-reward";
+import { resetAllProgression } from "@euphoria/core/progression";
 import type { StarterFaction } from "@euphoria/core/starter";
 
 // Build stamp (set by vite.config define): the deployed commit/timestamp, shown

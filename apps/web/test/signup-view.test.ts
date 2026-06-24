@@ -8,7 +8,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mountSignup } from "../src/signup-view";
-import { createLocalAuth } from "../src/auth";
+import { createLocalAuth } from "@euphoria/core/auth";
 import type { KeyValueStore } from "@euphoria/core/signup";
 
 function memoryStore(): KeyValueStore {
