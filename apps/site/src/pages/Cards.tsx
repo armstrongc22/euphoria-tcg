@@ -1,65 +1,141 @@
-import { cards, cardImageUrl } from "@euphoria/core/cards";
+import { useMemo, useState } from "react";
+import { cards } from "@euphoria/core/cards";
+import { filterCards, uniqueFactions, uniqueTypes } from "@euphoria/core/filters";
+import { sortCards } from "@euphoria/core/sort";
+import type { Card } from "../cards/types";
+import { CardTile } from "../cards/CardTile";
+import { CardDetailModal } from "../cards/CardDetailModal";
 
-// Proof-of-wiring: the card database is imported and validated through the
-// shared @euphoria/core package (same source of truth as the beta) — no copy,
-// no server. A full filterable collection viewer is a later milestone; for now
-// we show the count and a small sample so the data path is verified.
-const SAMPLE_SIZE = 12;
-const sample = cards.slice(0, SAMPLE_SIZE);
-const base = import.meta.env.BASE_URL;
+// Control options are derived from the live data via the shared core helpers, so
+// they always match what's actually in the archive.
+const FACTIONS = uniqueFactions(cards);
+const TYPES = uniqueTypes(cards);
 
-function factionTone(faction: string): string {
-  switch (faction) {
-    case "Monk":
-      return "red";
-    case "Sonic":
-      return "blue";
-    case "Surfer":
-      return "white";
-    case "Dwarf":
-      return "green";
-    case "Shaman":
-      return "purple";
+type SortKey = "grouped" | "name" | "type" | "faction";
+
+/** Apply the chosen sort. "grouped" reuses core's deterministic sortCards. */
+function applySort(list: readonly Card[], key: SortKey): Card[] {
+  switch (key) {
+    case "name":
+      return [...list].sort((a, b) => a.name.localeCompare(b.name));
+    case "type":
+      return [...list].sort(
+        (a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name),
+      );
+    case "faction":
+      return [...list].sort(
+        (a, b) =>
+          a.faction.localeCompare(b.faction) || a.name.localeCompare(b.name),
+      );
+    case "grouped":
     default:
-      return "white";
+      return sortCards(list);
   }
 }
 
-/** Card archive preview, reading live data from @euphoria/core. */
+/**
+ * The card database. Reads the real card list and the pure filter/sort logic
+ * from @euphoria/core — the same source of truth the beta and engine use — with
+ * no engine or schema changes. Faction/type filtering reuses core's
+ * `filterCards`; name search is applied on top so it stays name-only.
+ */
 export function Cards() {
+  const [search, setSearch] = useState("");
+  const [faction, setFaction] = useState("all");
+  const [type, setType] = useState("all");
+  const [sort, setSort] = useState<SortKey>("grouped");
+  const [selected, setSelected] = useState<Card | null>(null);
+
+  const visible = useMemo(() => {
+    // Faction + type via the shared core filter; cost left open here.
+    const byFacets = filterCards(cards, {
+      faction,
+      type,
+      cost: "all",
+      search: "",
+    });
+    const query = search.trim().toLowerCase();
+    const byName =
+      query === ""
+        ? byFacets
+        : byFacets.filter((card) => card.name.toLowerCase().includes(query));
+    return applySort(byName, sort);
+  }, [search, faction, type, sort]);
+
   return (
-    <div className="eu-page eu-page--blue">
+    <div className="eu-page eu-page--blue eu-cards">
       <p className="eu-page__eyebrow">Card Archive</p>
       <h1 className="eu-page__title">Cards</h1>
-      <p className="eu-page__body">
-        Loaded <strong>{cards.length}</strong> cards from{" "}
-        <code>@euphoria/core</code>. Showing the first {sample.length} as a
-        wiring check — the full collection viewer with filters and search comes
-        next.
+
+      <div className="eu-cards__controls">
+        <input
+          className="eu-input"
+          type="search"
+          placeholder="Search by name…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          aria-label="Search cards by name"
+        />
+        <select
+          className="eu-select"
+          value={faction}
+          onChange={(event) => setFaction(event.target.value)}
+          aria-label="Filter by faction"
+        >
+          <option value="all">All factions</option>
+          {FACTIONS.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
+        <select
+          className="eu-select"
+          value={type}
+          onChange={(event) => setType(event.target.value)}
+          aria-label="Filter by card type"
+        >
+          <option value="all">All types</option>
+          {TYPES.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
+        <select
+          className="eu-select"
+          value={sort}
+          onChange={(event) => setSort(event.target.value as SortKey)}
+          aria-label="Sort cards"
+        >
+          <option value="grouped">Sort: Grouped</option>
+          <option value="name">Sort: Name</option>
+          <option value="type">Sort: Type</option>
+          <option value="faction">Sort: Faction</option>
+        </select>
+      </div>
+
+      <p className="eu-cards__count">
+        Showing <strong>{visible.length}</strong> of {cards.length} cards
+        <span className="eu-cards__src">
+          {" "}
+          · data via <code>@euphoria/core</code>
+        </span>
       </p>
 
-      <div className="eu-card-grid">
-        {sample.map((card) => (
-          <article
-            key={card.id}
-            className={`eu-tile eu-tile--${factionTone(card.faction)}`}
-          >
-            <div className="eu-tile__art">
-              <img
-                src={cardImageUrl(card, base)}
-                alt={card.name}
-                loading="lazy"
-              />
-            </div>
-            <div className="eu-tile__meta">
-              <span className="eu-tile__name">{card.name}</span>
-              <span className="eu-tile__sub">
-                {card.faction} · {card.type} · ◆{card.cost}
-              </span>
-            </div>
-          </article>
-        ))}
-      </div>
+      {visible.length === 0 ? (
+        <p className="eu-cards__empty">No cards match those filters.</p>
+      ) : (
+        <div className="eu-card-grid">
+          {visible.map((card) => (
+            <CardTile key={card.id} card={card} onSelect={setSelected} />
+          ))}
+        </div>
+      )}
+
+      {selected !== null && (
+        <CardDetailModal card={selected} onClose={() => setSelected(null)} />
+      )}
     </div>
   );
 }

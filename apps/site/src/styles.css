@@ -509,3 +509,258 @@ code {
   color: var(--c-ink-dim);
   font-size: 0.82rem;
 }
+
+/* ---- Cards page: controls --------------------------------------------- */
+.eu-cards__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1.5rem 0 1rem;
+}
+
+.eu-input,
+.eu-select {
+  background: var(--c-panel);
+  color: var(--c-ink);
+  border: 1px solid var(--c-line);
+  border-radius: 9px;
+  padding: 0.6rem 0.8rem;
+  font: inherit;
+  font-size: 0.92rem;
+}
+
+.eu-input {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.eu-input:focus,
+.eu-select:focus {
+  outline: none;
+  border-color: var(--c-blue);
+  box-shadow: 0 0 0 2px rgba(46, 139, 255, 0.3);
+}
+
+.eu-select {
+  cursor: pointer;
+}
+
+.eu-cards__count {
+  color: var(--c-ink-dim);
+  font-size: 0.92rem;
+  margin: 0 0 0.5rem;
+}
+
+.eu-cards__count strong {
+  color: var(--c-ink);
+}
+
+.eu-cards__src {
+  color: var(--c-ink-dim);
+}
+
+.eu-cards__empty {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--c-ink-dim);
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-radius: 11px;
+}
+
+/* ---- Cards page: clickable tile + ownership placeholder --------------- */
+.eu-tile {
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.14s, border-color 0.16s;
+}
+
+.eu-tile:hover {
+  transform: translateY(-3px);
+}
+
+.eu-tile:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: 2px;
+}
+
+.eu-tile__art {
+  position: relative;
+}
+
+.eu-tile__own {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  border-radius: 50%;
+  color: var(--c-ink-dim);
+  background: rgba(7, 8, 13, 0.66);
+  backdrop-filter: blur(2px);
+}
+
+/* ---- Cards page: detail modal ----------------------------------------- */
+.eu-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(4, 5, 9, 0.78);
+  backdrop-filter: blur(4px);
+  animation: eu-fade 0.14s ease-out;
+}
+
+@keyframes eu-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.eu-modal__card {
+  position: relative;
+  display: flex;
+  gap: 1.25rem;
+  width: min(720px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 1.25rem;
+  background: var(--c-bg-2);
+  border: 1px solid var(--c-line);
+  border-top: 3px solid var(--c-line);
+  border-radius: 15px;
+}
+
+.eu-modal__card--red {
+  border-top-color: var(--c-red);
+}
+.eu-modal__card--blue {
+  border-top-color: var(--c-blue);
+}
+.eu-modal__card--white {
+  border-top-color: var(--c-white);
+}
+.eu-modal__card--green {
+  border-top-color: var(--c-green);
+}
+.eu-modal__card--purple {
+  border-top-color: var(--c-purple);
+}
+
+.eu-modal__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.6rem;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--c-ink-dim);
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.eu-modal__close:hover {
+  color: var(--c-ink);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.eu-modal__art {
+  flex: 0 0 42%;
+  align-self: flex-start;
+}
+
+.eu-modal__art img {
+  width: 100%;
+  border-radius: 9px;
+  display: block;
+}
+
+.eu-modal__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.eu-modal__name {
+  margin: 0 0 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.eu-modal__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.85rem;
+}
+
+.eu-modal__tag {
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--c-ink-dim);
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+}
+
+.eu-modal__stats {
+  display: flex;
+  gap: 1rem;
+  margin: 0 0 0.85rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.eu-modal__subtype {
+  margin: 0 0 0.6rem;
+  color: var(--c-ink-dim);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.eu-modal__effect {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-radius: 9px;
+  line-height: 1.5;
+}
+
+.eu-modal__effect--none {
+  color: var(--c-ink-dim);
+  font-style: italic;
+}
+
+.eu-modal__own {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--c-ink-dim);
+}
+
+@media (max-width: 560px) {
+  .eu-modal__card {
+    flex-direction: column;
+  }
+
+  .eu-modal__art {
+    flex-basis: auto;
+    max-width: 60%;
+    margin: 0 auto;
+  }
+}
