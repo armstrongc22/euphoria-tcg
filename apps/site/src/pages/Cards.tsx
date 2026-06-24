@@ -5,6 +5,7 @@ import { sortCards } from "@euphoria/core/sort";
 import type { Card } from "../cards/types";
 import { CardTile } from "../cards/CardTile";
 import { CardDetailModal } from "../cards/CardDetailModal";
+import { factionTone } from "../cards/factionTone";
 
 // Control options are derived from the live data via the shared core helpers, so
 // they always match what's actually in the archive.
@@ -62,6 +63,27 @@ export function Cards() {
     return applySort(byName, sort);
   }, [search, faction, type, sort]);
 
+  // Faction breakdown of the current results, in stable faction order.
+  const factionSummary = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const card of visible) {
+      counts.set(card.faction, (counts.get(card.faction) ?? 0) + 1);
+    }
+    return FACTIONS.filter((name) => counts.has(name)).map((name) => ({
+      name,
+      count: counts.get(name) ?? 0,
+    }));
+  }, [visible]);
+
+  const hasActiveFilters =
+    search.trim() !== "" || faction !== "all" || type !== "all";
+
+  function clearFilters(): void {
+    setSearch("");
+    setFaction("all");
+    setType("all");
+  }
+
   return (
     <div className="eu-page eu-page--blue eu-cards">
       <p className="eu-page__eyebrow">Card Archive</p>
@@ -113,6 +135,15 @@ export function Cards() {
           <option value="type">Sort: Type</option>
           <option value="faction">Sort: Faction</option>
         </select>
+        {hasActiveFilters && (
+          <button
+            type="button"
+            className="eu-cards__clear"
+            onClick={clearFilters}
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       <p className="eu-cards__count">
@@ -122,6 +153,19 @@ export function Cards() {
           · data via <code>@euphoria/core</code>
         </span>
       </p>
+
+      {factionSummary.length > 0 && (
+        <div className="eu-cards__summary" aria-label="Results by faction">
+          {factionSummary.map((entry) => (
+            <span
+              key={entry.name}
+              className={`eu-chip eu-chip--${factionTone(entry.name)} eu-cards__summary-chip`}
+            >
+              {entry.name} <span className="eu-cards__summary-n">{entry.count}</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {visible.length === 0 ? (
         <p className="eu-cards__empty">No cards match those filters.</p>
