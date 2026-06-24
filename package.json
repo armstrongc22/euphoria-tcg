@@ -17,7 +17,10 @@
     "sim:monk-compare": "tsx apps/simulator/src/monk-compare-main.ts",
     "web:dev": "npm run dev --workspace @euphoria/web",
     "web:build": "npm run build --workspace @euphoria/web",
-    "web": "npm run web:build"
+    "web": "npm run web:build",
+    "site:dev": "npm run dev --workspace @euphoria/site",
+    "site:build": "npm run build --workspace @euphoria/site",
+    "site:preview": "npm run preview --workspace @euphoria/site"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
