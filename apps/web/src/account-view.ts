@@ -13,7 +13,7 @@ import type { Card } from "@euphoria/card-data/schema";
 import type { Auth } from "./auth";
 import { describeError } from "@euphoria/core/errors";
 import { renderMatchResult } from "./match-view";
-import { runTestMatch, type MatchSummary } from "./match";
+import { runTestMatch, type MatchSummary } from "@euphoria/core/match";
 import { createPlayableMatch, ReplayError, type PlayableMatch } from "./play-match";
 import { renderPlayableMatch, type PlayableMatchBoard } from "./play-match-view";
 import { createCardDetail } from "./detail";
@@ -41,7 +41,7 @@ import {
   getRecipe,
   type StarterFaction,
 } from "@euphoria/core/starter";
-import { chooseActiveDeck, type ChosenActiveDeck } from "./deck-builder";
+import { chooseActiveDeck, type ChosenActiveDeck } from "@euphoria/core/deck-builder";
 import { renderRewardModal, type RewardClaimResult } from "./reward-view";
 import {
   appendPendingClaim,
@@ -65,7 +65,7 @@ import {
   markOnboardingProgress,
   setOnboardingDismissed,
   type ChecklistItem,
-} from "./onboarding-checklist";
+} from "@euphoria/core/onboarding-checklist";
 import { renderChecklistCard, renderShowGuide } from "./onboarding-checklist-view";
 import { createRng } from "@euphoria/game-engine";
 import {

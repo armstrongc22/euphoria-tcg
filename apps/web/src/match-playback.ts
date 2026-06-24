@@ -13,7 +13,7 @@
  * the best readable summary rather than inventing data.
  */
 import type { GameEvent, GameState, PlayerId } from "@euphoria/game-engine";
-import { OPPONENT_SEAT, PLAYER_SEAT } from "./match";
+import { OPPONENT_SEAT, PLAYER_SEAT } from "@euphoria/core/match";
 import type { MatchFrame } from "./play-match";
 
 /** Visual tone of a playback step / floating text. */

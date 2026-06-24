@@ -31,8 +31,8 @@ import {
   OPPONENT_SEAT,
   PLAYER_SEAT,
   type MatchSummary,
-} from "./match";
-import { expandDeckEntries } from "./deck-builder";
+} from "@euphoria/core/match";
+import { expandDeckEntries } from "@euphoria/core/deck-builder";
 import type { DeckEntry, StarterFaction } from "@euphoria/core/starter";
 
 /** Options for {@link createPlayableMatch}. */

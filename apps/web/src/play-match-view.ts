@@ -39,7 +39,7 @@ import {
   isStealHandItem,
 } from "@euphoria/game-engine";
 import { cardImageUrl } from "@euphoria/core/cards";
-import type { MatchSummary } from "./match";
+import type { MatchSummary } from "@euphoria/core/match";
 import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "./play-match";
 import {
   battleLogEntries,

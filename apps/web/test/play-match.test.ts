@@ -10,7 +10,7 @@ import { smartAgent } from "@euphoria/simulator";
 import { cards } from "@euphoria/core/cards";
 import { createPlayableMatch, ReplayError } from "../src/play-match";
 import { buildMatchHistoryInsert } from "../src/match-history";
-import { starterActiveDeck } from "../src/deck-builder";
+import { starterActiveDeck } from "@euphoria/core/deck-builder";
 import { STARTER_DECK_SIZE } from "@euphoria/core/starter";
 
 describe("createPlayableMatch — starting a match", () => {

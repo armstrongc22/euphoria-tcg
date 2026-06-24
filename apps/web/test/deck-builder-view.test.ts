@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cards } from "@euphoria/core/cards";
 import { mountDeckBuilder, renderDeckBuilder } from "../src/deck-builder-view";
-import { starterActiveDeck, deckSize } from "../src/deck-builder";
+import { starterActiveDeck, deckSize } from "@euphoria/core/deck-builder";
 import { createLocalAuth } from "../src/auth";
 import type { KeyValueStore } from "@euphoria/core/signup";
 import type { DeckEntry } from "@euphoria/core/starter";

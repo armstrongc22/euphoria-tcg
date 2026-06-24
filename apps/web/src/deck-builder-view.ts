@@ -20,7 +20,7 @@ import {
   getTutorialStore,
   isTutorialDismissed,
 } from "@euphoria/core/tutorial";
-import { markOnboardingProgress } from "./onboarding-checklist";
+import { markOnboardingProgress } from "@euphoria/core/onboarding-checklist";
 import type { OwnedCardRecord } from "@euphoria/core/rewards";
 import type { DeckEntry, StarterFaction } from "@euphoria/core/starter";
 import {
@@ -32,7 +32,7 @@ import {
   STARTER_DECK_SIZE,
   type AvailableCard,
   type DeckError,
-} from "./deck-builder";
+} from "@euphoria/core/deck-builder";
 
 function escapeHtml(text: string): string {
   const div = document.createElement("div");

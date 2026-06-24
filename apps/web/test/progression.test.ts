@@ -17,7 +17,7 @@ import {
   groupOwnedBySlug,
   type RewardMilestone,
 } from "@euphoria/core/rewards";
-import { availableCards, starterActiveDeck } from "../src/deck-builder";
+import { availableCards, starterActiveDeck } from "@euphoria/core/deck-builder";
 import { resetAllProgression } from "../src/progression";
 import { loadActiveMatch, saveActiveMatch } from "@euphoria/core/match-recovery";
 import { appendPendingClaim, loadPendingClaims } from "../src/pending-reward";

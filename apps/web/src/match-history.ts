@@ -12,7 +12,7 @@
  * The Supabase backend (auth.ts) writes the same row shape to a `match_history`
  * table; nothing here imports the Supabase SDK.
  */
-import type { MatchOutcome, MatchSummary } from "./match";
+import type { MatchOutcome, MatchSummary } from "@euphoria/core/match";
 import type { KeyValueStore } from "@euphoria/core/signup";
 import { STARTER_FACTIONS, type StarterFaction } from "@euphoria/core/starter";
 

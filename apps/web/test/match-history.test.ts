@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import type { GameResult } from "@euphoria/simulator";
 import { cards } from "@euphoria/core/cards";
-import { runTestMatch, type MatchOutcome, type MatchSummary } from "../src/match";
+import { runTestMatch, type MatchOutcome, type MatchSummary } from "@euphoria/core/match";
 import {
   appendLocalMatch,
   buildMatchHistoryInsert,

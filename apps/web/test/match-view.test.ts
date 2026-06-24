@@ -13,7 +13,7 @@ import { mountAccount } from "../src/account-view";
 import { createLocalAuth } from "../src/auth";
 import { appendLocalMatch } from "../src/match-history";
 import { renderMatchResult } from "../src/match-view";
-import { runTestMatch } from "../src/match";
+import { runTestMatch } from "@euphoria/core/match";
 import type { KeyValueStore } from "@euphoria/core/signup";
 import type { StarterFaction } from "@euphoria/core/starter";
 

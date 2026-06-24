@@ -6,7 +6,7 @@
  * The post-match reward chooser is a separate panel (./reward-view) appended by
  * the account flow; it is not part of this result card.
  */
-import type { MatchSummary } from "./match";
+import type { MatchSummary } from "@euphoria/core/match";
 
 function escapeHtml(text: string): string {
   const div = document.createElement("div");

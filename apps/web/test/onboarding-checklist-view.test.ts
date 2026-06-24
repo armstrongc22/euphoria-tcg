@@ -5,7 +5,7 @@
  * shows all 8; completion + hidden states. Visual redesign behavior.
  */
 import { describe, expect, it, vi } from "vitest";
-import { buildChecklist, type ChecklistState } from "../src/onboarding-checklist";
+import { buildChecklist, type ChecklistState } from "@euphoria/core/onboarding-checklist";
 import {
   renderChecklistCard,
   renderShowGuide,

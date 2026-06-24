@@ -40,7 +40,7 @@ import {
   saveLocalActiveDeck,
   type ActiveDeckPayload,
   type ActiveDeckRecord,
-} from "./deck-builder";
+} from "@euphoria/core/deck-builder";
 import type { FeedbackInsert } from "./feedback";
 import {
   clearSignup,
