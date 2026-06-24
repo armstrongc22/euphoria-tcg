@@ -14,7 +14,7 @@ import type { Auth } from "./auth";
 import { describeError } from "@euphoria/core/errors";
 import { renderMatchResult } from "./match-view";
 import { runTestMatch, type MatchSummary } from "@euphoria/core/match";
-import { createPlayableMatch, ReplayError, type PlayableMatch } from "./play-match";
+import { createPlayableMatch, ReplayError, type PlayableMatch } from "@euphoria/core/play-match";
 import { renderPlayableMatch, type PlayableMatchBoard } from "./play-match-view";
 import { createCardDetail } from "./detail";
 import {
@@ -35,7 +35,7 @@ import {
   recentMatches,
   type AccountStats,
   type MatchRecord,
-} from "./match-history";
+} from "@euphoria/core/match-history";
 import {
   deckCardCount,
   getRecipe,

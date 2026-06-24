@@ -13,7 +13,7 @@ import type { Card } from "@euphoria/card-data/schema";
 import type { GameState, WarriorInPlay } from "@euphoria/game-engine";
 import { smartAgent } from "@euphoria/simulator";
 import { cards } from "@euphoria/core/cards";
-import { createPlayableMatch } from "../src/play-match";
+import { createPlayableMatch } from "@euphoria/core/play-match";
 import {
   battleLogLines,
   renderPlayableMatch,

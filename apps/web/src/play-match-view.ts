@@ -40,14 +40,14 @@ import {
 } from "@euphoria/game-engine";
 import { cardImageUrl } from "@euphoria/core/cards";
 import type { MatchSummary } from "@euphoria/core/match";
-import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "./play-match";
+import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "@euphoria/core/play-match";
 import {
   battleLogEntries,
   toPlaybackSteps,
   MATCH_ANIM_EVENT,
   type MatchAnimDetail,
   type PlaybackStep,
-} from "./match-playback";
+} from "@euphoria/core/match-playback";
 import { recordMatchMetrics, setMatchActive, setMetricsProvider } from "@euphoria/core/debug-log";
 import {
   dismissTutorial,
@@ -67,7 +67,7 @@ import {
 const LIVE_ART_BASE = import.meta.env.BASE_URL;
 
 /** Re-exported so existing callers keep importing it from the view. */
-export { battleLogLines } from "./match-playback";
+export { battleLogLines } from "@euphoria/core/match-playback";
 
 /**
  * How many battle-log rows the live board keeps in the DOM. The full history is
@@ -78,7 +78,7 @@ export { battleLogLines } from "./match-playback";
  */
 export const MAX_RENDERED_LOG_ENTRIES = 60;
 /** Re-exported so callers (and later, a sound layer) can subscribe to moments. */
-export { MATCH_ANIM_EVENT, type MatchAnimDetail } from "./match-playback";
+export { MATCH_ANIM_EVENT, type MatchAnimDetail } from "@euphoria/core/match-playback";
 
 /**
  * Runs a Web Animations API keyframe effect when supported, and never throws

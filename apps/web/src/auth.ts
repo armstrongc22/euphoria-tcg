@@ -22,7 +22,7 @@ import {
   type AccountStats,
   type MatchHistoryInsert,
   type MatchRecord,
-} from "./match-history";
+} from "@euphoria/core/match-history";
 import {
   appendLocalOwned,
   appendLocalRewardEvent,
