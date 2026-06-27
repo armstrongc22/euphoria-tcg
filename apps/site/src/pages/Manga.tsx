@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { InterestForm } from "../signup/InterestForm";
 
 const SUPPORT: ReadonlyArray<{
   to: string;
@@ -164,13 +165,13 @@ export function Manga() {
         <h2 className="eu-manga__ks-title">The campaign is being built.</h2>
         <p className="eu-manga__body">
           A Kickstarter campaign for the Euphoria manga is in development. It isn’t
-          live yet — this is the place to get in before it is. Development updates,
-          including when the campaign goes live, post to the blog first. Follow
-          along and you’ll know the moment it’s ready.
+          live yet — this is the place to get in before it is. Add your email and
+          you’ll know the moment it goes live.
         </p>
-        <Link to="/blog" className="eu-btn eu-btn--red">
-          Join the list on the blog
-        </Link>
+        <InterestForm source="kickstarter" />
+        <p className="eu-manga__ks-secondary">
+          Prefer to lurk? <Link to="/blog">Follow development on the blog →</Link>
+        </p>
       </section>
 
       <section className="eu-manga__section">
