@@ -1,20 +1,24 @@
-import { PagePlaceholder } from "./PagePlaceholder";
+import { InteractiveMap } from "../map/InteractiveMap";
 
 /**
- * Placeholder for the explorable map. A 3D scene (React Three Fiber + Drei) is
- * planned here later — intentionally NOT pulled in yet to keep the shell light
- * and the dependency surface small.
+ * The Euphoria world map section. Shows the base map with lore markers for every
+ * visitor; the hidden notation/editor tools appear only when the URL carries
+ * ?mapDebug=1 (see InteractiveMap). A 3D scene may still replace this later, but
+ * the 2D annotated map is the live experience for now — no heavy 3D deps loaded.
  */
 export function MapPage() {
   return (
-    <PagePlaceholder eyebrow="Explore" title="Map" tone="white">
-      <p>
-        An explorable 3D map of the Euphoria worlds is planned for this space.
-      </p>
-      <p className="eu-note">
-        Coming later: an interactive scene (React Three Fiber). For now this is a
-        placeholder — no 3D dependencies are loaded.
-      </p>
-    </PagePlaceholder>
+    <div className="eu-page eu-page--purple">
+      <p className="eu-page__eyebrow">Explore</p>
+      <h1 className="eu-page__title">World Map</h1>
+      <div className="eu-page__body">
+        <p>
+          Chart the cities, territories, and drowned ruins of the Euphoria
+          worlds. Click a marker to read its lore; scroll or use the controls to
+          zoom and pan.
+        </p>
+      </div>
+      <InteractiveMap />
+    </div>
   );
 }
