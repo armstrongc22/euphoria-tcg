@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -16,6 +17,15 @@ import { MarkerGlyph } from "./MarkerGlyph";
 import { MarkerForm } from "./MarkerForm";
 import { MarkerPopup } from "./MarkerPopup";
 import { DebugPanel } from "./DebugPanel";
+import { MapLegend } from "./MapLegend";
+import { MapFilters } from "./MapFilters";
+import { MapSearch } from "./MapSearch";
+import {
+  activeFilterCount,
+  EMPTY_FILTERS,
+  filterMarkers,
+  type MarkerFilters,
+} from "./filters";
 import {
   isUnlockReached,
   readNotationUnlocked,
@@ -101,6 +111,20 @@ export function StaticMap2D({ markers, onMarkersChange }: StaticMap2DProps) {
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [draft, setDraft] = useState<{ marker: MapMarker; isExisting: boolean } | null>(null);
   const [popup, setPopup] = useState<MapMarker | null>(null);
+
+  // ---- Public exploration state (filters / search / legend) ----------------
+  const [filters, setFilters] = useState<MarkerFilters>(EMPTY_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Filters narrow what's drawn on the map; the notation list still sees all.
+  const visibleMarkers = useMemo(
+    () => filterMarkers(markers, filters),
+    [markers, filters],
+  );
+  const filterCount = activeFilterCount(filters);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -265,9 +289,42 @@ export function StaticMap2D({ markers, onMarkersChange }: StaticMap2DProps) {
   useEffect(
     () => () => {
       if (toastTimer.current !== null) clearTimeout(toastTimer.current);
+      if (highlightTimer.current !== null) clearTimeout(highlightTimer.current);
     },
     [],
   );
+
+  /**
+   * Focus a marker from search: center the map on it, briefly highlight it, and
+   * open its lore card. Centering uses the viewport rect + natural size so it
+   * stays accurate at any zoom/screen size.
+   */
+  function focusMarker(id: string): void {
+    const m = markers.find((x) => x.id === id);
+    if (m === undefined) return;
+    const vp = viewportRef.current;
+    if (vp !== null && natural !== null) {
+      const rect = vp.getBoundingClientRect();
+      const u = m.x / natural.w;
+      const v = m.y / natural.h;
+      const scale = Math.max(viewRef.current.scale, 2.5);
+      setView(
+        clampView(
+          {
+            scale,
+            tx: rect.width / 2 - u * rect.width * scale,
+            ty: rect.height / 2 - v * rect.height * scale,
+          },
+          rect.width,
+          rect.height,
+        ),
+      );
+    }
+    setPopup(m);
+    setHighlightedId(id);
+    if (highlightTimer.current !== null) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => setHighlightedId(null), 3000);
+  }
 
   /** Persist + announce a notation-mode change. */
   function setNotation(on: boolean): void {
@@ -307,6 +364,44 @@ export function StaticMap2D({ markers, onMarkersChange }: StaticMap2DProps) {
 
   return (
     <div className={`eu-map-wrap${debug ? " eu-map-wrap--debug" : ""}`}>
+      <div className="eu-map-explore">
+        <MapSearch markers={markers} onPick={focusMarker} />
+        <div className="eu-map-explore__toggles">
+          <button
+            type="button"
+            className={`eu-map-btn${showFilters ? " eu-map-btn--primary" : ""}`}
+            aria-expanded={showFilters}
+            onClick={() => {
+              setShowFilters((v) => !v);
+              setShowLegend(false);
+            }}
+          >
+            Filters{filterCount > 0 ? ` · ${filterCount}` : ""}
+          </button>
+          <button
+            type="button"
+            className={`eu-map-btn${showLegend ? " eu-map-btn--primary" : ""}`}
+            aria-expanded={showLegend}
+            onClick={() => {
+              setShowLegend((v) => !v);
+              setShowFilters(false);
+            }}
+          >
+            Legend
+          </button>
+        </div>
+      </div>
+
+      {showFilters && (
+        <MapFilters
+          markers={markers}
+          filters={filters}
+          onChange={setFilters}
+          onClose={() => setShowFilters(false)}
+        />
+      )}
+      {showLegend && <MapLegend onClose={() => setShowLegend(false)} />}
+
       <div className="eu-map-stage">
         <div className="eu-map-frame">
           <div
@@ -337,12 +432,13 @@ export function StaticMap2D({ markers, onMarkersChange }: StaticMap2DProps) {
                 }
               />
               {natural !== null &&
-                markers.map((m) => {
+                visibleMarkers.map((m) => {
                   const faction = m.factionAffinity[0];
+                  const active = m.id === highlightedId;
                   return (
                     <span
                       key={m.id}
-                      className={`eu-map-marker${faction !== undefined ? " eu-map-marker--faction" : ""}`}
+                      className={`eu-map-marker${faction !== undefined ? " eu-map-marker--faction" : ""}${active ? " eu-map-marker--active" : ""}`}
                       data-id={m.id}
                       data-type={m.type}
                       style={
@@ -405,6 +501,9 @@ export function StaticMap2D({ markers, onMarkersChange }: StaticMap2DProps) {
 
           {debug && (
             <p className="eu-map-badge">Debug · click to place · drag to move</p>
+          )}
+          {natural !== null && filterCount > 0 && visibleMarkers.length === 0 && (
+            <p className="eu-map-empty">No markers match these filters.</p>
           )}
           {toast !== null && <p className="eu-map-toast">{toast}</p>}
         </div>
