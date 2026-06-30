@@ -22,6 +22,20 @@ export const MARKER_TYPES = [
 
 export type MarkerType = (typeof MARKER_TYPES)[number];
 
+/**
+ * Optional per-marker hints for the future 3D map. All fields are optional so
+ * existing 2D-only marker data keeps validating unchanged; the 3D renderer
+ * supplies its own defaults when they're missing.
+ */
+export interface MarkerView3D {
+  /** Whether this marker should be shown in the 3D view (defaults to true). */
+  readonly enabled?: boolean;
+  /** Per-marker scale multiplier for the 3D billboard/model. */
+  readonly scale?: number;
+  /** Vertical nudge (world units) for the 3D label so it clears terrain. */
+  readonly labelOffsetY?: number;
+}
+
 export interface MapMarker {
   /** Stable slug, auto-derived from the name when absent. */
   readonly id: string;
@@ -35,6 +49,14 @@ export interface MapMarker {
   /** 0 = safe to show everyone; higher = more story-sensitive. */
   readonly spoilerLevel: number;
   readonly description: string;
+
+  // ---- Optional future-3D fields (ignored by the 2D view) ----
+  /** Ground elevation in world units, for raising the marker in 3D. */
+  readonly elevation?: number;
+  /** Height of the marker's pole/billboard in world units. */
+  readonly markerHeight?: number;
+  /** 3D-specific rendering hints. */
+  readonly view3d?: MarkerView3D;
 }
 
 /** localStorage key — bump the suffix if the shape ever changes incompatibly. */
@@ -104,8 +126,32 @@ export function normalizeMarker(
       factionAffinity,
       spoilerLevel: Number.isFinite(spoilerLevelNum) ? spoilerLevelNum : 0,
       description: typeof r["description"] === "string" ? r["description"] : "",
+      // Optional 3D fields are only attached when present & valid, so 2D-only
+      // markers round-trip byte-for-byte and nothing leaks bogus defaults.
+      ...optionalNumber(r["elevation"], "elevation"),
+      ...optionalNumber(r["markerHeight"], "markerHeight"),
+      ...normalizeView3D(r["view3d"]),
     },
   };
+}
+
+/** `{ [key]: n }` when value is a finite number, else `{}` (field omitted). */
+function optionalNumber(value: unknown, key: string): Record<string, number> {
+  return typeof value === "number" && Number.isFinite(value)
+    ? { [key]: value }
+    : {};
+}
+
+/** Pull through only the recognised, well-typed view3d hints; omit if empty. */
+function normalizeView3D(value: unknown): { view3d?: MarkerView3D } {
+  if (typeof value !== "object" || value === null) return {};
+  const v = value as Record<string, unknown>;
+  const view3d: MarkerView3D = {
+    ...(typeof v["enabled"] === "boolean" ? { enabled: v["enabled"] } : {}),
+    ...optionalNumber(v["scale"], "scale"),
+    ...optionalNumber(v["labelOffsetY"], "labelOffsetY"),
+  };
+  return Object.keys(view3d).length > 0 ? { view3d } : {};
 }
 
 /** Parse + validate a JSON array of markers (the import path). */

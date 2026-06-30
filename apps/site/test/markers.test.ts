@@ -59,6 +59,54 @@ describe("normalizeMarker", () => {
       expect(r.marker.spoilerLevel).toBe(2);
     }
   });
+
+  it("omits the optional 3D fields when absent (backward compatible)", () => {
+    const r = normalizeMarker({ name: "X", type: "city", x: 1, y: 2 });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect("elevation" in r.marker).toBe(false);
+      expect("markerHeight" in r.marker).toBe(false);
+      expect("view3d" in r.marker).toBe(false);
+    }
+  });
+
+  it("preserves valid optional 3D fields", () => {
+    const r = normalizeMarker({
+      name: "X",
+      type: "city",
+      x: 1,
+      y: 2,
+      elevation: 12,
+      markerHeight: 4,
+      view3d: { enabled: false, scale: 1.5, labelOffsetY: 3 },
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.marker.elevation).toBe(12);
+      expect(r.marker.markerHeight).toBe(4);
+      expect(r.marker.view3d).toEqual({
+        enabled: false,
+        scale: 1.5,
+        labelOffsetY: 3,
+      });
+    }
+  });
+
+  it("drops bogus 3D field values rather than storing them", () => {
+    const r = normalizeMarker({
+      name: "X",
+      type: "city",
+      x: 1,
+      y: 2,
+      elevation: "high",
+      view3d: { enabled: "yes", scale: "big" },
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect("elevation" in r.marker).toBe(false);
+      expect("view3d" in r.marker).toBe(false);
+    }
+  });
 });
 
 describe("parseMarkers", () => {

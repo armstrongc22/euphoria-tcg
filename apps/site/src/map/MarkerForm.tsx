@@ -75,6 +75,13 @@ export function MarkerForm({
       factionAffinity: factions,
       spoilerLevel,
       description: description.trim(),
+      // The form doesn't edit the optional 3D fields yet, but it must preserve
+      // any that were imported so editing a marker never silently drops them.
+      ...(draft.elevation !== undefined ? { elevation: draft.elevation } : {}),
+      ...(draft.markerHeight !== undefined
+        ? { markerHeight: draft.markerHeight }
+        : {}),
+      ...(draft.view3d !== undefined ? { view3d: draft.view3d } : {}),
     });
   }
 

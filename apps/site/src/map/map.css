@@ -2,9 +2,54 @@
    color tokens (--c-bg, faction accents) from styles.css. Scoped under
    .eu-map-* so it never touches the TCG/game views. */
 
-.eu-map-wrap {
+.eu-map-root {
   --map-accent: var(--c-purple);
   margin-top: 1.5rem;
+}
+
+.eu-map-wrap {
+  --map-accent: var(--c-purple);
+  margin-top: 1rem;
+}
+
+/* ---- Mode switcher (2D / 3D Preview) ----------------------------------- */
+.eu-map-modes {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+}
+.eu-map-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--c-ink-dim);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.4rem 0.95rem;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.eu-map-mode:hover {
+  color: var(--c-ink);
+}
+.eu-map-mode--active {
+  color: var(--c-ink);
+  background: var(--c-purple);
+}
+.eu-map-mode__tag {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .eu-map-stage {
@@ -265,6 +310,112 @@
 .eu-map-btn--sm {
   padding: 0.15rem 0.45rem;
   font-size: 0.75rem;
+}
+
+/* ---- 3D preview (experimental placeholder) ----------------------------- */
+.eu-map-3d {
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(155, 92, 255, 0.12), transparent 60%),
+    var(--c-bg-2);
+}
+.eu-map-3d__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--c-line);
+}
+.eu-map-3d__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.eu-map-3d__tag {
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-purple);
+  border: 1px solid var(--c-purple);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+.eu-map-3d__stage {
+  padding: 1rem;
+}
+/* Faux-3D ground: the live map tilted into perspective so the marker pipeline
+   (same data → normalized coords → plane) is visible before Three.js lands. */
+.eu-map-3d__scene {
+  perspective: 900px;
+  perspective-origin: 50% 30%;
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 0 2.5rem;
+  overflow: hidden;
+}
+.eu-map-3d__plane {
+  position: relative;
+  width: min(78%, 560px);
+  aspect-ratio: 1122 / 1402;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid rgba(201, 162, 58, 0.5);
+  border-radius: 6px;
+  transform: rotateX(52deg) rotateZ(0deg);
+  transform-style: preserve-3d;
+  box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.95);
+  filter: saturate(1.05) brightness(0.92);
+}
+.eu-map-3d__pin {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--c-purple);
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 10px 1px rgba(155, 92, 255, 0.8);
+  /* Stand the pin up off the tilted plane so it reads as a billboard. */
+  transform: rotateX(-52deg) translateZ(10px);
+}
+.eu-map-3d__pin[data-type="city"] { background: var(--c-blue); box-shadow: 0 0 10px 1px rgba(46, 139, 255, 0.8); }
+.eu-map-3d__pin[data-type="territory"] { background: var(--c-green); }
+.eu-map-3d__pin[data-type="island"] { background: var(--c-white); }
+.eu-map-3d__pin[data-type="ruin"] { background: #c9a23a; }
+.eu-map-3d__pin[data-type="battle site"] { background: var(--c-red); }
+.eu-map-3d__pin[data-type="route point"] { background: #6b7280; }
+.eu-map-3d__pin[data-type="submerged city"] { background: #2bd4c8; }
+.eu-map-3d__pin[data-type="faction zone"] { background: var(--c-purple); }
+.eu-map-3d__note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--c-ink-dim);
+  text-align: center;
+}
+.eu-map-3d__fallback {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--c-ink-dim);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+.eu-map-3d__fallback-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--c-ink);
+}
+.eu-map-3d__fallback p {
+  margin: 0;
+  max-width: 42ch;
 }
 
 /* ---- Debug panel -------------------------------------------------------- */
