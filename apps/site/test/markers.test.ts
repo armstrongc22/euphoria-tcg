@@ -339,6 +339,84 @@ describe("backward compatibility", () => {
   });
 });
 
+describe("optional lore fields", () => {
+  it("omits related-lore fields when absent", () => {
+    const r = normalizeMarker({ name: "X", type: "city", x: 1, y: 2 });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect("relatedCharacters" in r.marker).toBe(false);
+      expect("relatedArcs" in r.marker).toBe(false);
+      expect("relatedCards" in r.marker).toBe(false);
+      expect("relatedLinks" in r.marker).toBe(false);
+    }
+  });
+
+  it("keeps valid related-lore fields and trims string lists", () => {
+    const r = normalizeMarker({
+      name: "Port Troy",
+      type: "city",
+      x: 1,
+      y: 2,
+      relatedCharacters: [" Kai ", "", "Delta"],
+      relatedArcs: ["Port Troy Dragon Event"],
+      relatedCards: ["Mark Lee Fathom"],
+      relatedLinks: [
+        { label: "Wiki", url: "https://example.com/port-troy" },
+        { label: "", url: "https://bad" },
+        { nope: true },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.marker.relatedCharacters).toEqual(["Kai", "Delta"]);
+      expect(r.marker.relatedArcs).toEqual(["Port Troy Dragon Event"]);
+      expect(r.marker.relatedCards).toEqual(["Mark Lee Fathom"]);
+      expect(r.marker.relatedLinks).toEqual([
+        { label: "Wiki", url: "https://example.com/port-troy" },
+      ]);
+    }
+  });
+
+  it("round-trips related-lore fields through import/export", () => {
+    const full: MapMarker = {
+      id: "port-troy",
+      name: "Port Troy",
+      type: "city",
+      tags: [],
+      markerSymbol: "circle",
+      x: 10,
+      y: 20,
+      territory: "",
+      factionAffinity: ["Human"],
+      spoilerLevel: 0,
+      description: "Hub.",
+      relatedCharacters: ["Kai"],
+      relatedArcs: ["Dragon Event"],
+      relatedCards: ["Mark Lee Fathom"],
+      relatedLinks: [{ label: "Wiki", url: "https://example.com" }],
+    };
+    const r = parseMarkers(serializeMarkers([full]));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.markers[0]).toEqual(full);
+  });
+
+  it("drops a related-lore field that is entirely invalid", () => {
+    const r = normalizeMarker({
+      name: "X",
+      type: "city",
+      x: 1,
+      y: 2,
+      relatedCharacters: [1, 2, 3],
+      relatedLinks: "nope",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect("relatedCharacters" in r.marker).toBe(false);
+      expect("relatedLinks" in r.marker).toBe(false);
+    }
+  });
+});
+
 describe("upsertMarker", () => {
   const base: MapMarker = {
     id: "a",

@@ -98,6 +98,52 @@ export function MarkerPopup({ marker, onClose }: MarkerPopupProps) {
             No lore recorded yet.
           </p>
         )}
+
+        <RelatedChips label="Characters" items={marker.relatedCharacters} />
+        <RelatedChips label="Arcs" items={marker.relatedArcs} />
+        <RelatedChips label="Cards" items={marker.relatedCards} />
+
+        {marker.relatedLinks !== undefined && marker.relatedLinks.length > 0 && (
+          <div className="eu-map-related">
+            <span className="eu-map-related__label">Links</span>
+            <div className="eu-map-related__items">
+              {marker.relatedLinks.map((l) => (
+                <a
+                  key={`${l.label}-${l.url}`}
+                  className="eu-map-related__link"
+                  href={l.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {l.label} ↗
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** One row of related-lore chips, rendered only when there are items. */
+function RelatedChips({
+  label,
+  items,
+}: {
+  readonly label: string;
+  readonly items?: readonly string[];
+}) {
+  if (items === undefined || items.length === 0) return null;
+  return (
+    <div className="eu-map-related">
+      <span className="eu-map-related__label">{label}</span>
+      <div className="eu-map-related__items">
+        {items.map((it) => (
+          <span key={it} className="eu-modal__tag">
+            {it}
+          </span>
+        ))}
       </div>
     </div>
   );

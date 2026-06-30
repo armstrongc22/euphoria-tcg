@@ -137,6 +137,12 @@ export interface MarkerView3D {
   readonly labelOffsetY?: number;
 }
 
+/** A labelled external/internal link for a marker's lore card. */
+export interface RelatedLink {
+  readonly label: string;
+  readonly url: string;
+}
+
 export interface MapMarker {
   /** Stable slug, auto-derived from the name when absent. */
   readonly id: string;
@@ -162,6 +168,12 @@ export interface MapMarker {
   readonly markerHeight?: number;
   /** 3D-specific rendering hints. */
   readonly view3d?: MarkerView3D;
+
+  // ---- Optional lore cross-references (shown on the public card if present) ----
+  readonly relatedCharacters?: readonly string[];
+  readonly relatedArcs?: readonly string[];
+  readonly relatedCards?: readonly string[];
+  readonly relatedLinks?: readonly RelatedLink[];
 }
 
 /** localStorage key — bump the suffix if the shape ever changes incompatibly. */
@@ -260,8 +272,40 @@ export function normalizeMarker(
       ...optionalNumber(r["elevation"], "elevation"),
       ...optionalNumber(r["markerHeight"], "markerHeight"),
       ...normalizeView3D(r["view3d"]),
+      // Optional lore cross-references — same "only when present & valid" rule.
+      ...optionalStringArray(r["relatedCharacters"], "relatedCharacters"),
+      ...optionalStringArray(r["relatedArcs"], "relatedArcs"),
+      ...optionalStringArray(r["relatedCards"], "relatedCards"),
+      ...normalizeRelatedLinks(r["relatedLinks"]),
     },
   };
+}
+
+/** `{ [key]: string[] }` of trimmed non-empty strings, or `{}` when none. */
+function optionalStringArray(
+  value: unknown,
+  key: string,
+): Record<string, string[]> {
+  if (!Array.isArray(value)) return {};
+  const list = value
+    .filter((s): s is string => typeof s === "string")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return list.length > 0 ? { [key]: list } : {};
+}
+
+/** Keep only well-formed {label,url} link objects; omit the field if none. */
+function normalizeRelatedLinks(value: unknown): { relatedLinks?: RelatedLink[] } {
+  if (!Array.isArray(value)) return {};
+  const links: RelatedLink[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) continue;
+    const o = item as Record<string, unknown>;
+    const label = typeof o["label"] === "string" ? o["label"].trim() : "";
+    const url = typeof o["url"] === "string" ? o["url"].trim() : "";
+    if (label.length > 0 && url.length > 0) links.push({ label, url });
+  }
+  return links.length > 0 ? { relatedLinks: links } : {};
 }
 
 /** `{ [key]: n }` when value is a finite number, else `{}` (field omitted). */
