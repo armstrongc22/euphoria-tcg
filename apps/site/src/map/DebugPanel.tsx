@@ -1,10 +1,12 @@
 import { useState } from "react";
 import {
+  factionColor,
   parseMarkers,
   serializeMarkers,
   STARTER_MARKERS,
   type MapMarker,
 } from "./markers";
+import { MarkerGlyph } from "./MarkerGlyph";
 
 interface DebugPanelProps {
   readonly markers: readonly MapMarker[];
@@ -118,28 +120,49 @@ export function DebugPanel({
               {markers.length === 0 && (
                 <li className="eu-map-list__empty">No markers yet.</li>
               )}
-              {markers.map((m) => (
-                <li key={m.id} className="eu-map-list__row">
-                  <button
-                    type="button"
-                    className="eu-map-list__name"
-                    onClick={() => onEdit(m.id)}
-                    title="Edit"
-                  >
-                    <span className="eu-map-list__dot" data-type={m.type} />
-                    {m.name}
-                    <span className="eu-map-list__meta">{m.type}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="eu-map-btn eu-map-btn--danger eu-map-btn--sm"
-                    onClick={() => onDelete(m.id)}
-                    aria-label={`Delete ${m.name}`}
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
+              {markers.map((m) => {
+                const lead = m.factionAffinity[0];
+                return (
+                  <li key={m.id} className="eu-map-list__row">
+                    <button
+                      type="button"
+                      className="eu-map-list__name"
+                      onClick={() => onEdit(m.id)}
+                      title="Edit"
+                    >
+                      <span
+                        className="eu-map-list__glyph"
+                        style={
+                          {
+                            ...(lead !== undefined
+                              ? { ["--faction"]: factionColor(lead) }
+                              : {}),
+                          } as React.CSSProperties
+                        }
+                      >
+                        <MarkerGlyph symbol={m.markerSymbol} />
+                      </span>
+                      <span className="eu-map-list__text">
+                        <span className="eu-map-list__title">{m.name}</span>
+                        <span className="eu-map-list__meta">
+                          {m.type} · {m.markerSymbol}
+                          {m.factionAffinity.length > 0 &&
+                            ` · ${m.factionAffinity.join("/")}`}
+                          {m.tags.length > 0 && ` · #${m.tags.join(" #")}`}
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="eu-map-btn eu-map-btn--danger eu-map-btn--sm"
+                      onClick={() => onDelete(m.id)}
+                      aria-label={`Delete ${m.name}`}
+                    >
+                      ×
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
 

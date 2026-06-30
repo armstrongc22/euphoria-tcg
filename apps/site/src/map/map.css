@@ -2,9 +2,54 @@
    color tokens (--c-bg, faction accents) from styles.css. Scoped under
    .eu-map-* so it never touches the TCG/game views. */
 
-.eu-map-wrap {
+.eu-map-root {
   --map-accent: var(--c-purple);
   margin-top: 1.5rem;
+}
+
+.eu-map-wrap {
+  --map-accent: var(--c-purple);
+  margin-top: 1rem;
+}
+
+/* ---- Mode switcher (2D / 3D Preview) ----------------------------------- */
+.eu-map-modes {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+}
+.eu-map-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--c-ink-dim);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.4rem 0.95rem;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.eu-map-mode:hover {
+  color: var(--c-ink);
+}
+.eu-map-mode--active {
+  color: var(--c-ink);
+  background: var(--c-purple);
+}
+.eu-map-mode__tag {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .eu-map-stage {
@@ -60,6 +105,8 @@
 
 /* ---- Markers ------------------------------------------------------------ */
 .eu-map-marker {
+  /* Default ring tint; markers with a faction override --faction inline. */
+  --faction: rgba(238, 242, 248, 0.45);
   position: absolute;
   transform: translate(-50%, -50%);
   display: flex;
@@ -68,23 +115,41 @@
   gap: 0.25rem;
   cursor: pointer;
   z-index: 2;
-  /* The hit area is the pin; the label floats above it. */
+  /* The hit area is the glyph disc; the label floats above it. */
 }
 
-.eu-map-marker__pin {
-  width: 14px;
-  height: 14px;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(45deg);
-  background: var(--pin, var(--c-purple));
-  border: 2px solid rgba(255, 255, 255, 0.85);
+/* The glyph disc carries the symbol (ink) with a faction-colored ring + glow.
+   --faction is set inline per marker (default = subtle ivory for no faction). */
+.eu-map-marker__glyph {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: #f3ead0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 42%,
+    rgba(10, 13, 22, 0.92),
+    rgba(7, 8, 13, 0.78)
+  );
   box-shadow:
-    0 0 0 2px rgba(0, 0, 0, 0.5),
-    0 0 14px 2px var(--pin-glow, rgba(155, 92, 255, 0.7));
-  transition: transform 0.12s ease;
+    0 0 0 2px var(--faction),
+    0 0 12px 1px var(--faction),
+    0 2px 6px rgba(0, 0, 0, 0.7);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-.eu-map-marker:hover .eu-map-marker__pin {
-  transform: rotate(45deg) scale(1.25);
+.eu-map-marker__glyph svg {
+  width: 15px;
+  height: 15px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+.eu-map-marker:hover .eu-map-marker__glyph,
+.eu-map-marker:focus-visible .eu-map-marker__glyph {
+  transform: scale(1.18);
+  box-shadow:
+    0 0 0 2px var(--faction),
+    0 0 20px 5px var(--faction),
+    0 2px 8px rgba(0, 0, 0, 0.8);
 }
 
 .eu-map-marker__label {
@@ -105,16 +170,6 @@
 .eu-map-marker:hover .eu-map-marker__label {
   opacity: 1;
 }
-
-/* Per-type pin colors — drawn from the faction palette for cohesion. */
-.eu-map-marker[data-type="city"] { --pin: var(--c-blue); --pin-glow: rgba(46, 139, 255, 0.7); }
-.eu-map-marker[data-type="territory"] { --pin: var(--c-green); --pin-glow: rgba(41, 209, 122, 0.7); }
-.eu-map-marker[data-type="island"] { --pin: var(--c-white); --pin-glow: rgba(238, 242, 248, 0.6); }
-.eu-map-marker[data-type="ruin"] { --pin: #c9a23a; --pin-glow: rgba(201, 162, 58, 0.7); }
-.eu-map-marker[data-type="battle site"] { --pin: var(--c-red); --pin-glow: rgba(255, 46, 77, 0.75); }
-.eu-map-marker[data-type="route point"] { --pin: #6b7280; --pin-glow: rgba(107, 114, 128, 0.6); }
-.eu-map-marker[data-type="submerged city"] { --pin: #2bd4c8; --pin-glow: rgba(43, 212, 200, 0.7); }
-.eu-map-marker[data-type="faction zone"] { --pin: var(--c-purple); --pin-glow: rgba(155, 92, 255, 0.7); }
 
 /* ---- Overlays (zoom + badge) ------------------------------------------- */
 .eu-map-zoom {
@@ -267,6 +322,112 @@
   font-size: 0.75rem;
 }
 
+/* ---- 3D preview (experimental placeholder) ----------------------------- */
+.eu-map-3d {
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(155, 92, 255, 0.12), transparent 60%),
+    var(--c-bg-2);
+}
+.eu-map-3d__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--c-line);
+}
+.eu-map-3d__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.eu-map-3d__tag {
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-purple);
+  border: 1px solid var(--c-purple);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+.eu-map-3d__stage {
+  padding: 1rem;
+}
+/* Faux-3D ground: the live map tilted into perspective so the marker pipeline
+   (same data → normalized coords → plane) is visible before Three.js lands. */
+.eu-map-3d__scene {
+  perspective: 900px;
+  perspective-origin: 50% 30%;
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 0 2.5rem;
+  overflow: hidden;
+}
+.eu-map-3d__plane {
+  position: relative;
+  width: min(78%, 560px);
+  aspect-ratio: 1122 / 1402;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid rgba(201, 162, 58, 0.5);
+  border-radius: 6px;
+  transform: rotateX(52deg) rotateZ(0deg);
+  transform-style: preserve-3d;
+  box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.95);
+  filter: saturate(1.05) brightness(0.92);
+}
+.eu-map-3d__pin {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--c-purple);
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 10px 1px rgba(155, 92, 255, 0.8);
+  /* Stand the pin up off the tilted plane so it reads as a billboard. */
+  transform: rotateX(-52deg) translateZ(10px);
+}
+.eu-map-3d__pin[data-type="city"] { background: var(--c-blue); box-shadow: 0 0 10px 1px rgba(46, 139, 255, 0.8); }
+.eu-map-3d__pin[data-type="territory"] { background: var(--c-green); }
+.eu-map-3d__pin[data-type="island"] { background: var(--c-white); }
+.eu-map-3d__pin[data-type="ruin"] { background: #c9a23a; }
+.eu-map-3d__pin[data-type="battle site"] { background: var(--c-red); }
+.eu-map-3d__pin[data-type="route point"] { background: #6b7280; }
+.eu-map-3d__pin[data-type="submerged city"] { background: #2bd4c8; }
+.eu-map-3d__pin[data-type="faction zone"] { background: var(--c-purple); }
+.eu-map-3d__note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--c-ink-dim);
+  text-align: center;
+}
+.eu-map-3d__fallback {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--c-ink-dim);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+.eu-map-3d__fallback-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--c-ink);
+}
+.eu-map-3d__fallback p {
+  margin: 0;
+  max-width: 42ch;
+}
+
 /* ---- Debug panel -------------------------------------------------------- */
 .eu-map-debug {
   flex: 0 0 320px;
@@ -358,27 +519,47 @@
 .eu-map-list__name:hover {
   border-color: var(--c-purple);
 }
-.eu-map-list__dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--c-purple);
+/* Small faction-ringed glyph disc shared by the list, popup, and form preview. */
+.eu-map-list__glyph,
+.eu-map-popup__glyph,
+.eu-map-form__glyph-preview {
+  --faction: rgba(238, 242, 248, 0.45);
+  display: inline-grid;
+  place-items: center;
   flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  color: #f3ead0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, rgba(10, 13, 22, 0.92), rgba(7, 8, 13, 0.78));
+  box-shadow: 0 0 0 1.5px var(--faction), 0 0 7px 0 var(--faction);
 }
-.eu-map-list__dot[data-type="city"] { background: var(--c-blue); }
-.eu-map-list__dot[data-type="territory"] { background: var(--c-green); }
-.eu-map-list__dot[data-type="island"] { background: var(--c-white); }
-.eu-map-list__dot[data-type="ruin"] { background: #c9a23a; }
-.eu-map-list__dot[data-type="battle site"] { background: var(--c-red); }
-.eu-map-list__dot[data-type="route point"] { background: #6b7280; }
-.eu-map-list__dot[data-type="submerged city"] { background: #2bd4c8; }
-.eu-map-list__dot[data-type="faction zone"] { background: var(--c-purple); }
+.eu-map-list__glyph svg,
+.eu-map-popup__glyph svg,
+.eu-map-form__glyph-preview svg {
+  width: 13px;
+  height: 13px;
+}
+.eu-map-list__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.1rem;
+}
+.eu-map-list__title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .eu-map-list__meta {
-  margin-left: auto;
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   color: var(--c-ink-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .eu-map-debug__btns {
@@ -470,6 +651,18 @@
   font-size: 0.82rem;
   color: var(--c-ink);
 }
+.eu-map-faction__swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 5px 0 currentColor;
+  flex: 0 0 auto;
+}
+.eu-map-form__glyph-preview {
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
 .eu-map-form__actions {
   display: flex;
   align-items: center;
@@ -492,6 +685,52 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--c-purple);
+}
+.eu-map-popup__name {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.2rem 0 0.6rem;
+  font-size: 1.5rem;
+}
+.eu-map-popup__taglist {
+  margin-bottom: 0.35rem;
+}
+.eu-map-tag {
+  font-size: 0.72rem;
+  color: var(--c-ink);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--c-line);
+  border-radius: 6px;
+  padding: 0.12rem 0.5rem;
+}
+.eu-map-tag::before {
+  content: "#";
+  opacity: 0.5;
+  margin-right: 0.1rem;
+}
+/* Faction chip tinted by --faction (set inline from the map faction palette). */
+.eu-map-faction-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--c-ink);
+  background: color-mix(in srgb, var(--faction) 16%, transparent);
+  border: 1px solid var(--faction);
+  border-radius: 999px;
+  padding: 0.14rem 0.55rem;
+}
+.eu-map-faction-chip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faction);
+  box-shadow: 0 0 6px 0 var(--faction);
+}
+.eu-map-popup__spoiler {
+  opacity: 0.85;
 }
 
 /* ---- Mobile: panel becomes a bottom drawer ----------------------------- */
