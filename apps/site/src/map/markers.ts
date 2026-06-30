@@ -5,8 +5,36 @@
  * validation rules are trivially unit-testable.
  */
 
-/** The five playable factions — reused for marker faction affinity. */
-export const FACTIONS = ["Monk", "Dwarf", "Sonic", "Surfer", "Shaman"] as const;
+/** Factions a marker can be affiliated with (multi-select). */
+export const FACTIONS = [
+  "Monk",
+  "Dwarf",
+  "Sonic",
+  "Surfer",
+  "Shaman",
+  "Human",
+  "Neutral",
+] as const;
+
+/**
+ * Map-only faction → color. Deliberately separate from the site-wide
+ * `factionTone` (used by the card UI) because the map uses its own palette
+ * (e.g. Sonic = yellow here, blue there). Unknown factions fall back to silver.
+ */
+export const FACTION_COLORS: Record<string, string> = {
+  Dwarf: "#29d17a", // green
+  Monk: "#ff2e4d", // red
+  Surfer: "#2e8bff", // blue
+  Sonic: "#f2c11d", // yellow
+  Shaman: "#9b5cff", // purple
+  Human: "#a9744f", // brown
+  Neutral: "#c3c8d2", // silver
+};
+
+/** Hex color for a faction (silver fallback for anything unrecognised). */
+export function factionColor(faction: string): string {
+  return FACTION_COLORS[faction] ?? FACTION_COLORS["Neutral"]!;
+}
 
 /** All marker categories the editor offers. */
 export const MARKER_TYPES = [
@@ -18,9 +46,80 @@ export const MARKER_TYPES = [
   "route point",
   "submerged city",
   "faction zone",
+  "historic site",
+  "criminal location",
+  "business",
+  "temple",
 ] as const;
 
 export type MarkerType = (typeof MARKER_TYPES)[number];
+
+/** Symbol/shape glyphs a marker can render with (independent of faction color). */
+export const MARKER_SYMBOLS = [
+  "circle",
+  "square",
+  "triangle",
+  "diamond",
+  "pentagon",
+  "hexagon",
+  "octagon",
+  "star",
+  "cross",
+  "tower",
+  "temple",
+  "skull",
+  "coin",
+  "scroll",
+  "flag",
+] as const;
+
+export type MarkerSymbol = (typeof MARKER_SYMBOLS)[number];
+
+/** Safe fallback when a marker has no symbol set. */
+export const DEFAULT_SYMBOL: MarkerSymbol = "circle";
+
+/**
+ * Suggested symbol for a given type — used by the form to pre-fill the selector
+ * for a NEW marker. Not applied at the data layer: imported markers with no
+ * symbol default to {@link DEFAULT_SYMBOL} so old data behaves predictably.
+ */
+export const DEFAULT_SYMBOL_BY_TYPE: Record<MarkerType, MarkerSymbol> = {
+  city: "circle",
+  territory: "hexagon",
+  island: "diamond",
+  ruin: "tower",
+  "battle site": "cross",
+  "route point": "flag",
+  "submerged city": "diamond",
+  "faction zone": "pentagon",
+  "historic site": "scroll",
+  "criminal location": "skull",
+  business: "coin",
+  temple: "temple",
+};
+
+/** Default symbol the form offers when creating a marker of `type`. */
+export function defaultSymbolForType(type: MarkerType): MarkerSymbol {
+  return DEFAULT_SYMBOL_BY_TYPE[type] ?? DEFAULT_SYMBOL;
+}
+
+/**
+ * Parse a comma-separated tag string into a clean list: trimmed, empties
+ * dropped, duplicates removed (case-insensitive, first spelling wins).
+ */
+export function parseTags(input: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const part of input.split(",")) {
+    const tag = part.trim();
+    if (tag.length === 0) continue;
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
+  }
+  return out;
+}
 
 /**
  * Optional per-marker hints for the future 3D map. All fields are optional so
@@ -41,6 +140,10 @@ export interface MapMarker {
   readonly id: string;
   readonly name: string;
   readonly type: MarkerType;
+  /** Free-form custom tags/categories, separate from `type` (may be empty). */
+  readonly tags: readonly string[];
+  /** Shape glyph; defaults to {@link DEFAULT_SYMBOL} for old data. */
+  readonly markerSymbol: MarkerSymbol;
   /** Coordinates in the ORIGINAL natural image pixels (resolution-independent). */
   readonly x: number;
   readonly y: number;
@@ -78,6 +181,13 @@ function isMarkerType(value: unknown): value is MarkerType {
   );
 }
 
+function isMarkerSymbol(value: unknown): value is MarkerSymbol {
+  return (
+    typeof value === "string" &&
+    (MARKER_SYMBOLS as readonly string[]).includes(value)
+  );
+}
+
 /**
  * Coerce one untrusted record into a clean MapMarker, or return an error string.
  * Missing optional fields get sane defaults; a missing id is derived from name.
@@ -112,6 +222,21 @@ export function normalizeMarker(
     ? r["factionAffinity"].filter((f): f is string => typeof f === "string")
     : [];
 
+  // Tags accept a string[] (canonical) or a comma-separated string (lenient),
+  // each normalized to trimmed, de-duplicated entries. Missing → [].
+  const tags = Array.isArray(r["tags"])
+    ? parseTags(
+        r["tags"].filter((t): t is string => typeof t === "string").join(","),
+      )
+    : typeof r["tags"] === "string"
+      ? parseTags(r["tags"])
+      : [];
+
+  // Unknown/missing symbols fall back to the safe default so old data renders.
+  const markerSymbol = isMarkerSymbol(r["markerSymbol"])
+    ? r["markerSymbol"]
+    : DEFAULT_SYMBOL;
+
   const spoilerLevelNum = Number(r["spoilerLevel"]);
 
   return {
@@ -120,6 +245,8 @@ export function normalizeMarker(
       id,
       name,
       type: r["type"],
+      tags,
+      markerSymbol,
       x,
       y,
       territory: typeof r["territory"] === "string" ? r["territory"] : "",
@@ -225,10 +352,12 @@ export const STARTER_MARKERS: readonly MapMarker[] = [
     id: "port-troy",
     name: "Port Troy",
     type: "city",
+    tags: ["historic site", "battle site"],
+    markerSymbol: "circle",
     x: 300,
     y: 1040,
     territory: "Euphrates Territory",
-    factionAffinity: ["Sonic", "Shaman"],
+    factionAffinity: ["Sonic", "Human"],
     spoilerLevel: 1,
     description:
       "A major coastal city devastated during the Port Troy dragon event.",
@@ -237,6 +366,8 @@ export const STARTER_MARKERS: readonly MapMarker[] = [
     id: "orange-court",
     name: "Orange Court",
     type: "city",
+    tags: ["business"],
+    markerSymbol: "circle",
     x: 560,
     y: 700,
     territory: "Aldebaran Territory",
@@ -248,6 +379,8 @@ export const STARTER_MARKERS: readonly MapMarker[] = [
     id: "tarkana",
     name: "Tarkana",
     type: "city",
+    tags: [],
+    markerSymbol: "circle",
     x: 820,
     y: 520,
     territory: "Aldebaran Territory",
@@ -259,6 +392,8 @@ export const STARTER_MARKERS: readonly MapMarker[] = [
     id: "seraphim-falls",
     name: "Seraphim Falls",
     type: "ruin",
+    tags: ["historic site"],
+    markerSymbol: "tower",
     x: 640,
     y: 250,
     territory: "Aldebaran Territory",
@@ -270,6 +405,8 @@ export const STARTER_MARKERS: readonly MapMarker[] = [
     id: "metallstadt",
     name: "Metallstadt",
     type: "city",
+    tags: ["business"],
+    markerSymbol: "circle",
     x: 880,
     y: 980,
     territory: "Euphrates Territory",
@@ -280,7 +417,9 @@ export const STARTER_MARKERS: readonly MapMarker[] = [
   {
     id: "musa",
     name: "Musa",
-    type: "city",
+    type: "temple",
+    tags: ["temple", "historic site"],
+    markerSymbol: "temple",
     x: 420,
     y: 460,
     territory: "Aldebaran Territory",
@@ -292,6 +431,8 @@ export const STARTER_MARKERS: readonly MapMarker[] = [
     id: "alta",
     name: "Alta",
     type: "city",
+    tags: [],
+    markerSymbol: "circle",
     x: 760,
     y: 760,
     territory: "Euphrates Territory",
@@ -303,6 +444,8 @@ export const STARTER_MARKERS: readonly MapMarker[] = [
     id: "marina",
     name: "Marina",
     type: "city",
+    tags: [],
+    markerSymbol: "circle",
     x: 240,
     y: 800,
     territory: "Euphrates Territory",
@@ -314,10 +457,12 @@ export const STARTER_MARKERS: readonly MapMarker[] = [
     id: "twilight-islands",
     name: "Twilight Islands",
     type: "island",
+    tags: [],
+    markerSymbol: "diamond",
     x: 980,
     y: 1240,
     territory: "Euphrates Territory",
-    factionAffinity: ["Surfer"],
+    factionAffinity: ["Surfer", "Neutral"],
     spoilerLevel: 1,
     description: "Placeholder — reposition in debug mode.",
   },
@@ -325,6 +470,8 @@ export const STARTER_MARKERS: readonly MapMarker[] = [
     id: "aldebaran-territory",
     name: "Aldebaran Territory",
     type: "faction zone",
+    tags: [],
+    markerSymbol: "pentagon",
     x: 560,
     y: 360,
     territory: "Aldebaran Territory",
@@ -336,6 +483,8 @@ export const STARTER_MARKERS: readonly MapMarker[] = [
     id: "euphrates-territory",
     name: "Euphrates Territory",
     type: "faction zone",
+    tags: [],
+    markerSymbol: "pentagon",
     x: 520,
     y: 1160,
     territory: "Euphrates Territory",

@@ -1,11 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  defaultSymbolForType,
+  factionColor,
   FACTIONS,
+  MARKER_SYMBOLS,
   MARKER_TYPES,
+  parseTags,
   slugify,
   type MapMarker,
+  type MarkerSymbol,
   type MarkerType,
 } from "./markers";
+import { MarkerGlyph } from "./MarkerGlyph";
 
 interface MarkerFormProps {
   /** The marker being edited/created. New markers carry their clicked x/y. */
@@ -32,6 +38,11 @@ export function MarkerForm({
 }: MarkerFormProps) {
   const [name, setName] = useState(draft.name);
   const [type, setType] = useState<MarkerType>(draft.type);
+  // New markers start on the type's suggested symbol; existing keep their own.
+  const [symbol, setSymbol] = useState<MarkerSymbol>(
+    isExisting ? draft.markerSymbol : defaultSymbolForType(draft.type),
+  );
+  const [tagsInput, setTagsInput] = useState(draft.tags.join(", "));
   const [territory, setTerritory] = useState(draft.territory);
   const [factions, setFactions] = useState<string[]>([
     ...draft.factionAffinity,
@@ -39,6 +50,14 @@ export function MarkerForm({
   const [spoilerLevel, setSpoilerLevel] = useState(draft.spoilerLevel);
   const [description, setDescription] = useState(draft.description);
   const nameRef = useRef<HTMLInputElement>(null);
+
+  /** Changing the type re-suggests its symbol — unless you've picked your own. */
+  function handleTypeChange(next: MarkerType): void {
+    setSymbol((current) =>
+      current === defaultSymbolForType(type) ? defaultSymbolForType(next) : current,
+    );
+    setType(next);
+  }
 
   useEffect(() => {
     nameRef.current?.focus();
@@ -69,6 +88,8 @@ export function MarkerForm({
       id: isExisting ? draft.id : slugify(trimmed),
       name: trimmed,
       type,
+      tags: parseTags(tagsInput),
+      markerSymbol: symbol,
       x: Math.round(draft.x),
       y: Math.round(draft.y),
       territory: territory.trim(),
@@ -129,7 +150,7 @@ export function MarkerForm({
           <span>Type</span>
           <select
             value={type}
-            onChange={(e) => setType(e.target.value as MarkerType)}
+            onChange={(e) => handleTypeChange(e.target.value as MarkerType)}
           >
             {MARKER_TYPES.map((t) => (
               <option key={t} value={t}>
@@ -137,6 +158,35 @@ export function MarkerForm({
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="eu-map-field">
+          <span>
+            Symbol / shape
+            <span className="eu-map-form__glyph-preview">
+              <MarkerGlyph symbol={symbol} />
+            </span>
+          </span>
+          <select
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value as MarkerSymbol)}
+          >
+            {MARKER_SYMBOLS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="eu-map-field">
+          <span>Tags (comma-separated)</span>
+          <input
+            type="text"
+            value={tagsInput}
+            onChange={(e) => setTagsInput(e.target.value)}
+            placeholder="historic site, battle site, temple"
+          />
         </label>
 
         <fieldset className="eu-map-field eu-map-field--factions">
@@ -148,6 +198,10 @@ export function MarkerForm({
                   type="checkbox"
                   checked={factions.includes(f)}
                   onChange={() => toggleFaction(f)}
+                />
+                <span
+                  className="eu-map-faction__swatch"
+                  style={{ background: factionColor(f) }}
                 />
                 {f}
               </label>

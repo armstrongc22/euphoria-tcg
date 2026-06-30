@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { imageToNormalizedCoords } from "./coords";
-import type { MapMarker } from "./markers";
+import { factionColor, type MapMarker } from "./markers";
 
 const MAP_SRC = `${import.meta.env.BASE_URL}maps/euphoria-base-map.png`;
 
@@ -87,12 +87,18 @@ export function MapPreview3D({ markers, onBack }: MapPreview3DProps) {
               {dims !== null &&
                 visible.map((m) => {
                   const { u, v } = imageToNormalizedCoords(m.x, m.y, dims.w, dims.h);
+                  const lead = m.factionAffinity[0];
                   return (
                     <span
                       key={m.id}
                       className="eu-map-3d__pin"
-                      data-type={m.type}
-                      style={{ left: `${u * 100}%`, top: `${v * 100}%` }}
+                      style={{
+                        left: `${u * 100}%`,
+                        top: `${v * 100}%`,
+                        ...(lead !== undefined
+                          ? { background: factionColor(lead) }
+                          : {}),
+                      }}
                       title={m.name}
                     />
                   );

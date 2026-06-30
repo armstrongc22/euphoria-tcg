@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  defaultSymbolForType,
+  factionColor,
+  FACTIONS,
+  MARKER_TYPES,
   normalizeMarker,
   parseMarkers,
+  parseTags,
   serializeMarkers,
   slugify,
   STARTER_MARKERS,
@@ -25,6 +30,9 @@ describe("normalizeMarker", () => {
       expect(r.marker.id).toBe("port-troy");
       expect(r.marker.factionAffinity).toEqual([]);
       expect(r.marker.spoilerLevel).toBe(0);
+      // New fields default gracefully for old-shaped data.
+      expect(r.marker.tags).toEqual([]);
+      expect(r.marker.markerSymbol).toBe("circle");
     }
   });
 
@@ -138,11 +146,185 @@ describe("parseMarkers", () => {
   });
 });
 
+describe("expanded types, factions, and colors", () => {
+  it("offers the new marker types", () => {
+    for (const t of [
+      "historic site",
+      "criminal location",
+      "business",
+      "temple",
+    ]) {
+      expect((MARKER_TYPES as readonly string[]).includes(t)).toBe(true);
+    }
+  });
+
+  it("offers the Human and Neutral factions", () => {
+    expect((FACTIONS as readonly string[]).includes("Human")).toBe(true);
+    expect((FACTIONS as readonly string[]).includes("Neutral")).toBe(true);
+  });
+
+  it("maps each faction to its map color", () => {
+    expect(factionColor("Dwarf")).toBe("#29d17a");
+    expect(factionColor("Monk")).toBe("#ff2e4d");
+    expect(factionColor("Surfer")).toBe("#2e8bff");
+    expect(factionColor("Sonic")).toBe("#f2c11d");
+    expect(factionColor("Shaman")).toBe("#9b5cff");
+    expect(factionColor("Human")).toBe("#a9744f");
+    expect(factionColor("Neutral")).toBe("#c3c8d2");
+  });
+
+  it("falls back to silver for an unknown faction", () => {
+    expect(factionColor("Aliens")).toBe("#c3c8d2");
+  });
+
+  it("accepts the new types/factions through normalizeMarker", () => {
+    const r = normalizeMarker({
+      name: "Tarkana Temple",
+      type: "temple",
+      x: 1,
+      y: 2,
+      factionAffinity: ["Human", "Neutral"],
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.marker.type).toBe("temple");
+      expect(r.marker.factionAffinity).toEqual(["Human", "Neutral"]);
+    }
+  });
+});
+
+describe("parseTags", () => {
+  it("splits, trims, and drops empties", () => {
+    expect(parseTags(" historic site ,  temple , ,battle site")).toEqual([
+      "historic site",
+      "temple",
+      "battle site",
+    ]);
+  });
+
+  it("de-duplicates case-insensitively, keeping first spelling", () => {
+    expect(parseTags("Temple, temple, TEMPLE")).toEqual(["Temple"]);
+  });
+
+  it("returns an empty list for blank input", () => {
+    expect(parseTags("   ,  , ")).toEqual([]);
+  });
+});
+
+describe("tags + markerSymbol in normalizeMarker", () => {
+  it("defaults markerSymbol to circle and tags to [] when absent", () => {
+    const r = normalizeMarker({ name: "X", type: "temple", x: 1, y: 2 });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.marker.markerSymbol).toBe("circle");
+      expect(r.marker.tags).toEqual([]);
+    }
+  });
+
+  it("preserves a valid markerSymbol and a string[] of tags", () => {
+    const r = normalizeMarker({
+      name: "X",
+      type: "criminal location",
+      markerSymbol: "skull",
+      tags: [" smugglers ", "criminal location", "smugglers"],
+      x: 1,
+      y: 2,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.marker.markerSymbol).toBe("skull");
+      expect(r.marker.tags).toEqual(["smugglers", "criminal location"]);
+    }
+  });
+
+  it("falls back to circle for an unknown markerSymbol", () => {
+    const r = normalizeMarker({
+      name: "X",
+      type: "city",
+      markerSymbol: "rocket",
+      x: 1,
+      y: 2,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.marker.markerSymbol).toBe("circle");
+  });
+
+  it("accepts a comma-separated tags string too", () => {
+    const r = normalizeMarker({
+      name: "X",
+      type: "city",
+      tags: "business, historic site",
+      x: 1,
+      y: 2,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.marker.tags).toEqual(["business", "historic site"]);
+  });
+});
+
+describe("defaultSymbolForType", () => {
+  it("suggests the mapped symbol per type", () => {
+    expect(defaultSymbolForType("temple")).toBe("temple");
+    expect(defaultSymbolForType("criminal location")).toBe("skull");
+    expect(defaultSymbolForType("business")).toBe("coin");
+    expect(defaultSymbolForType("historic site")).toBe("scroll");
+    expect(defaultSymbolForType("city")).toBe("circle");
+  });
+});
+
+describe("backward compatibility", () => {
+  it("validates an old marker with no tags/symbol/new factions", () => {
+    const legacy = JSON.stringify([
+      {
+        id: "old-town",
+        name: "Old Town",
+        type: "city",
+        x: 100,
+        y: 200,
+        territory: "Euphrates Territory",
+        factionAffinity: ["Sonic"],
+        spoilerLevel: 0,
+        description: "Pre-upgrade marker.",
+      },
+    ]);
+    const r = parseMarkers(legacy);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.markers[0]?.tags).toEqual([]);
+      expect(r.markers[0]?.markerSymbol).toBe("circle");
+    }
+  });
+
+  it("round-trips a marker carrying every new field", () => {
+    const full: MapMarker = {
+      id: "port-troy",
+      name: "Port Troy",
+      type: "city",
+      tags: ["historic site", "battle site"],
+      markerSymbol: "circle",
+      x: 1840,
+      y: 2920,
+      territory: "Euphrates Territory",
+      factionAffinity: ["Sonic", "Human"],
+      spoilerLevel: 1,
+      description: "A major coastal city.",
+      elevation: 12,
+      markerHeight: 36,
+      view3d: { enabled: true, scale: 1, labelOffsetY: 40 },
+    };
+    const r = parseMarkers(serializeMarkers([full]));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.markers[0]).toEqual(full);
+  });
+});
+
 describe("upsertMarker", () => {
   const base: MapMarker = {
     id: "a",
     name: "A",
     type: "city",
+    tags: [],
+    markerSymbol: "circle",
     x: 1,
     y: 1,
     territory: "",

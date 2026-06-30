@@ -105,6 +105,8 @@
 
 /* ---- Markers ------------------------------------------------------------ */
 .eu-map-marker {
+  /* Default ring tint; markers with a faction override --faction inline. */
+  --faction: rgba(238, 242, 248, 0.45);
   position: absolute;
   transform: translate(-50%, -50%);
   display: flex;
@@ -113,23 +115,41 @@
   gap: 0.25rem;
   cursor: pointer;
   z-index: 2;
-  /* The hit area is the pin; the label floats above it. */
+  /* The hit area is the glyph disc; the label floats above it. */
 }
 
-.eu-map-marker__pin {
-  width: 14px;
-  height: 14px;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(45deg);
-  background: var(--pin, var(--c-purple));
-  border: 2px solid rgba(255, 255, 255, 0.85);
+/* The glyph disc carries the symbol (ink) with a faction-colored ring + glow.
+   --faction is set inline per marker (default = subtle ivory for no faction). */
+.eu-map-marker__glyph {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: #f3ead0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 42%,
+    rgba(10, 13, 22, 0.92),
+    rgba(7, 8, 13, 0.78)
+  );
   box-shadow:
-    0 0 0 2px rgba(0, 0, 0, 0.5),
-    0 0 14px 2px var(--pin-glow, rgba(155, 92, 255, 0.7));
-  transition: transform 0.12s ease;
+    0 0 0 2px var(--faction),
+    0 0 12px 1px var(--faction),
+    0 2px 6px rgba(0, 0, 0, 0.7);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-.eu-map-marker:hover .eu-map-marker__pin {
-  transform: rotate(45deg) scale(1.25);
+.eu-map-marker__glyph svg {
+  width: 15px;
+  height: 15px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+.eu-map-marker:hover .eu-map-marker__glyph,
+.eu-map-marker:focus-visible .eu-map-marker__glyph {
+  transform: scale(1.18);
+  box-shadow:
+    0 0 0 2px var(--faction),
+    0 0 20px 5px var(--faction),
+    0 2px 8px rgba(0, 0, 0, 0.8);
 }
 
 .eu-map-marker__label {
@@ -150,16 +170,6 @@
 .eu-map-marker:hover .eu-map-marker__label {
   opacity: 1;
 }
-
-/* Per-type pin colors — drawn from the faction palette for cohesion. */
-.eu-map-marker[data-type="city"] { --pin: var(--c-blue); --pin-glow: rgba(46, 139, 255, 0.7); }
-.eu-map-marker[data-type="territory"] { --pin: var(--c-green); --pin-glow: rgba(41, 209, 122, 0.7); }
-.eu-map-marker[data-type="island"] { --pin: var(--c-white); --pin-glow: rgba(238, 242, 248, 0.6); }
-.eu-map-marker[data-type="ruin"] { --pin: #c9a23a; --pin-glow: rgba(201, 162, 58, 0.7); }
-.eu-map-marker[data-type="battle site"] { --pin: var(--c-red); --pin-glow: rgba(255, 46, 77, 0.75); }
-.eu-map-marker[data-type="route point"] { --pin: #6b7280; --pin-glow: rgba(107, 114, 128, 0.6); }
-.eu-map-marker[data-type="submerged city"] { --pin: #2bd4c8; --pin-glow: rgba(43, 212, 200, 0.7); }
-.eu-map-marker[data-type="faction zone"] { --pin: var(--c-purple); --pin-glow: rgba(155, 92, 255, 0.7); }
 
 /* ---- Overlays (zoom + badge) ------------------------------------------- */
 .eu-map-zoom {
@@ -509,27 +519,47 @@
 .eu-map-list__name:hover {
   border-color: var(--c-purple);
 }
-.eu-map-list__dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--c-purple);
+/* Small faction-ringed glyph disc shared by the list, popup, and form preview. */
+.eu-map-list__glyph,
+.eu-map-popup__glyph,
+.eu-map-form__glyph-preview {
+  --faction: rgba(238, 242, 248, 0.45);
+  display: inline-grid;
+  place-items: center;
   flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  color: #f3ead0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, rgba(10, 13, 22, 0.92), rgba(7, 8, 13, 0.78));
+  box-shadow: 0 0 0 1.5px var(--faction), 0 0 7px 0 var(--faction);
 }
-.eu-map-list__dot[data-type="city"] { background: var(--c-blue); }
-.eu-map-list__dot[data-type="territory"] { background: var(--c-green); }
-.eu-map-list__dot[data-type="island"] { background: var(--c-white); }
-.eu-map-list__dot[data-type="ruin"] { background: #c9a23a; }
-.eu-map-list__dot[data-type="battle site"] { background: var(--c-red); }
-.eu-map-list__dot[data-type="route point"] { background: #6b7280; }
-.eu-map-list__dot[data-type="submerged city"] { background: #2bd4c8; }
-.eu-map-list__dot[data-type="faction zone"] { background: var(--c-purple); }
+.eu-map-list__glyph svg,
+.eu-map-popup__glyph svg,
+.eu-map-form__glyph-preview svg {
+  width: 13px;
+  height: 13px;
+}
+.eu-map-list__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.1rem;
+}
+.eu-map-list__title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .eu-map-list__meta {
-  margin-left: auto;
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   color: var(--c-ink-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .eu-map-debug__btns {
@@ -621,6 +651,18 @@
   font-size: 0.82rem;
   color: var(--c-ink);
 }
+.eu-map-faction__swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 5px 0 currentColor;
+  flex: 0 0 auto;
+}
+.eu-map-form__glyph-preview {
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
 .eu-map-form__actions {
   display: flex;
   align-items: center;
@@ -643,6 +685,52 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--c-purple);
+}
+.eu-map-popup__name {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.2rem 0 0.6rem;
+  font-size: 1.5rem;
+}
+.eu-map-popup__taglist {
+  margin-bottom: 0.35rem;
+}
+.eu-map-tag {
+  font-size: 0.72rem;
+  color: var(--c-ink);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--c-line);
+  border-radius: 6px;
+  padding: 0.12rem 0.5rem;
+}
+.eu-map-tag::before {
+  content: "#";
+  opacity: 0.5;
+  margin-right: 0.1rem;
+}
+/* Faction chip tinted by --faction (set inline from the map faction palette). */
+.eu-map-faction-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--c-ink);
+  background: color-mix(in srgb, var(--faction) 16%, transparent);
+  border: 1px solid var(--faction);
+  border-radius: 999px;
+  padding: 0.14rem 0.55rem;
+}
+.eu-map-faction-chip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faction);
+  box-shadow: 0 0 6px 0 var(--faction);
+}
+.eu-map-popup__spoiler {
+  opacity: 0.85;
 }
 
 /* ---- Mobile: panel becomes a bottom drawer ----------------------------- */

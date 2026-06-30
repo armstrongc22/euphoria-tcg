@@ -6,7 +6,13 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { upsertMarker, type MapMarker, type MarkerType } from "./markers";
+import {
+  factionColor,
+  upsertMarker,
+  type MapMarker,
+  type MarkerType,
+} from "./markers";
+import { MarkerGlyph } from "./MarkerGlyph";
 import { MarkerForm } from "./MarkerForm";
 import { MarkerPopup } from "./MarkerPopup";
 import { DebugPanel } from "./DebugPanel";
@@ -217,6 +223,8 @@ export function StaticMap2D({ markers, onMarkersChange }: StaticMap2DProps) {
           id: "",
           name: "",
           type: "city" as MarkerType,
+          tags: [],
+          markerSymbol: "circle",
           x: nat.x,
           y: nat.y,
           territory: "",
@@ -329,24 +337,34 @@ export function StaticMap2D({ markers, onMarkersChange }: StaticMap2DProps) {
                 }
               />
               {natural !== null &&
-                markers.map((m) => (
-                  <span
-                    key={m.id}
-                    className="eu-map-marker"
-                    data-id={m.id}
-                    data-type={m.type}
-                    style={{
-                      left: `${(m.x / natural.w) * 100}%`,
-                      top: `${(m.y / natural.h) * 100}%`,
-                    }}
-                    title={m.name}
-                    role="button"
-                    aria-label={m.name}
-                  >
-                    <span className="eu-map-marker__pin" />
-                    <span className="eu-map-marker__label">{m.name}</span>
-                  </span>
-                ))}
+                markers.map((m) => {
+                  const faction = m.factionAffinity[0];
+                  return (
+                    <span
+                      key={m.id}
+                      className={`eu-map-marker${faction !== undefined ? " eu-map-marker--faction" : ""}`}
+                      data-id={m.id}
+                      data-type={m.type}
+                      style={
+                        {
+                          left: `${(m.x / natural.w) * 100}%`,
+                          top: `${(m.y / natural.h) * 100}%`,
+                          ...(faction !== undefined
+                            ? { ["--faction"]: factionColor(faction) }
+                            : {}),
+                        } as React.CSSProperties
+                      }
+                      title={m.name}
+                      role="button"
+                      aria-label={m.name}
+                    >
+                      <span className="eu-map-marker__glyph">
+                        <MarkerGlyph symbol={m.markerSymbol} />
+                      </span>
+                      <span className="eu-map-marker__label">{m.name}</span>
+                    </span>
+                  );
+                })}
             </div>
           </div>
 
