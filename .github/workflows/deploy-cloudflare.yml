@@ -1,0 +1,69 @@
+name: Deploy hosted site to Cloudflare
+
+# Verify the full project, then build the hosted bundle (React site + the TCG
+# beta under /beta/) and deploy it to Cloudflare via wrangler. wrangler.jsonc at
+# the repo root serves apps/site/dist as a Worker with static assets.
+#
+# Required repository configuration (Settings → Secrets and variables → Actions):
+#   Secrets:
+#     CLOUDFLARE_API_TOKEN    – token with "Edit Workers" permission
+#     CLOUDFLARE_ACCOUNT_ID   – the Cloudflare account id
+#   Variables (same Supabase project as the beta; anon key only — never
+#   service_role). If absent the build still succeeds and the beta runs in
+#   localStorage demo mode:
+#     VITE_SUPABASE_URL
+#     VITE_SUPABASE_ANON_KEY
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Only one Cloudflare deploy at a time; let an in-progress one finish.
+concurrency:
+  group: cloudflare-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Validate cards
+        run: npm run validate:cards
+
+      - name: Build hosted bundle (site + beta)
+        run: npm run build:hosted
+        env:
+          # Stamp the beta bundle with the deployed commit (footer/window marker).
+          GITHUB_SHA: ${{ github.sha }}
+          # Inlined at build time into BOTH the site (interest form) and the beta
+          # (Supabase auth/rewards). Anon/publishable key only.
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Deploy to Cloudflare
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

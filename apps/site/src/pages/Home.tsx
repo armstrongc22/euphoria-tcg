@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { BETA_URL } from "../beta";
 
 const CTAS: ReadonlyArray<{
   to: string;
@@ -36,9 +37,9 @@ export function Home() {
           the cards, and chart the map.
         </p>
         <div className="eu-hero__ctas">
-          <Link to="/play" className="eu-btn eu-btn--red">
+          <a href={BETA_URL} className="eu-btn eu-btn--red">
             Play Beta
-          </Link>
+          </a>
           <Link to="/cards" className="eu-btn eu-btn--blue eu-btn--ghost">
             Explore Cards
           </Link>

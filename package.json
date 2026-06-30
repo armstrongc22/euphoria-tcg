@@ -20,7 +20,9 @@
     "web": "npm run web:build",
     "site:dev": "npm run dev --workspace @euphoria/site",
     "site:build": "npm run build --workspace @euphoria/site",
-    "site:preview": "npm run preview --workspace @euphoria/site"
+    "site:preview": "npm run preview --workspace @euphoria/site",
+    "build:hosted": "node scripts/build-hosted.mjs",
+    "deploy:hosted": "npm run build:hosted && wrangler deploy"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
