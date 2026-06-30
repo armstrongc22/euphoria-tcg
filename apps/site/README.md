@@ -2,16 +2,42 @@
 
 The Euphoria Universe franchise site — React + Vite + React Router, deployed as a
 static SPA via Cloudflare Workers static assets (see `wrangler.jsonc` at the repo
-root). It consumes shared game content/logic from `@euphoria/core`; it never
-touches the game engine, card data schema, or the beta (`apps/web`).
+root). It consumes shared game content/logic from `@euphoria/core`; it does not
+modify the game engine, card data schema, or the beta (`apps/web`).
 
 ## Develop
 
 ```bash
 npm run site:dev       # vite dev server
 npm run site:build     # production build → apps/site/dist
-npm run site:preview   # preview the build
+npm run site:preview   # preview the build (serves the bundled beta too)
 ```
+
+## Bundled TCG beta (`/beta/`)
+
+The playable beta (`apps/web`) ships **inside this site's deployment** so the whole
+experience lives on one Cloudflare origin. `npm run build:hosted` (at the repo
+root) builds the site into `apps/site/dist`, then builds the beta into
+`apps/site/dist/beta` with base `/beta/`. The site's "Play Beta" buttons link to
+`/beta/` (a plain `<a href>` — a real navigation, not a React route; see
+`src/beta.ts`).
+
+```bash
+npm run build:hosted   # site → dist, beta → dist/beta (base /beta/)
+npm run deploy:hosted   # build:hosted, then `wrangler deploy`
+npm run site:preview   # smoke-test "/" and "/beta/" locally
+```
+
+To exercise the beta on its own during development, run `npm run web:dev`. The
+standalone GitHub Pages build of the beta (`web:build` → `apps/web/dist`,
+`VITE_BASE=/euphoria-tcg/`) is unchanged and independent of this bundle.
+
+> **Deploy note:** the beta reads `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`
+> at build time for real accounts/rewards — set them in the Cloudflare project's
+> build env (same Supabase project as the interest form), and add the Cloudflare
+> domain to the Supabase **Auth → URL Configuration** allow-list so email
+> confirmation/login redirects resolve. Without the vars the beta still builds and
+> runs in localStorage demo mode.
 
 ## Environment
 

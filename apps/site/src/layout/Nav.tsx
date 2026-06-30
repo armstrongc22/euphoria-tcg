@@ -1,4 +1,5 @@
 import { NavLink, Link } from "react-router-dom";
+import { BETA_URL } from "../beta";
 
 const LINKS: ReadonlyArray<{ to: string; label: string }> = [
   { to: "/play", label: "Play" },
@@ -30,9 +31,9 @@ export function Nav() {
           </NavLink>
         ))}
       </nav>
-      <Link to="/play" className="eu-btn eu-btn--sm eu-btn--red eu-nav__cta">
+      <a href={BETA_URL} className="eu-btn eu-btn--sm eu-btn--red eu-nav__cta">
         Play Beta
-      </Link>
+      </a>
     </header>
   );
 }

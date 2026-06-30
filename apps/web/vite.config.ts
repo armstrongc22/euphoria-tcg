@@ -14,6 +14,13 @@ const repoRoot = path.resolve(here, "..", "..");
 // cardImageUrl uses import.meta.env.BASE_URL, so art resolves under any base.
 const base = process.env["VITE_BASE"] ?? "/";
 
+// Output directory override. Defaults to apps/web/dist (standalone GitHub Pages
+// build); the hosted-bundle build (scripts/build-hosted.mjs) sets WEB_OUT_DIR to
+// apps/site/dist/beta so the beta ships inside the Cloudflare site at /beta/.
+const outDir = process.env["WEB_OUT_DIR"]
+  ? path.resolve(repoRoot, process.env["WEB_OUT_DIR"])
+  : path.join(here, "dist");
+
 // A build stamp so a deployed bundle's freshness is verifiable from the page
 // (footer + window.__EUPHORIA_BUILD__). Uses the CI commit SHA when present,
 // else a local timestamp. This is how we confirm GitHub Pages isn't serving a
@@ -27,7 +34,7 @@ export default defineConfig({
   root: here,
   publicDir: path.join(repoRoot, "assets", "cards"),
   server: { fs: { allow: [repoRoot] } },
-  build: { outDir: path.join(here, "dist"), emptyOutDir: true },
+  build: { outDir, emptyOutDir: true },
   define: {
     "import.meta.env.VITE_BUILD_STAMP": JSON.stringify(buildStamp),
   },

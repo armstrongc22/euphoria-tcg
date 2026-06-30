@@ -1,29 +1,39 @@
-import { PagePlaceholder } from "./PagePlaceholder";
+import { BETA_URL } from "../beta";
 
 /**
- * Placeholder for the TCG. The working battle engine + board live in the
- * existing beta (apps/web). Wiring the playable match into this React shell —
- * reusing @euphoria/core's play-match controller, with no engine changes — is
- * the next milestone after the shell is approved.
+ * /play — launcher for the TCG beta. The beta itself (apps/web) is bundled into
+ * the same Cloudflare deployment under /beta/ and runs as its own app, so this
+ * page is a thin entry point: it links out to /beta/ with a plain anchor (a real
+ * navigation, not a React Router route). The prominent "Play Beta" buttons in the
+ * nav/hero go straight to /beta/; this page is the landing for the section tab.
  */
 export function Play() {
   return (
-    <PagePlaceholder eyebrow="Trading Card Game" title="Play" tone="red">
-      <p>
-        The Euphoria TCG beta is playable today. Its rules engine, card effects,
-        accounts, rewards, and match history are stable and untouched — they now
-        live in the shared <code>@euphoria/core</code> package.
-      </p>
-      <p>
-        <strong>Coming next:</strong> the live battle board is being brought into
-        this new site by reusing the same <code>@euphoria/core</code> match
-        controller — the engine and backend behavior stay exactly as they are in
-        the current beta.
-      </p>
-      <p className="eu-note">
-        In the meantime, the existing beta remains available and fully
-        functional.
-      </p>
-    </PagePlaceholder>
+    <div className="eu-page eu-page--red">
+      <p className="eu-page__eyebrow">Trading Card Game</p>
+      <h1 className="eu-page__title">Play the Beta</h1>
+      <div className="eu-page__body">
+        <p>
+          The Euphoria TCG beta is live and fully playable. Sign up, pick or build
+          a deck, and battle a complete match — your account, match history, and
+          reward progress persist.
+        </p>
+        <ul className="eu-play-list">
+          <li>Sign up or log in (or play in guest demo mode)</li>
+          <li>Choose a starter deck or build your own</li>
+          <li>Play a full match against the AI — win or lose</li>
+          <li>Earn rewards at win milestones and track your collection</li>
+        </ul>
+        <p className="eu-play-cta">
+          <a href={BETA_URL} className="eu-btn eu-btn--red">
+            Launch the Beta
+          </a>
+        </p>
+        <p className="eu-note">
+          Opens the battle client in this window. Best experienced on a stable
+          connection; progress is saved to your account.
+        </p>
+      </div>
+    </div>
   );
 }
