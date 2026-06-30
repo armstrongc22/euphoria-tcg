@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { cardImageUrl } from "@euphoria/core/cards";
 import type { Card } from "./types";
 import { factionTone } from "./factionTone";
@@ -12,12 +12,21 @@ interface CardDetailModalProps {
 
 /** Full card detail overlay. Closes on backdrop click, the × button, or Escape. */
 export function CardDetailModal({ card, onClose }: CardDetailModalProps) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
     function onKey(event: KeyboardEvent): void {
       if (event.key === "Escape") onClose();
     }
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    // Move focus into the dialog and lock background scroll while it's open.
+    closeRef.current?.focus();
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [onClose]);
 
   const hasCombat = card.attack !== undefined || card.health !== undefined;
@@ -35,6 +44,7 @@ export function CardDetailModal({ card, onClose }: CardDetailModalProps) {
         onClick={(event) => event.stopPropagation()}
       >
         <button
+          ref={closeRef}
           type="button"
           className="eu-modal__close"
           onClick={onClose}

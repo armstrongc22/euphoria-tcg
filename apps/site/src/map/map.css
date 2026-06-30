@@ -1,0 +1,520 @@
+/* Euphoria interactive map — cinematic, manga/TCG feel. Reuses the shell's
+   color tokens (--c-bg, faction accents) from styles.css. Scoped under
+   .eu-map-* so it never touches the TCG/game views. */
+
+.eu-map-wrap {
+  --map-accent: var(--c-purple);
+  margin-top: 1.5rem;
+}
+
+.eu-map-stage {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+/* The map frame: a bordered, glowing window into the world. */
+.eu-map-frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(155, 92, 255, 0.12), transparent 60%),
+    var(--c-bg-2);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 24px 60px -28px rgba(0, 0, 0, 0.9),
+    inset 0 0 120px rgba(0, 0, 0, 0.55);
+}
+
+.eu-map-viewport {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none; /* we own pan/zoom; stop the browser from scrolling */
+}
+.eu-map-viewport:active {
+  cursor: grabbing;
+}
+
+.eu-map-canvas {
+  position: relative;
+  width: 100%;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.eu-map-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+  /* Subtle aged-parchment grade so it reads as in-universe, not a screenshot. */
+  filter: saturate(1.05) contrast(1.03);
+}
+
+/* ---- Markers ------------------------------------------------------------ */
+.eu-map-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  z-index: 2;
+  /* The hit area is the pin; the label floats above it. */
+}
+
+.eu-map-marker__pin {
+  width: 14px;
+  height: 14px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(45deg);
+  background: var(--pin, var(--c-purple));
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.5),
+    0 0 14px 2px var(--pin-glow, rgba(155, 92, 255, 0.7));
+  transition: transform 0.12s ease;
+}
+.eu-map-marker:hover .eu-map-marker__pin {
+  transform: rotate(45deg) scale(1.25);
+}
+
+.eu-map-marker__label {
+  transform: translateY(-2px);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  color: var(--c-ink);
+  background: rgba(7, 8, 13, 0.82);
+  border: 1px solid var(--c-line);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.eu-map-marker:hover .eu-map-marker__label {
+  opacity: 1;
+}
+
+/* Per-type pin colors — drawn from the faction palette for cohesion. */
+.eu-map-marker[data-type="city"] { --pin: var(--c-blue); --pin-glow: rgba(46, 139, 255, 0.7); }
+.eu-map-marker[data-type="territory"] { --pin: var(--c-green); --pin-glow: rgba(41, 209, 122, 0.7); }
+.eu-map-marker[data-type="island"] { --pin: var(--c-white); --pin-glow: rgba(238, 242, 248, 0.6); }
+.eu-map-marker[data-type="ruin"] { --pin: #c9a23a; --pin-glow: rgba(201, 162, 58, 0.7); }
+.eu-map-marker[data-type="battle site"] { --pin: var(--c-red); --pin-glow: rgba(255, 46, 77, 0.75); }
+.eu-map-marker[data-type="route point"] { --pin: #6b7280; --pin-glow: rgba(107, 114, 128, 0.6); }
+.eu-map-marker[data-type="submerged city"] { --pin: #2bd4c8; --pin-glow: rgba(43, 212, 200, 0.7); }
+.eu-map-marker[data-type="faction zone"] { --pin: var(--c-purple); --pin-glow: rgba(155, 92, 255, 0.7); }
+
+/* ---- Overlays (zoom + badge) ------------------------------------------- */
+.eu-map-zoom {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  z-index: 5;
+}
+.eu-map-zoom .eu-map-btn {
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.eu-map-badge {
+  position: absolute;
+  bottom: 0.6rem;
+  left: 0.6rem;
+  margin: 0;
+  z-index: 5;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-ink-dim);
+  background: rgba(7, 8, 13, 0.8);
+  border: 1px solid var(--map-accent);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+}
+
+/* ---- Secret compass emblem (notation unlock target) -------------------- */
+.eu-map-compass {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  z-index: 5;
+  width: 2.9rem;
+  height: 2.9rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.eu-map-compass:hover {
+  opacity: 0.95;
+  transform: rotate(8deg);
+}
+.eu-map-compass svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
+}
+.eu-map-compass__ring {
+  fill: rgba(7, 8, 13, 0.55);
+  stroke: rgba(201, 162, 58, 0.85);
+  stroke-width: 1.5;
+}
+.eu-map-compass__ring2 {
+  fill: none;
+  stroke: rgba(201, 162, 58, 0.4);
+  stroke-width: 1;
+}
+.eu-map-compass__ns {
+  fill: rgba(238, 242, 248, 0.92);
+}
+.eu-map-compass__ew {
+  fill: rgba(201, 162, 58, 0.85);
+}
+.eu-map-compass__hub {
+  fill: var(--c-bg);
+  stroke: rgba(238, 242, 248, 0.8);
+  stroke-width: 1;
+}
+
+/* ---- "Notation mode unlocked" toast ------------------------------------ */
+.eu-map-toast {
+  position: absolute;
+  top: 0.7rem;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  z-index: 30;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--c-ink);
+  background: rgba(12, 15, 25, 0.94);
+  border: 1px solid var(--c-purple);
+  border-radius: 999px;
+  padding: 0.4rem 1rem;
+  box-shadow: 0 0 22px -4px rgba(155, 92, 255, 0.7);
+  animation: eu-map-toast-in 0.2s ease;
+  pointer-events: none;
+}
+@keyframes eu-map-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* ---- Buttons (shared) --------------------------------------------------- */
+.eu-map-btn {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--c-ink);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--c-line);
+  border-radius: 8px;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.eu-map-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--map-accent);
+}
+.eu-map-btn--primary {
+  background: var(--c-purple);
+  border-color: var(--c-purple);
+}
+.eu-map-btn--primary:hover {
+  filter: brightness(1.1);
+}
+.eu-map-btn--danger {
+  color: #ffd7dd;
+  border-color: rgba(255, 46, 77, 0.5);
+}
+.eu-map-btn--danger:hover {
+  background: rgba(255, 46, 77, 0.18);
+  border-color: var(--c-red);
+}
+.eu-map-btn--sm {
+  padding: 0.15rem 0.45rem;
+  font-size: 0.75rem;
+}
+
+/* ---- Debug panel -------------------------------------------------------- */
+.eu-map-debug {
+  flex: 0 0 320px;
+  align-self: stretch;
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.eu-map-debug__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--c-line);
+  background: linear-gradient(180deg, rgba(155, 92, 255, 0.12), transparent);
+}
+.eu-map-debug__eyebrow {
+  margin: 0;
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-purple);
+}
+.eu-map-debug__title {
+  margin: 0.1rem 0 0;
+  font-size: 1.05rem;
+}
+.eu-map-debug__body {
+  padding: 0.85rem 1rem 1rem;
+  overflow-y: auto;
+}
+.eu-map-debug__hint {
+  margin: 0 0 0.9rem;
+  font-size: 0.8rem;
+  color: var(--c-ink-dim);
+}
+.eu-map-debug__section {
+  margin-bottom: 1.1rem;
+}
+.eu-map-debug__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--c-ink-dim);
+  margin-bottom: 0.5rem;
+}
+
+.eu-map-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.eu-map-list__empty {
+  font-size: 0.8rem;
+  color: var(--c-ink-dim);
+  padding: 0.4rem 0;
+}
+.eu-map-list__row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.eu-map-list__name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  color: var(--c-ink);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--c-line);
+  border-radius: 8px;
+  padding: 0.4rem 0.55rem;
+  cursor: pointer;
+}
+.eu-map-list__name:hover {
+  border-color: var(--c-purple);
+}
+.eu-map-list__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--c-purple);
+  flex: 0 0 auto;
+}
+.eu-map-list__dot[data-type="city"] { background: var(--c-blue); }
+.eu-map-list__dot[data-type="territory"] { background: var(--c-green); }
+.eu-map-list__dot[data-type="island"] { background: var(--c-white); }
+.eu-map-list__dot[data-type="ruin"] { background: #c9a23a; }
+.eu-map-list__dot[data-type="battle site"] { background: var(--c-red); }
+.eu-map-list__dot[data-type="route point"] { background: #6b7280; }
+.eu-map-list__dot[data-type="submerged city"] { background: #2bd4c8; }
+.eu-map-list__dot[data-type="faction zone"] { background: var(--c-purple); }
+.eu-map-list__meta {
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--c-ink-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.eu-map-debug__btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.eu-map-debug__json {
+  width: 100%;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  color: var(--c-ink);
+  background: var(--c-bg);
+  border: 1px solid var(--c-line);
+  border-radius: 8px;
+  padding: 0.5rem;
+  resize: vertical;
+}
+.eu-map-debug__feedback {
+  margin: 0.5rem 0 0;
+  font-size: 0.76rem;
+  color: var(--c-green);
+}
+
+.eu-map-debug__toggle {
+  display: none; /* desktop: panel is always open */
+}
+
+.eu-map-debug__exit {
+  width: 100%;
+  margin-top: 0.2rem;
+}
+
+/* ---- Marker form -------------------------------------------------------- */
+.eu-map-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  max-width: 460px;
+  width: 100%;
+  padding: 1.4rem;
+}
+.eu-map-form__coords {
+  margin: -0.3rem 0 0.3rem;
+  font-size: 0.72rem;
+  color: var(--c-ink-dim);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.eu-map-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--c-ink-dim);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.eu-map-field > span,
+.eu-map-field > legend {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0;
+}
+.eu-map-field input[type="text"],
+.eu-map-field select,
+.eu-map-field textarea {
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--c-ink);
+  background: var(--c-bg);
+  border: 1px solid var(--c-line);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+.eu-map-field textarea {
+  resize: vertical;
+}
+.eu-map-factions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.eu-map-faction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  color: var(--c-ink);
+}
+.eu-map-form__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+.eu-map-form__spacer {
+  flex: 1;
+}
+
+/* ---- Marker popup (public) --------------------------------------------- */
+.eu-map-popup {
+  max-width: 420px;
+  width: 100%;
+  padding: 1.5rem;
+}
+.eu-map-popup__type {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-purple);
+}
+
+/* ---- Mobile: panel becomes a bottom drawer ----------------------------- */
+@media (max-width: 760px) {
+  .eu-map-stage {
+    flex-direction: column;
+  }
+  .eu-map-debug {
+    position: sticky;
+    bottom: 0;
+    flex-basis: auto;
+    width: 100%;
+    max-height: 60vh;
+    z-index: 20;
+    box-shadow: 0 -16px 40px -20px rgba(0, 0, 0, 0.9);
+  }
+  .eu-map-debug--collapsed {
+    max-height: none;
+  }
+  .eu-map-debug--collapsed .eu-map-debug__body {
+    display: none;
+  }
+  .eu-map-debug__toggle {
+    display: inline-block;
+  }
+}
