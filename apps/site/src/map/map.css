@@ -132,8 +132,10 @@
     rgba(10, 13, 22, 0.92),
     rgba(7, 8, 13, 0.78)
   );
+  /* Light hairline first so even a black (Criminal) ring stays readable. */
   box-shadow:
-    0 0 0 2px var(--faction),
+    0 0 0 1px rgba(255, 255, 255, 0.28),
+    0 0 0 3px var(--faction),
     0 0 12px 1px var(--faction),
     0 2px 6px rgba(0, 0, 0, 0.7);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
@@ -147,7 +149,8 @@
 .eu-map-marker:focus-visible .eu-map-marker__glyph {
   transform: scale(1.18);
   box-shadow:
-    0 0 0 2px var(--faction),
+    0 0 0 1px rgba(255, 255, 255, 0.28),
+    0 0 0 3px var(--faction),
     0 0 20px 5px var(--faction),
     0 2px 8px rgba(0, 0, 0, 0.8);
 }
@@ -532,7 +535,10 @@
   color: #f3ead0;
   border-radius: 50%;
   background: radial-gradient(circle at 50% 42%, rgba(10, 13, 22, 0.92), rgba(7, 8, 13, 0.78));
-  box-shadow: 0 0 0 1.5px var(--faction), 0 0 7px 0 var(--faction);
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.3),
+    0 0 0 1.5px var(--faction),
+    0 0 7px 0 var(--faction);
 }
 .eu-map-list__glyph svg,
 .eu-map-popup__glyph svg,

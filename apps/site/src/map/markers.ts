@@ -14,6 +14,7 @@ export const FACTIONS = [
   "Shaman",
   "Human",
   "Neutral",
+  "Criminal",
 ] as const;
 
 /**
@@ -29,6 +30,7 @@ export const FACTION_COLORS: Record<string, string> = {
   Shaman: "#9b5cff", // purple
   Human: "#a9744f", // brown
   Neutral: "#c3c8d2", // silver
+  Criminal: "#000000", // black
 };
 
 /** Hex color for a faction (silver fallback for anything unrecognised). */

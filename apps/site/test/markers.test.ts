@@ -158,9 +158,10 @@ describe("expanded types, factions, and colors", () => {
     }
   });
 
-  it("offers the Human and Neutral factions", () => {
+  it("offers the Human, Neutral, and Criminal factions", () => {
     expect((FACTIONS as readonly string[]).includes("Human")).toBe(true);
     expect((FACTIONS as readonly string[]).includes("Neutral")).toBe(true);
+    expect((FACTIONS as readonly string[]).includes("Criminal")).toBe(true);
   });
 
   it("maps each faction to its map color", () => {
@@ -171,6 +172,7 @@ describe("expanded types, factions, and colors", () => {
     expect(factionColor("Shaman")).toBe("#9b5cff");
     expect(factionColor("Human")).toBe("#a9744f");
     expect(factionColor("Neutral")).toBe("#c3c8d2");
+    expect(factionColor("Criminal")).toBe("#000000");
   });
 
   it("falls back to silver for an unknown faction", () => {
@@ -183,13 +185,32 @@ describe("expanded types, factions, and colors", () => {
       type: "temple",
       x: 1,
       y: 2,
-      factionAffinity: ["Human", "Neutral"],
+      factionAffinity: ["Human", "Neutral", "Criminal"],
     });
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.marker.type).toBe("temple");
-      expect(r.marker.factionAffinity).toEqual(["Human", "Neutral"]);
+      expect(r.marker.factionAffinity).toEqual(["Human", "Neutral", "Criminal"]);
     }
+  });
+
+  it("round-trips a Criminal-faction marker through import/export", () => {
+    const marker: MapMarker = {
+      id: "smugglers-den",
+      name: "Smugglers' Den",
+      type: "criminal location",
+      tags: ["criminal location"],
+      markerSymbol: "skull",
+      x: 410,
+      y: 905,
+      territory: "Euphrates Territory",
+      factionAffinity: ["Criminal"],
+      spoilerLevel: 2,
+      description: "A black-market harbor.",
+    };
+    const r = parseMarkers(serializeMarkers([marker]));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.markers[0]).toEqual(marker);
   });
 });
 
