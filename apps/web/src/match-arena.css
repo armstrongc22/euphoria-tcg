@@ -34,10 +34,19 @@
 .gc .gc-screen-root:has(.arena) > .play-match {
   flex: 1;
   min-height: 0;
+  /* Break fully out of the narrow, centered .account "card": full-bleed
+     battlefield with no big vertical margin, width cap, or panel chrome — this
+     is what reclaims the wasted space and lets the grid fill the viewport. */
+  width: 100%;
+  max-width: none;
+  margin: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 0.4rem 0.5rem;
+  padding: 0.35rem 0.5rem;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 /* ---- Battlefield grid (explicit, guaranteed-height rows) --------------- */
@@ -47,24 +56,27 @@
    combat log (bottom, secondary) gives up space first. */
 .gc .arena {
   --arena-gap: 0.35rem;
-  --arena-field-min: 88px;
+  --arena-field-min: clamp(120px, 20vh, 210px);
+  --arena-hand-min: clamp(120px, 18vh, 190px);
   --arena-strip-h: clamp(46px, 6vh, 58px);
-  --arena-hand-h: clamp(132px, 24vh, 196px);
   --arena-actions-h: clamp(46px, 6vh, 56px);
   flex: 1;
   min-height: 0;
   display: grid;
   gap: var(--arena-gap);
   grid-template-columns: 1fr;
+  /* Fields AND hand flex to fill ALL available height (fr units) with readable
+     minimums, so the board expands to use the viewport instead of leaving gaps.
+     Fields carry more weight than the hand so summoned Warriors get room. */
   grid-template-rows:
-    auto                                    /* top: compact HUD */
-    minmax(var(--arena-field-min), 1fr)     /* opponent field */
-    auto                                    /* lane: phase/status */
-    minmax(var(--arena-field-min), 1fr)     /* player field */
-    auto                                    /* command strip (0 when empty) */
-    var(--arena-hand-h)                     /* hand dock */
-    var(--arena-actions-h)                  /* primary actions */
-    auto;                                   /* combat log (secondary) */
+    auto                                       /* top: compact HUD */
+    minmax(var(--arena-field-min), 1.25fr)     /* opponent field */
+    auto                                       /* lane: phase/status */
+    minmax(var(--arena-field-min), 1.25fr)     /* player field */
+    auto                                       /* command strip (0 when empty) */
+    minmax(var(--arena-hand-min), 1fr)         /* hand dock */
+    var(--arena-actions-h)                     /* primary actions */
+    auto;                                      /* combat log (secondary) */
   grid-template-areas:
     "top"
     "opp"
@@ -98,12 +110,53 @@
   display: flex;
   flex-direction: column;
 }
+/* The field is a single horizontal lane of Warriors that fill its height. It
+   scrolls HORIZONTALLY only when there are more Warriors than fit across — never
+   vertically — so one (or a few) Warriors are always fully visible, not clipped
+   into a scrolling sliver. */
 .gc .arena__opp .play-match__field,
 .gc .arena__mine .play-match__field {
   flex: 1;
-  min-height: 56px; /* always tall enough to show a Warrior tile */
-  overflow-y: auto;
-  align-content: flex-start;
+  min-height: 0;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  align-content: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 0.4rem;
+}
+/* Warriors fill the field height; width follows the art (3:4). */
+.gc .arena__opp .play-match__warrior,
+.gc .arena__mine .play-match__warrior {
+  height: 100%;
+  width: auto;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+.gc .arena__opp .play-match__warrior-face,
+.gc .arena__mine .play-match__warrior-face {
+  flex: 1;
+  min-height: 0;
+}
+.gc .arena__opp .play-match__art-wrap,
+.gc .arena__mine .play-match__art-wrap {
+  height: 100%;
+  min-height: 0;
+}
+.gc .arena__opp .play-match__art-wrap .play-match__art,
+.gc .arena__mine .play-match__art-wrap .play-match__art {
+  height: 100%;
+  width: auto;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+.gc .arena__opp .play-match__warrior-info,
+.gc .arena__mine .play-match__warrior-info {
+  flex: 0 0 auto;
+  padding: 0.15rem 0.3rem;
+  font-size: 0.66rem;
+  line-height: 1.15;
 }
 
 /* Center action / phase / targeting lane (compact status only). */
@@ -685,18 +738,34 @@
 .gc .arena__hand .play-match__hand {
   flex: 1;
   min-height: 0;
-  align-items: flex-start;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
-/* Responsive width; height follows the art and stays shorter than the dock row
-   (so no vertical clip). The hand scrolls horizontally, never vertically. */
+/* Cards fill the dock height; width follows the art (3:4). Bigger on tall/wide
+   screens, smaller on short ones (the row itself flexes). Horizontal scroll for
+   many cards; the art is never vertically clipped. */
 .gc .arena__hand .play-match__card {
-  width: clamp(84px, 12vh, 120px);
-  height: auto;
+  height: 100%;
+  width: auto;
   flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+.gc .arena__hand .play-match__card-face {
+  flex: 1;
+  min-height: 0;
+}
+.gc .arena__hand .play-match__card-face .play-match__art {
+  height: 100%;
+  width: auto;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
 }
 /* Compact one-line caption — art stays visible; details live in inspect/zoom. */
-.gc .arena__hand .play-match__card-info,
-.gc .arena__hand .play-match__card-meta {
+.gc .arena__hand .play-match__card-info {
+  flex: 0 0 auto;
   padding: 0.15rem 0.35rem;
   font-size: 0.66rem;
   line-height: 1.15;
@@ -706,6 +775,9 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.gc .arena__hand .play-match__card-meta {
+  font-size: 0.62rem;
 }
 
 /* ---- Primary action bar (Enter Battle / End Turn — always visible) ------ */
@@ -967,11 +1039,11 @@
     column-gap: 0.7rem;
     grid-template-rows:
       auto
-      minmax(120px, 1fr)
+      minmax(var(--arena-field-min), 1.25fr)
       auto
-      minmax(120px, 1fr)
+      minmax(var(--arena-field-min), 1.25fr)
       auto
-      var(--arena-hand-h)
+      minmax(var(--arena-hand-min), 1fr)
       var(--arena-actions-h);
     grid-template-areas:
       "top     log"

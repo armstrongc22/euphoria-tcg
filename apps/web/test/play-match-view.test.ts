@@ -2465,3 +2465,33 @@ describe("renderPlayableMatch — contextual primary-action overlay", () => {
     expect(root.querySelector(".arena__actions .play-match__end")).not.toBeNull();
   });
 });
+
+describe("renderPlayableMatch — field lane fills space (no cramped scroll)", () => {
+  it("renders the summoned Warrior directly in the player-field lane", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    // Summon a Warrior via the contextual overlay.
+    buttonByText(root, ".play-match__card-btn", "Summon")!
+      .closest<HTMLElement>(".play-match__card")!
+      .querySelector<HTMLElement>(".play-match__card-face")!
+      .click();
+    root.querySelector<HTMLButtonElement>(".arena__mine .play-match__primary-action")!.click();
+    // The Warrior is a DIRECT child of the field lane (visible), not buried in a
+    // nested scroll wrapper.
+    const field = root.querySelector<HTMLElement>(".arena__mine .play-match__field")!;
+    expect(field).not.toBeNull();
+    expect(field.querySelector(":scope > .play-match__warrior")).not.toBeNull();
+    // Hand, contextual action, and primary actions all still present.
+    expect(root.querySelectorAll(".arena__hand .play-match__card").length).toBeGreaterThan(0);
+    expect(root.querySelector(".arena__actions .play-match__enter")).not.toBeNull();
+    expect(root.querySelector(".arena__actions .play-match__end")).not.toBeNull();
+  });
+
+  it("keeps both field lanes and the flexible arena grid present", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    const arena = root.querySelector(".arena")!;
+    expect(arena).not.toBeNull();
+    expect(arena.querySelector(".arena__opp .play-match__field")).not.toBeNull();
+    expect(arena.querySelector(".arena__mine .play-match__field")).not.toBeNull();
+  });
+});
