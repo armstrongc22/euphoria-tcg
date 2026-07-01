@@ -139,7 +139,10 @@ function buildArena(frag: DocumentFragment): HTMLElement {
   const opp = region("arena__opp");
   const lane = region("arena__lane");
   const mine = region("arena__mine");
-  const dock = region("arena__dock");
+  // Distinct, guaranteed-height regions so no gameplay control collapses:
+  const strip = region("arena__strip"); // selected-card command strip + prompts
+  const hand = region("arena__hand"); // hand cards only
+  const acts = region("arena__actions"); // Enter Battle / End Turn
 
   const move = (parent: HTMLElement, sel: string): void => {
     const el = frag.querySelector<HTMLElement>(sel);
@@ -148,7 +151,7 @@ function buildArena(frag: DocumentFragment): HTMLElement {
 
   move(top, ".play-match__header");
   move(opp, ".play-match__zone--opponent");
-  // Center lane = the phase/targeting/prompt area between the two fields.
+  // Center lane = the phase/targeting status between the two fields (compact).
   for (const sel of [
     ".play-match__phase",
     ".play-match__playback-banner",
@@ -160,16 +163,16 @@ function buildArena(frag: DocumentFragment): HTMLElement {
     move(lane, sel);
   }
   move(mine, ".play-match__zone--mine");
-  // Pinned action dock: attack/target prompts and the selected-card action bar
-  // sit ABOVE the hand so their action buttons (Summon/Play/Equip/Attack) are
-  // always visible — never clipped by the viewport-constrained layout.
+  // Command strip: attack/target prompts + the selected-card action bar, in a
+  // row with a guaranteed readable height (never a crushed thin band).
   for (const p of Array.from(frag.querySelectorAll<HTMLElement>(".play-match__choice"))) {
-    dock.append(p);
+    strip.append(p);
   }
-  move(dock, ".play-match__selected");
-  move(dock, ".play-match__zone--hand");
+  move(strip, ".play-match__selected");
+  move(hand, ".play-match__zone--hand");
+  move(acts, ".play-match__actionbar");
 
-  grid.append(top, opp, lane, mine, dock);
+  grid.append(top, opp, lane, mine, strip, hand, acts);
 
   const log = frag.querySelector<HTMLElement>(".play-match__log");
   if (log !== null) {
@@ -1261,20 +1264,16 @@ export function renderPlayableMatch(
       return z;
     };
 
-    // Header: title + concede.
+    // Compact top HUD (one thin row): match title + turn/phase + Concede. The
+    // decorative "Euphoria TCG · Live match" eyebrow and the verbose mode line
+    // are gone — the prominent status lives in the phase banner (center lane).
     const header = document.createElement("div");
-    header.className = "account__header play-match__header";
-    const mode = playing
-      ? "Opponent is acting…"
-      : yourTurn
-        ? "Your move"
-        : "Opponent…";
+    header.className = "account__header play-match__header play-match__hud";
     header.innerHTML =
-      `<p class="account__eyebrow">Euphoria TCG · Live match</p>` +
-      `<h2 class="account__title">${escapeHtml(match.playerFaction)} vs ` +
-      `${escapeHtml(match.opponentFaction)}</h2>` +
-      `<p class="account__mode">Turn ${state.turn} · ${escapeHtml(state.phase)} phase · ` +
-      `${escapeHtml(mode)}</p>`;
+      `<span class="play-match__hud-brand">Match Arena</span>` +
+      `<span class="account__title play-match__hud-title">${escapeHtml(match.playerFaction)} vs ` +
+      `${escapeHtml(match.opponentFaction)}</span>` +
+      `<span class="play-match__hud-turn">Turn ${state.turn} · ${escapeHtml(state.phase)}</span>`;
     const concede = document.createElement("button");
     concede.type = "button";
     concede.className = "account__signout play-match__quit";
@@ -1285,7 +1284,7 @@ export function renderPlayableMatch(
       const report = document.createElement("button");
       report.type = "button";
       report.className = "account__signout play-match__report";
-      report.textContent = "Report issue";
+      report.textContent = "Report";
       report.addEventListener("click", actions.onReportIssue);
       header.append(report);
     }
@@ -1427,13 +1426,16 @@ export function renderPlayableMatch(
     }
 
     // Hand zone (visually distinct from the field) + the action bar.
+    // Persistent primary-action bar (Enter Battle / End Turn). Built separately
+    // from the hand so buildArena can place it in its own always-visible region
+    // below the hand — never pushed off-screen by the hand or command strip.
     const bar = document.createElement("div");
     bar.className = "play-match__actionbar";
     bar.append(
       barButton("Enter Battle", idx.enterBattle, "play-match__enter"),
       barButton("End Turn", idx.endTurn, "play-match__end"),
     );
-    const handZone = zone("Your hand", "hand", handRow(me, idx), bar);
+    const handZone = zone("Your hand", "hand", handRow(me, idx));
 
     // Selected-card action panel (Feature B), shown just above the hand when the
     // player has tapped a card/Warrior they can act on. We relocate that tile's
@@ -1458,6 +1460,8 @@ export function renderPlayableMatch(
     }
 
     frag.append(handZone);
+    // The primary-action bar (Enter Battle / End Turn) is its own region now.
+    frag.append(bar);
 
     // Battle log (full history).
     frag.append(logPanel(state));

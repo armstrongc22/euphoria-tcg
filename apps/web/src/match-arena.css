@@ -40,42 +40,51 @@
   padding: 0.4rem 0.5rem;
 }
 
-/* ---- Battlefield grid (Phase 3C: viewport-constrained) ----------------- */
+/* ---- Battlefield grid (explicit, guaranteed-height rows) --------------- */
+/* Every gameplay row has a readable MINIMUM so nothing collapses into a thin
+   band. The two fields flex to fill spare height (min 88px each); the command
+   strip, hand, and primary-action bar have fixed readable heights; only the
+   combat log (bottom, secondary) gives up space first. */
 .gc .arena {
-  --arena-gap: 0.4rem;
+  --arena-gap: 0.35rem;
+  --arena-field-min: 88px;
+  --arena-strip-h: clamp(46px, 6vh, 58px);
+  --arena-hand-h: clamp(132px, 24vh, 196px);
+  --arena-actions-h: clamp(46px, 6vh, 56px);
   flex: 1;
   min-height: 0;
   display: grid;
   gap: var(--arena-gap);
   grid-template-columns: 1fr;
-  /* Fields (opp/mine) flex and absorb overflow; the rest are content-sized. */
-  grid-template-rows: auto minmax(0, 1fr) auto minmax(0, 1fr) auto auto;
+  grid-template-rows:
+    auto                                    /* top: compact HUD */
+    minmax(var(--arena-field-min), 1fr)     /* opponent field */
+    auto                                    /* lane: phase/status */
+    minmax(var(--arena-field-min), 1fr)     /* player field */
+    auto                                    /* command strip (0 when empty) */
+    var(--arena-hand-h)                     /* hand dock */
+    var(--arena-actions-h)                  /* primary actions */
+    auto;                                   /* combat log (secondary) */
   grid-template-areas:
     "top"
     "opp"
     "lane"
     "mine"
-    "dock"
+    "strip"
+    "hand"
+    "actions"
     "log";
 }
 .gc .arena__top { grid-area: top; }
 .gc .arena__opp { grid-area: opp; }
 .gc .arena__lane { grid-area: lane; }
 .gc .arena__mine { grid-area: mine; }
+.gc .arena__strip { grid-area: strip; min-height: 0; }
+.gc .arena__hand { grid-area: hand; min-height: 0; }
+.gc .arena__actions { grid-area: actions; min-height: 0; }
 .gc .arena__log { grid-area: log; }
 
-/* Pinned action dock (bottom): selected-card action bar + attack/target prompts
-   sit ABOVE the hand and are always visible. It never shrinks — the fields
-   (minmax(0,1fr)) give up space first — so action buttons are never clipped. */
-.gc .arena__dock {
-  grid-area: dock;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  min-height: 0;
-}
-
-/* Opponent/player areas: the field scrolls internally instead of growing. */
+/* Opponent/player areas: field scrolls internally, never collapses. */
 .gc .arena__opp,
 .gc .arena__mine {
   min-height: 0;
@@ -92,31 +101,30 @@
 .gc .arena__opp .play-match__field,
 .gc .arena__mine .play-match__field {
   flex: 1;
-  min-height: 0;
+  min-height: 56px; /* always tall enough to show a Warrior tile */
   overflow-y: auto;
   align-content: flex-start;
 }
 
-/* Center action / phase / targeting lane. */
+/* Center action / phase / targeting lane (compact status only). */
 .gc .arena__lane {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.25rem;
   align-items: stretch;
   min-height: 0;
 }
-/* Only the most relevant lane content stays; keep it compact so fields win. */
 .gc .arena__lane .play-match__hint,
 .gc .arena__lane .play-match__tutorial-hint {
   display: none;
 }
 
-/* Log: a collapsible bottom drawer on narrow screens (capped height, internal
-   scroll) so it never forces the board to grow. On wide screens it moves to a
-   side column (see the desktop media query below). */
+/* Combat log (secondary): a collapsible drawer on narrow screens — capped and
+   internally scrolled so it never steals height from gameplay. It's the LAST
+   grid row, so if the viewport is very short it's the first thing to give. */
 .gc .arena__log {
   min-height: 0;
-  max-height: 26vh;
+  max-height: 22vh;
   display: flex;
   flex-direction: column;
 }
@@ -539,20 +547,69 @@
   cursor: pointer;
 }
 
-/* ---- Selected-card COMMAND STRIP (compact, one line, pinned in dock) ----- */
-/* A single horizontal line with a hard height cap: it can NEVER grow tall enough
-   to push the hand or the Enter Battle / End Turn bar out of view. Extra action
-   buttons scroll horizontally instead of wrapping downward. */
+/* ---- Compact top HUD (one thin row, ~52px) ----------------------------- */
+.gc .play-match__hud {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem 0.7rem;
+  height: var(--arena-strip-h, 52px);
+  padding: 0 0.7rem;
+  margin: 0;
+  border: 1px solid var(--gc-line);
+  border-left: 3px solid var(--arena);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent), var(--gc-panel);
+  overflow: hidden;
+}
+.gc .play-match__hud-brand {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--arena);
+  white-space: nowrap;
+}
+.gc .play-match__hud-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gc .play-match__hud-turn {
+  font-size: 0.75rem;
+  color: var(--gc-dim);
+  white-space: nowrap;
+  margin-left: auto;
+}
+.gc .play-match__hud .play-match__quit,
+.gc .play-match__hud .play-match__report {
+  flex: 0 0 auto;
+}
+
+/* ---- Selected-card COMMAND STRIP (readable, one line) ------------------- */
+/* A single horizontal row with a GUARANTEED readable height — never a crushed
+   band. Extra action buttons scroll horizontally rather than shrinking the row.
+   Lives in its own grid row (.arena__strip), so it can't push the hand or the
+   primary-action bar off-screen. */
+.gc .arena__strip {
+  display: flex;
+  align-items: stretch;
+}
 .gc .arena__command {
+  flex: 1;
   align-self: stretch;
   width: auto;
   max-width: none;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0.5rem;
-  max-height: 3rem;
+  gap: 0.55rem;
+  padding: 0.3rem 0.6rem;
+  min-height: var(--arena-strip-h, 52px);
   overflow-x: auto;
   overflow-y: hidden;
   border-radius: 10px;
@@ -561,13 +618,13 @@
 .gc .arena__command .play-match__selected-head {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
   flex: 0 0 auto;
 }
-/* Fixed tiny thumbnail — overrides the 3:4 card-art aspect so it stays small. */
+/* Small readable thumbnail — overrides the 3:4 card-art aspect. */
 .gc .arena__command .play-match__selected-head .play-match__art {
-  width: 28px;
-  height: 38px;
+  width: 30px;
+  height: 40px;
   aspect-ratio: auto;
   object-fit: cover;
   border-radius: 4px;
@@ -581,12 +638,13 @@
 }
 .gc .arena__command .play-match__selected-title {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 700;
   white-space: nowrap;
 }
 .gc .arena__command .play-match__selected-sub {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   color: var(--gc-dim);
   white-space: nowrap;
 }
@@ -601,18 +659,67 @@
   white-space: nowrap;
 }
 
-/* Attack/target prompts in the dock: full width, capped height + internal
-   scroll so their options never push the hand/action bar out of view. */
-.gc .arena__dock .play-match__choice {
+/* Attack/target prompts sit in the same strip region; keep them readable and
+   internally scrolled so they never grow the board. */
+.gc .arena__strip .play-match__choice {
+  flex: 1;
   align-self: stretch;
   max-width: none;
   max-height: 34vh;
   overflow-y: auto;
 }
-/* Compact the "Your hand" label so the dock stays short. */
-.gc .arena__dock .play-match__zone-label {
+
+/* ---- Hand dock (readable, height-constrained, horizontal scroll) -------- */
+.gc .arena__hand > .play-match__zone--hand {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.gc .arena__hand .play-match__zone-label {
   font-size: 0.55rem;
-  margin-bottom: 0.15rem;
+  margin: 0 0 0.15rem;
+  flex: 0 0 auto;
+}
+.gc .arena__hand .play-match__hand {
+  flex: 1;
+  min-height: 0;
+  align-items: flex-start;
+}
+/* Responsive width; height follows the art and stays shorter than the dock row
+   (so no vertical clip). The hand scrolls horizontally, never vertically. */
+.gc .arena__hand .play-match__card {
+  width: clamp(84px, 12vh, 120px);
+  height: auto;
+  flex: 0 0 auto;
+}
+/* Compact one-line caption — art stays visible; details live in inspect/zoom. */
+.gc .arena__hand .play-match__card-info,
+.gc .arena__hand .play-match__card-meta {
+  padding: 0.15rem 0.35rem;
+  font-size: 0.66rem;
+  line-height: 1.15;
+}
+.gc .arena__hand .play-match__card-name {
+  font-size: 0.72rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Primary action bar (Enter Battle / End Turn — always visible) ------ */
+.gc .arena__actions {
+  display: flex;
+  align-items: stretch;
+}
+.gc .arena__actions .play-match__actionbar {
+  flex: 1;
+  margin: 0;
+  align-items: stretch;
+}
+.gc .arena__actions .play-match__actionbar button {
+  height: 100%;
 }
 
 /* Cancel/Deselect button. */
@@ -805,19 +912,27 @@
   border: 1px solid var(--gc-line);
 }
 
-/* ---- Desktop: log becomes a side drawer -------------------------------- */
 /* ---- Desktop/wide: board + combat-log side column, still no page scroll -- */
 @media (min-width: 1100px) {
   .gc .arena {
     grid-template-columns: minmax(0, 1fr) 300px;
     column-gap: 0.7rem;
-    grid-template-rows: auto minmax(0, 1fr) auto minmax(0, 1fr) auto;
+    grid-template-rows:
+      auto
+      minmax(120px, 1fr)
+      auto
+      minmax(120px, 1fr)
+      auto
+      var(--arena-hand-h)
+      var(--arena-actions-h);
     grid-template-areas:
-      "top  log"
-      "opp  log"
-      "lane log"
-      "mine log"
-      "dock log";
+      "top     log"
+      "opp     log"
+      "lane    log"
+      "mine    log"
+      "strip   log"
+      "hand    log"
+      "actions log";
   }
   .gc .arena__log {
     grid-row: 1 / -1;

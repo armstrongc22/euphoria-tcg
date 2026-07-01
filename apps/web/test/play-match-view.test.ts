@@ -2199,7 +2199,8 @@ describe("renderPlayableMatch — battlefield layout", () => {
       ".arena__opp",
       ".arena__lane",
       ".arena__mine",
-      ".arena__dock",
+      ".arena__hand",
+      ".arena__actions",
     ]) {
       expect(arena!.querySelector(region)).not.toBeNull();
     }
@@ -2211,17 +2212,17 @@ describe("renderPlayableMatch — battlefield layout", () => {
     const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
     expect(root.querySelector(".arena__opp .play-match__zone--opponent")).not.toBeNull();
     expect(root.querySelector(".arena__mine .play-match__zone--mine")).not.toBeNull();
-    expect(root.querySelector(".arena__dock .play-match__zone--hand")).not.toBeNull();
+    expect(root.querySelector(".arena__hand .play-match__zone--hand")).not.toBeNull();
     expect(root.querySelector(".arena__lane .play-match__phase")).not.toBeNull();
     // Action buttons stay reachable inside the dock.
-    expect(root.querySelector(".arena__dock .play-match__enter")).not.toBeNull();
-    expect(root.querySelector(".arena__dock .play-match__end")).not.toBeNull();
+    expect(root.querySelector(".arena__actions .play-match__enter")).not.toBeNull();
+    expect(root.querySelector(".arena__actions .play-match__end")).not.toBeNull();
   });
 
   it("keeps the hand and its wired controls intact after reparenting", () => {
     const match = newMatch();
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
-    const cards = root.querySelectorAll(".arena__dock .play-match__card");
+    const cards = root.querySelectorAll(".arena__hand .play-match__card");
     expect(cards.length).toBeGreaterThan(0);
     // A Summon control still works through the new layout (no logic change).
     const summon = buttonByText(root, ".play-match__card-btn", "Summon");
@@ -2257,9 +2258,9 @@ describe("renderPlayableMatch — viewport-constrained layout", () => {
     const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
     expect(root.querySelector(".arena__opp .play-match__field")).not.toBeNull();
     expect(root.querySelector(".arena__mine .play-match__field")).not.toBeNull();
-    expect(root.querySelector(".arena__dock .play-match__card")).not.toBeNull();
-    expect(root.querySelector(".arena__dock .play-match__enter")).not.toBeNull();
-    expect(root.querySelector(".arena__dock .play-match__end")).not.toBeNull();
+    expect(root.querySelector(".arena__hand .play-match__card")).not.toBeNull();
+    expect(root.querySelector(".arena__actions .play-match__enter")).not.toBeNull();
+    expect(root.querySelector(".arena__actions .play-match__end")).not.toBeNull();
   });
 });
 
@@ -2277,10 +2278,10 @@ describe("renderPlayableMatch — pinned selected-card action bar", () => {
     expect(root.querySelector(".play-match__selected")).toBeNull();
     selectSummonCard(root);
     // The action bar lives in the pinned dock, above the hand.
-    expect(root.querySelector(".arena__dock .play-match__selected")).not.toBeNull();
+    expect(root.querySelector(".arena__strip .play-match__selected")).not.toBeNull();
     // Its Summon action is present in the dock — never left in the center lane.
     expect(
-      buttonByText(root, ".arena__dock .play-match__selected-actions .play-match__card-btn", "Summon"),
+      buttonByText(root, ".arena__strip .play-match__selected-actions .play-match__card-btn", "Summon"),
     ).toBeDefined();
     expect(root.querySelector(".arena__lane .play-match__selected")).toBeNull();
   });
@@ -2289,7 +2290,7 @@ describe("renderPlayableMatch — pinned selected-card action bar", () => {
     const match = newMatch();
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
     selectSummonCard(root);
-    buttonByText(root, ".arena__dock .play-match__selected-actions .play-match__card-btn", "Summon")!.click();
+    buttonByText(root, ".arena__strip .play-match__selected-actions .play-match__card-btn", "Summon")!.click();
     expect(match.state().players.player1.field.length).toBe(1);
   });
 
@@ -2299,14 +2300,14 @@ describe("renderPlayableMatch — pinned selected-card action bar", () => {
     const nameOf = (c: Element): string =>
       c.querySelector(".play-match__card-name")?.textContent ?? "";
 
-    const first = root.querySelector<HTMLElement>(".arena__dock .play-match__card")!;
+    const first = root.querySelector<HTMLElement>(".arena__hand .play-match__card")!;
     const name0 = nameOf(first);
     first.querySelector<HTMLElement>(".play-match__card-face")!.click();
     expect(root.querySelector(".play-match__selected-title")!.textContent).toContain(name0);
 
     // Re-query (paint rebuilt the tiles) and pick a differently-named card.
     const other = Array.from(
-      root.querySelectorAll<HTMLElement>(".arena__dock .play-match__card"),
+      root.querySelectorAll<HTMLElement>(".arena__hand .play-match__card"),
     ).find((c) => nameOf(c) !== name0);
     if (other !== undefined) {
       const name1 = nameOf(other);
@@ -2336,7 +2337,7 @@ describe("renderPlayableMatch — selected-card command strip", () => {
   it("renders a compact command strip (not a large panel) in the dock", () => {
     const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
     selectSummon(root);
-    const strip = root.querySelector(".arena__dock .arena__command");
+    const strip = root.querySelector(".arena__strip .arena__command");
     expect(strip).not.toBeNull();
     expect(
       buttonByText(root, ".arena__command .play-match__selected-actions .play-match__card-btn", "Summon"),
@@ -2348,9 +2349,9 @@ describe("renderPlayableMatch — selected-card command strip", () => {
   it("keeps the hand and Enter Battle / End Turn visible while a card is selected", () => {
     const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
     selectSummon(root);
-    expect(root.querySelectorAll(".arena__dock .play-match__card").length).toBeGreaterThan(0);
-    expect(root.querySelector(".arena__dock .play-match__enter")).not.toBeNull();
-    expect(root.querySelector(".arena__dock .play-match__end")).not.toBeNull();
+    expect(root.querySelectorAll(".arena__hand .play-match__card").length).toBeGreaterThan(0);
+    expect(root.querySelector(".arena__actions .play-match__enter")).not.toBeNull();
+    expect(root.querySelector(".arena__actions .play-match__end")).not.toBeNull();
   });
 
   it("does not leave a selected panel in the center lane or player field", () => {
@@ -2358,6 +2359,45 @@ describe("renderPlayableMatch — selected-card command strip", () => {
     selectSummon(root);
     expect(root.querySelector(".arena__lane .play-match__selected")).toBeNull();
     expect(root.querySelector(".arena__mine .play-match__selected")).toBeNull();
-    expect(root.querySelector(".arena__dock .arena__command")).not.toBeNull();
+    expect(root.querySelector(".arena__strip .arena__command")).not.toBeNull();
+  });
+});
+
+describe("renderPlayableMatch — rebalanced compact board", () => {
+  it("renders a compact HUD with match title + turn/phase (no oversized info panel)", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    const hud = root.querySelector(".arena__top .play-match__hud");
+    expect(hud).not.toBeNull();
+    expect(hud!.querySelector(".play-match__hud-title")!.textContent).toContain("Sonic vs Dwarf");
+    expect(hud!.querySelector(".play-match__hud-turn")!.textContent).toContain("Turn 1");
+    // The old decorative match-info panel content is gone.
+    expect(root.textContent).not.toContain("Euphoria TCG · Live match");
+  });
+
+  it("places the hand and primary actions in their own guaranteed regions", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    expect(root.querySelector(".arena__hand .play-match__zone--hand")).not.toBeNull();
+    expect(root.querySelector(".arena__actions .play-match__enter")).not.toBeNull();
+    expect(root.querySelector(".arena__actions .play-match__end")).not.toBeNull();
+    // Enter/End are no longer nested inside the hand zone.
+    expect(root.querySelector(".play-match__zone--hand .play-match__enter")).toBeNull();
+  });
+
+  it("shows a summoned Warrior in the player field, with actions still visible", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(root.querySelectorAll(".arena__mine .play-match__warrior").length).toBe(0);
+    // Summon from the hand.
+    buttonByText(root, ".play-match__card-btn", "Summon")!
+      .closest<HTMLElement>(".play-match__card")!
+      .querySelector<HTMLElement>(".play-match__card-face")!
+      .click();
+    buttonByText(root, ".arena__strip .play-match__selected-actions .play-match__card-btn", "Summon")!.click();
+    // The Warrior now appears in the player field region.
+    expect(match.state().players.player1.field.length).toBe(1);
+    expect(root.querySelector(".arena__mine .play-match__warrior")).not.toBeNull();
+    // Primary actions remain rendered.
+    expect(root.querySelector(".arena__actions .play-match__enter")).not.toBeNull();
+    expect(root.querySelector(".arena__actions .play-match__end")).not.toBeNull();
   });
 });
