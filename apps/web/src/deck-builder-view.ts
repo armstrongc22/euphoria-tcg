@@ -12,7 +12,7 @@
  */
 import type { Card } from "@euphoria/card-data/schema";
 import type { Auth } from "@euphoria/core/auth";
-import { cardImageUrl } from "@euphoria/core/cards";
+import { cardImageUrl, cardThumbUrl } from "@euphoria/core/cards";
 import { createCardDetail } from "./detail";
 import { getPendingStore, syncPendingRewards } from "@euphoria/core/pending-reward";
 import {
@@ -43,10 +43,16 @@ function escapeHtml(text: string): string {
 function cardArt(card: Card, base: string): HTMLImageElement {
   const img = document.createElement("img");
   img.className = "deck-builder__art";
-  img.loading = "lazy";
-  img.src = cardImageUrl(card, base);
+  img.loading = "lazy"; // the deck editor's full card list defers offscreen art
+  img.decoding = "async";
+  img.src = cardThumbUrl(card, base);
   img.alt = card.name;
   img.addEventListener("error", () => {
+    if (img.dataset["fallback"] === undefined) {
+      img.dataset["fallback"] = "1";
+      img.src = cardImageUrl(card, base);
+      return;
+    }
     img.removeAttribute("src");
     img.classList.add("deck-builder__art--missing");
   });

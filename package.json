@@ -22,7 +22,8 @@
     "site:build": "npm run build --workspace @euphoria/site",
     "site:preview": "npm run preview --workspace @euphoria/site",
     "build:hosted": "node scripts/build-hosted.mjs",
-    "deploy:hosted": "npm run build:hosted && wrangler deploy"
+    "deploy:hosted": "npm run build:hosted && wrangler deploy",
+    "cards:optimize": "node scripts/optimize-card-art.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

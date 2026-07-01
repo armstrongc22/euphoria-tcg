@@ -4,7 +4,7 @@
  * later filters and styling hook into.
  */
 import type { Card } from "@euphoria/card-data";
-import { cardImageUrl } from "@euphoria/core/cards";
+import { cardImageUrl, cardThumbUrl } from "@euphoria/core/cards";
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -38,12 +38,18 @@ function cardElement(card: Card, onSelect?: (card: Card) => void): HTMLElement {
 
   const img = document.createElement("img");
   img.className = "card__art";
-  img.loading = "lazy";
-  img.src = cardImageUrl(card, BASE);
+  img.loading = "lazy"; // offscreen collection cards defer until scrolled near
+  img.decoding = "async";
+  img.src = cardThumbUrl(card, BASE);
   img.alt = card.name;
-  // Degrade gracefully if art is missing: drop the broken-image icon and show
-  // a styled placeholder (the caption still names the card).
+  // If the optimized thumbnail is missing, fall back to the full-size PNG; only
+  // then degrade to a styled placeholder (the caption still names the card).
   img.addEventListener("error", () => {
+    if (img.dataset["fallback"] === undefined) {
+      img.dataset["fallback"] = "1";
+      img.src = cardImageUrl(card, BASE);
+      return;
+    }
     img.removeAttribute("src");
     img.classList.add("card__art--missing");
   });

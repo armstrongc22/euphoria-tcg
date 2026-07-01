@@ -277,6 +277,14 @@
   box-shadow: 0 -16px 30px -22px #000;
 }
 
+/* Reserve card-art space (2:3) so images don't cause layout shift, and show a
+   dark skeleton placeholder underneath while the thumbnail loads. */
+.gc .play-match__art {
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  background: linear-gradient(160deg, #14181f, #0c0e14);
+}
+
 /* Card interaction states. Playable = has an enabled action; invalid =
    everything disabled (dimmed). Uses :has() so no DOM/logic change is needed. */
 .gc .play-match__card:has(.play-match__card-btn:not(:disabled)) {

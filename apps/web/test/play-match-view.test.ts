@@ -1645,14 +1645,20 @@ describe("renderPlayableMatch — battlefield card visuals (milestone)", () => {
     expect(warrior!.querySelector(".play-match__warrior-stats")?.textContent).toBeTruthy();
   });
 
-  it("falls back to the missing-art placeholder when a card image fails", () => {
+  it("falls back to full-size art, then the missing-art placeholder", () => {
     const match = newMatch();
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
     const art = root.querySelector<HTMLImageElement>(".play-match__card .play-match__art")!;
     expect(art.classList.contains("play-match__art--missing")).toBe(false);
+    // The display src is the optimized thumbnail.
+    expect(art.getAttribute("src")).toMatch(/optimized\/.+\.webp$/);
+    // First failure (thumbnail missing) falls back to the full-size PNG.
+    art.dispatchEvent(new Event("error"));
+    expect(art.getAttribute("src")).toMatch(/\.png$/);
+    expect(art.classList.contains("play-match__art--missing")).toBe(false);
+    // Second failure (full-size also missing) drops the icon for the placeholder.
     art.dispatchEvent(new Event("error"));
     expect(art.classList.contains("play-match__art--missing")).toBe(true);
-    // No broken-image icon: the src is dropped on failure.
     expect(art.hasAttribute("src")).toBe(false);
   });
 
