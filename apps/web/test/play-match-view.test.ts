@@ -2536,3 +2536,30 @@ describe("renderPlayableMatch — full-card display (no crop) + magnifier", () =
     expect(warrior.querySelector(".play-match__warrior-inspect")).not.toBeNull();
   });
 });
+
+describe("renderPlayableMatch — larger cards + reclaimed status row", () => {
+  it("carries turn AND phase in the compact HUD (center status bar is redundant)", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    const turn = root.querySelector(".arena__top .play-match__hud-turn")!;
+    expect(turn.textContent).toContain("Turn 1");
+    // The phase word lives here too, so hiding the big center banner loses nothing.
+    expect(turn.textContent!.toLowerCase()).toContain("main");
+  });
+
+  it("renders hand cards in the hand region and Warriors in the field region", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    // Hand cards live in the sized hand region.
+    expect(root.querySelectorAll(".arena__hand .play-match__card").length).toBeGreaterThan(0);
+    // Summon and confirm the Warrior renders in the sized field region.
+    buttonByText(root, ".play-match__card-btn", "Summon")!
+      .closest<HTMLElement>(".play-match__card")!
+      .querySelector<HTMLElement>(".play-match__card-face")!
+      .click();
+    root.querySelector<HTMLButtonElement>(".arena__mine .play-match__primary-action")!.click();
+    expect(root.querySelector(".arena__mine .play-match__field .play-match__warrior")).not.toBeNull();
+    // Primary actions + contextual overlay still present.
+    expect(root.querySelector(".arena__actions .play-match__enter")).not.toBeNull();
+    expect(root.querySelector(".arena__actions .play-match__end")).not.toBeNull();
+  });
+});
