@@ -3,7 +3,7 @@
  * cards as the Node loader, and image URLs resolve under any base path.
  */
 import { describe, expect, it } from "vitest";
-import { cards, cardImageUrl } from "../src/cards";
+import { cards, cardImageUrl, cardThumbUrl } from "../src/cards";
 
 describe("browser card data", () => {
   it("loads and validates the full card set", () => {
@@ -27,5 +27,18 @@ describe("cardImageUrl", () => {
     expect(card.imageFile).toBe("monk/hideon.png");
     expect(cardImageUrl(card, "/")).toBe("/monk/hideon.png");
     expect(cardImageUrl(card, "/euphoria/")).toBe("/euphoria/monk/hideon.png");
+  });
+});
+
+describe("cardThumbUrl", () => {
+  it("points at the optimized WebP thumbnail under any base", () => {
+    const card = cards.find((c) => c.slug === "hideon")!;
+    expect(cardThumbUrl(card, "/")).toBe("/optimized/monk/hideon.webp");
+    expect(cardThumbUrl(card, "/beta/")).toBe("/beta/optimized/monk/hideon.webp");
+  });
+
+  it("differs from the full-size URL (thumb is a distinct, smaller asset)", () => {
+    const card = cards.find((c) => c.slug === "hideon")!;
+    expect(cardThumbUrl(card, "/beta/")).not.toBe(cardImageUrl(card, "/beta/"));
   });
 });

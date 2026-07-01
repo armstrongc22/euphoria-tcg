@@ -38,7 +38,7 @@ import {
   isOutDeckReviveItem,
   isStealHandItem,
 } from "@euphoria/game-engine";
-import { cardImageUrl } from "@euphoria/core/cards";
+import { cardImageUrl, cardThumbUrl, preloadCardArt } from "@euphoria/core/cards";
 import type { MatchSummary } from "@euphoria/core/match";
 import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "@euphoria/core/play-match";
 import {
@@ -296,6 +296,25 @@ export function renderPlayableMatch(
 
   // Battle-log collapse state (mobile drawer). UI-only; persists across paints.
   let logCollapsed = false;
+
+  // Warm the browser cache for the opening hand + on-board art up front so
+  // gameplay visuals appear immediately (optimized thumbnails only — the
+  // full-size zoom image is never preloaded). Best-effort; no gameplay effect.
+  if (!noArt()) {
+    try {
+      const s0 = match.state();
+      preloadCardArt(
+        [
+          ...s0.players.player1.hand,
+          ...s0.players.player1.field.map((w) => w.card),
+          ...s0.players.player2.field.map((w) => w.card),
+        ],
+        LIVE_ART_BASE,
+      );
+    } catch {
+      /* preload is best-effort */
+    }
+  }
 
   // Stability switches (Feature B/C), read once. All default off; desktop is
   // unaffected unless a flag is set. Each isolates one suspected reload cause.
@@ -738,10 +757,17 @@ export function renderPlayableMatch(
       const img = document.createElement("img");
       img.className = "play-match__art";
       img.alt = "";
-      img.loading = "lazy";
+      // Match cards are all immediately relevant (opening hand + battlefield), so
+      // load eagerly — never defer gameplay visibility. Thumbnails are ~30–80 KB.
+      img.loading = "eager";
       img.decoding = "async";
-      img.src = cardImageUrl(card, LIVE_ART_BASE);
+      img.src = cardThumbUrl(card, LIVE_ART_BASE);
       img.addEventListener("error", () => {
+        if (img.dataset["fallback"] === undefined) {
+          img.dataset["fallback"] = "1";
+          img.src = cardImageUrl(card, LIVE_ART_BASE);
+          return;
+        }
         img.removeAttribute("src");
         img.classList.add("play-match__art--missing");
       });
