@@ -2262,3 +2262,65 @@ describe("renderPlayableMatch — viewport-constrained layout", () => {
     expect(root.querySelector(".arena__dock .play-match__end")).not.toBeNull();
   });
 });
+
+describe("renderPlayableMatch — pinned selected-card action bar", () => {
+  function selectSummonCard(root: HTMLElement): void {
+    const summon = buttonByText(root, ".play-match__card-btn", "Summon")!;
+    summon.closest<HTMLElement>(".play-match__card")!
+      .querySelector<HTMLElement>(".play-match__card-face")!
+      .click();
+  }
+
+  it("renders the action bar in the dock (not the clipped center lane)", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(root.querySelector(".play-match__selected")).toBeNull();
+    selectSummonCard(root);
+    // The action bar lives in the pinned dock, above the hand.
+    expect(root.querySelector(".arena__dock .play-match__selected")).not.toBeNull();
+    // Its Summon action is present in the dock — never left in the center lane.
+    expect(
+      buttonByText(root, ".arena__dock .play-match__selected-actions .play-match__card-btn", "Summon"),
+    ).toBeDefined();
+    expect(root.querySelector(".arena__lane .play-match__selected")).toBeNull();
+  });
+
+  it("keeps the primary action working from the pinned bar", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    selectSummonCard(root);
+    buttonByText(root, ".arena__dock .play-match__selected-actions .play-match__card-btn", "Summon")!.click();
+    expect(match.state().players.player1.field.length).toBe(1);
+  });
+
+  it("swaps the action bar when a different card is selected", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const nameOf = (c: Element): string =>
+      c.querySelector(".play-match__card-name")?.textContent ?? "";
+
+    const first = root.querySelector<HTMLElement>(".arena__dock .play-match__card")!;
+    const name0 = nameOf(first);
+    first.querySelector<HTMLElement>(".play-match__card-face")!.click();
+    expect(root.querySelector(".play-match__selected-title")!.textContent).toContain(name0);
+
+    // Re-query (paint rebuilt the tiles) and pick a differently-named card.
+    const other = Array.from(
+      root.querySelectorAll<HTMLElement>(".arena__dock .play-match__card"),
+    ).find((c) => nameOf(c) !== name0);
+    if (other !== undefined) {
+      const name1 = nameOf(other);
+      other.querySelector<HTMLElement>(".play-match__card-face")!.click();
+      expect(root.querySelector(".play-match__selected-title")!.textContent).toContain(name1);
+    }
+  });
+
+  it("Cancel/Deselect clears the selection and hides the action bar", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    selectSummonCard(root);
+    expect(root.querySelector(".play-match__selected")).not.toBeNull();
+    root.querySelector<HTMLButtonElement>(".play-match__selected-cancel")!.click();
+    expect(root.querySelector(".play-match__selected")).toBeNull();
+  });
+});

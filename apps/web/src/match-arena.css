@@ -62,8 +62,18 @@
 .gc .arena__opp { grid-area: opp; }
 .gc .arena__lane { grid-area: lane; }
 .gc .arena__mine { grid-area: mine; }
-.gc .arena__dock { grid-area: dock; }
 .gc .arena__log { grid-area: log; }
+
+/* Pinned action dock (bottom): selected-card action bar + attack/target prompts
+   sit ABOVE the hand and are always visible. It never shrinks — the fields
+   (minmax(0,1fr)) give up space first — so action buttons are never clipped. */
+.gc .arena__dock {
+  grid-area: dock;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-height: 0;
+}
 
 /* Opponent/player areas: the field scrolls internally instead of growing. */
 .gc .arena__opp,
@@ -527,6 +537,70 @@
   border-radius: 8px;
   padding: 0.4rem 0.7rem;
   cursor: pointer;
+}
+
+/* ---- Pinned selected-card action bar (in the dock) --------------------- */
+/* In the dock these become compact, full-width horizontal bars so their
+   actions never grow tall enough to clip. Higher specificity (.arena__dock …)
+   overrides the centered game-modal styling above. */
+.gc .arena__dock .play-match__selected,
+.gc .arena__dock .play-match__choice {
+  align-self: stretch;
+  width: auto;
+  max-width: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 10px;
+}
+/* Tiny card thumb + inline name/type/cost, then the action buttons. */
+.gc .arena__dock .play-match__selected-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.gc .arena__dock .play-match__selected-head .play-match__art {
+  width: clamp(28px, 5vh, 44px);
+  height: auto;
+  border-radius: 4px;
+}
+.gc .arena__dock .play-match__selected-title {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.gc .arena__dock .play-match__selected-sub {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--gc-dim);
+}
+.gc .arena__dock .play-match__selected-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Cancel/Deselect button. */
+.gc .play-match__selected-cancel {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--gc-dim);
+  background: none;
+  border: 1px solid var(--gc-line);
+  border-radius: 8px;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+  margin-left: auto; /* pin to the far end of the action row */
+}
+.gc .play-match__selected-cancel:hover {
+  color: var(--gc-ink);
+  border-color: var(--f-monk);
 }
 
 /* ---- Callout / hints ---------------------------------------------------- */

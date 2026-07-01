@@ -159,11 +159,14 @@ function buildArena(frag: DocumentFragment): HTMLElement {
   ]) {
     move(lane, sel);
   }
-  for (const p of Array.from(frag.querySelectorAll<HTMLElement>(".play-match__choice"))) {
-    lane.append(p);
-  }
-  move(lane, ".play-match__selected");
   move(mine, ".play-match__zone--mine");
+  // Pinned action dock: attack/target prompts and the selected-card action bar
+  // sit ABOVE the hand so their action buttons (Summon/Play/Equip/Attack) are
+  // always visible — never clipped by the viewport-constrained layout.
+  for (const p of Array.from(frag.querySelectorAll<HTMLElement>(".play-match__choice"))) {
+    dock.append(p);
+  }
+  move(dock, ".play-match__selected");
   move(dock, ".play-match__zone--hand");
 
   grid.append(top, opp, lane, mine, dock);
@@ -1192,6 +1195,16 @@ export function renderPlayableMatch(
       none.textContent = "No actions available right now.";
       actions.append(none);
     }
+    // Cancel/Deselect — clears the selection and resets the action bar. UI only.
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "play-match__selected-cancel";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", () => {
+      selected = null;
+      paint();
+    });
+    actions.append(cancelBtn);
     panel.append(actions);
     return panel;
   };
