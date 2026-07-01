@@ -19,11 +19,37 @@
 .gc .play-match[data-faction="Surfer"] { --arena: var(--f-surfer); }
 .gc .play-match[data-faction="Shaman"] { --arena: var(--f-shaman); }
 
-/* ---- Battlefield grid (Phase 2 layout) --------------------------------- */
+/* ---- Viewport-constrained match (no document scroll) ------------------- */
+/* While a live board (.arena) is on screen, the match owns the viewport: the
+   screen root stops scrolling, the footer is hidden, and the board fills the
+   available height. The fields scroll INTERNALLY so the page never grows taller
+   than one screen. Uses :has(.arena) so the post-match result screen (no .arena)
+   keeps normal scrolling + footer. */
+.gc:has(.arena) .gc-foot {
+  display: none;
+}
+.gc .gc-screen-root:has(.arena) {
+  overflow: hidden;
+}
+.gc .gc-screen-root:has(.arena) > .play-match {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0.4rem 0.5rem;
+}
+
+/* ---- Battlefield grid (Phase 3C: viewport-constrained) ----------------- */
 .gc .arena {
+  --arena-gap: 0.4rem;
+  flex: 1;
+  min-height: 0;
   display: grid;
-  gap: 0.55rem;
+  gap: var(--arena-gap);
   grid-template-columns: 1fr;
+  /* Fields (opp/mine) flex and absorb overflow; the rest are content-sized. */
+  grid-template-rows: auto minmax(0, 1fr) auto minmax(0, 1fr) auto auto;
   grid-template-areas:
     "top"
     "opp"
@@ -31,27 +57,65 @@
     "mine"
     "dock"
     "log";
-  align-content: start;
 }
 .gc .arena__top { grid-area: top; }
 .gc .arena__opp { grid-area: opp; }
 .gc .arena__lane { grid-area: lane; }
 .gc .arena__mine { grid-area: mine; }
-.gc .arena__dock {
-  grid-area: dock;
-  position: sticky;
-  bottom: 0;
-  z-index: 6;
-}
+.gc .arena__dock { grid-area: dock; }
 .gc .arena__log { grid-area: log; }
+
+/* Opponent/player areas: the field scrolls internally instead of growing. */
+.gc .arena__opp,
+.gc .arena__mine {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.gc .arena__opp > .play-match__zone,
+.gc .arena__mine > .play-match__zone {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.gc .arena__opp .play-match__field,
+.gc .arena__mine .play-match__field {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  align-content: flex-start;
+}
 
 /* Center action / phase / targeting lane. */
 .gc .arena__lane {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.3rem;
   align-items: stretch;
-  padding: 0.2rem;
+  min-height: 0;
+}
+/* Only the most relevant lane content stays; keep it compact so fields win. */
+.gc .arena__lane .play-match__hint,
+.gc .arena__lane .play-match__tutorial-hint {
+  display: none;
+}
+
+/* Log: a collapsible bottom drawer on narrow screens (capped height, internal
+   scroll) so it never forces the board to grow. On wide screens it moves to a
+   side column (see the desktop media query below). */
+.gc .arena__log {
+  min-height: 0;
+  max-height: 26vh;
+  display: flex;
+  flex-direction: column;
+}
+.gc .arena__log .play-match__log-list {
+  flex: 1;
+  min-height: 0;
+}
+.gc .arena__log.play-match__log--collapsed {
+  max-height: none;
 }
 
 /* ---- Top HUD (title / turn / phase) ------------------------------------ */
@@ -152,7 +216,7 @@
 /* ---- Seats / zones ------------------------------------------------------ */
 .gc .play-match__zone {
   margin: 0;
-  padding: 0.55rem 0.6rem;
+  padding: 0.4rem 0.5rem;
   border: 1px solid var(--gc-line);
   border-radius: 12px;
   background:
@@ -309,7 +373,9 @@
 .gc .play-match__card {
   position: relative;
   flex: 0 0 auto;
-  width: 130px;
+  /* Readable but height-aware: shrinks on short viewports so the hand dock never
+     forces vertical page scroll; the hand scrolls horizontally instead. */
+  width: clamp(78px, 13vh, 132px);
   scroll-snap-align: start;
   border: 1px solid var(--gc-line);
   border-radius: 12px;
@@ -636,10 +702,12 @@
 }
 
 /* ---- Desktop: log becomes a side drawer -------------------------------- */
-@media (min-width: 920px) {
+/* ---- Desktop/wide: board + combat-log side column, still no page scroll -- */
+@media (min-width: 1100px) {
   .gc .arena {
     grid-template-columns: minmax(0, 1fr) 300px;
     column-gap: 0.7rem;
+    grid-template-rows: auto minmax(0, 1fr) auto minmax(0, 1fr) auto;
     grid-template-areas:
       "top  log"
       "opp  log"
@@ -648,19 +716,14 @@
       "dock log";
   }
   .gc .arena__log {
-    align-self: start;
-    position: sticky;
-    top: 0.4rem;
-    max-height: calc(100dvh - 5.5rem);
-    display: flex;
-    flex-direction: column;
+    grid-row: 1 / -1;
+    align-self: stretch;
+    max-height: none; /* full-height side panel, internal scroll */
+    min-height: 0;
   }
   .gc .arena__log .play-match__log-list {
-    max-height: none;
     flex: 1;
-  }
-  .gc .play-match__card {
-    width: 150px;
+    min-height: 0;
   }
 }
 

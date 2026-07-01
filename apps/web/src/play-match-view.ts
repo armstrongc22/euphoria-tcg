@@ -294,8 +294,30 @@ export function renderPlayableMatch(
   // the player's faction; CSS maps it to a glow color). No gameplay effect.
   root.dataset["faction"] = match.playerFaction;
 
-  // Battle-log collapse state (mobile drawer). UI-only; persists across paints.
-  let logCollapsed = false;
+  // Battle-log collapse state (drawer). UI-only; persists across paints. On
+  // narrow screens (no room for the side-panel log) it starts collapsed so the
+  // battlefield + hand own the viewport; on desktop the log is a side column.
+  let logCollapsed =
+    typeof window !== "undefined" && window.innerWidth < 1100;
+
+  // Warm the browser cache for the opening hand + on-board art up front so
+  // gameplay visuals appear immediately (optimized thumbnails only — the
+  // full-size zoom image is never preloaded). Best-effort; no gameplay effect.
+  if (!noArt()) {
+    try {
+      const s0 = match.state();
+      preloadCardArt(
+        [
+          ...s0.players.player1.hand,
+          ...s0.players.player1.field.map((w) => w.card),
+          ...s0.players.player2.field.map((w) => w.card),
+        ],
+        LIVE_ART_BASE,
+      );
+    } catch {
+      /* preload is best-effort */
+    }
+  }
 
   // Warm the browser cache for the opening hand + on-board art up front so
   // gameplay visuals appear immediately (optimized thumbnails only — the
