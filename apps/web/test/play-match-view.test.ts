@@ -2180,3 +2180,45 @@ describe("renderPlayableMatch — arena presentation", () => {
     expect(root.querySelector(".play-match__log-toggle")!.textContent).toBe("Show");
   });
 });
+
+describe("renderPlayableMatch — battlefield layout", () => {
+  it("wraps the board in a structured arena grid with all regions", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    const arena = root.querySelector(".arena");
+    expect(arena).not.toBeNull();
+    for (const region of [
+      ".arena__top",
+      ".arena__opp",
+      ".arena__lane",
+      ".arena__mine",
+      ".arena__dock",
+    ]) {
+      expect(arena!.querySelector(region)).not.toBeNull();
+    }
+    // The log lives in its own drawer region.
+    expect(root.querySelector(".arena__log")).not.toBeNull();
+  });
+
+  it("places each board piece in the correct battlefield region", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    expect(root.querySelector(".arena__opp .play-match__zone--opponent")).not.toBeNull();
+    expect(root.querySelector(".arena__mine .play-match__zone--mine")).not.toBeNull();
+    expect(root.querySelector(".arena__dock .play-match__zone--hand")).not.toBeNull();
+    expect(root.querySelector(".arena__lane .play-match__phase")).not.toBeNull();
+    // Action buttons stay reachable inside the dock.
+    expect(root.querySelector(".arena__dock .play-match__enter")).not.toBeNull();
+    expect(root.querySelector(".arena__dock .play-match__end")).not.toBeNull();
+  });
+
+  it("keeps the hand and its wired controls intact after reparenting", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const cards = root.querySelectorAll(".arena__dock .play-match__card");
+    expect(cards.length).toBeGreaterThan(0);
+    // A Summon control still works through the new layout (no logic change).
+    const summon = buttonByText(root, ".play-match__card-btn", "Summon");
+    expect(summon).toBeDefined();
+    summon!.click();
+    expect(match.state().players.player1.field.length).toBe(1);
+  });
+});

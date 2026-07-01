@@ -121,6 +121,64 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
+/**
+ * Reparent the freshly-painted board pieces (still in `frag`) into a structured
+ * battlefield grid: top bar, opponent area, center action lane, player area,
+ * hand dock, and a log drawer. This is a pure DOM move — every element and its
+ * already-wired handlers are the SAME node; nothing is rebuilt and no gameplay
+ * logic is involved. CSS (.arena*) lays the regions out.
+ */
+function buildArena(frag: DocumentFragment): HTMLElement {
+  const region = (cls: string): HTMLElement => {
+    const d = document.createElement("div");
+    d.className = cls;
+    return d;
+  };
+  const grid = region("arena");
+  const top = region("arena__top");
+  const opp = region("arena__opp");
+  const lane = region("arena__lane");
+  const mine = region("arena__mine");
+  const dock = region("arena__dock");
+
+  const move = (parent: HTMLElement, sel: string): void => {
+    const el = frag.querySelector<HTMLElement>(sel);
+    if (el !== null) parent.append(el);
+  };
+
+  move(top, ".play-match__header");
+  move(opp, ".play-match__zone--opponent");
+  // Center lane = the phase/targeting/prompt area between the two fields.
+  for (const sel of [
+    ".play-match__phase",
+    ".play-match__playback-banner",
+    ".play-match__error",
+    ".play-match__callout",
+    ".play-match__hint",
+    ".play-match__tutorial-hint",
+  ]) {
+    move(lane, sel);
+  }
+  for (const p of Array.from(frag.querySelectorAll<HTMLElement>(".play-match__choice"))) {
+    lane.append(p);
+  }
+  move(lane, ".play-match__selected");
+  move(mine, ".play-match__zone--mine");
+  move(dock, ".play-match__zone--hand");
+
+  grid.append(top, opp, lane, mine, dock);
+
+  const log = frag.querySelector<HTMLElement>(".play-match__log");
+  if (log !== null) {
+    log.classList.add("arena__log");
+    grid.append(log);
+  }
+
+  // Safety net: never drop a node if the board grows a new top-level piece.
+  while (frag.firstChild !== null) grid.append(frag.firstChild);
+  return grid;
+}
+
 /** True when an attack action resolves through a chosen Attack card. */
 function hasAttackCard(action: GameAction): boolean {
   return action.kind === "attack" && action.selectedAttackCardId !== undefined;
@@ -1367,7 +1425,11 @@ export function renderPlayableMatch(
       : floaters;
     renderFloaters(frag, activeFloaters);
 
-    root.replaceChildren(frag);
+    // Battlefield layout (Phase 2): reparent the freshly-built pieces into a
+    // structured arena grid — top bar, opponent area, center action lane, player
+    // area, hand dock, and log drawer. Presentation only: every element (and its
+    // wired handlers) is the SAME node, moved into a region, not rebuilt.
+    root.replaceChildren(buildArena(frag));
 
     // Prune cached art for tiles no longer in play, so the cache can't grow
     // unbounded over a long match (it tracks only on-screen cards/Warriors).

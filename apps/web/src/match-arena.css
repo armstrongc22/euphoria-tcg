@@ -8,10 +8,6 @@
 
 .gc .play-match {
   --arena: var(--gc-accent);
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.55rem;
-  align-content: start;
   padding: 0.6rem 0.6rem 0;
   background: transparent;
   border: 0;
@@ -22,6 +18,41 @@
 .gc .play-match[data-faction="Sonic"] { --arena: var(--f-sonic); }
 .gc .play-match[data-faction="Surfer"] { --arena: var(--f-surfer); }
 .gc .play-match[data-faction="Shaman"] { --arena: var(--f-shaman); }
+
+/* ---- Battlefield grid (Phase 2 layout) --------------------------------- */
+.gc .arena {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "top"
+    "opp"
+    "lane"
+    "mine"
+    "dock"
+    "log";
+  align-content: start;
+}
+.gc .arena__top { grid-area: top; }
+.gc .arena__opp { grid-area: opp; }
+.gc .arena__lane { grid-area: lane; }
+.gc .arena__mine { grid-area: mine; }
+.gc .arena__dock {
+  grid-area: dock;
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+}
+.gc .arena__log { grid-area: log; }
+
+/* Center action / phase / targeting lane. */
+.gc .arena__lane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: stretch;
+  padding: 0.2rem;
+}
 
 /* ---- Top HUD (title / turn / phase) ------------------------------------ */
 .gc .play-match__header {
@@ -235,17 +266,28 @@
   text-shadow: 0 1px 3px #000;
 }
 
-/* ---- Hand (anchored near the bottom) ----------------------------------- */
+/* ---- Hand dock (anchored near the bottom) ------------------------------ */
 .gc .play-match__zone--hand {
-  position: sticky;
-  bottom: 0;
-  z-index: 6;
-  margin-top: 0.2rem;
+  margin: 0;
   border-top: 2px solid var(--arena);
+  border-radius: 12px 12px 0 0;
   background:
     linear-gradient(0deg, rgba(5, 6, 11, 0.96), rgba(5, 6, 11, 0.86)),
     var(--gc-panel);
   box-shadow: 0 -16px 30px -22px #000;
+}
+
+/* Card interaction states. Playable = has an enabled action; invalid =
+   everything disabled (dimmed). Uses :has() so no DOM/logic change is needed. */
+.gc .play-match__card:has(.play-match__card-btn:not(:disabled)) {
+  border-color: color-mix(in srgb, var(--arena) 60%, var(--gc-line));
+}
+.gc .play-match__card:not(:has(.play-match__card-btn:not(:disabled))):not(.play-match__card--selected) {
+  opacity: 0.62;
+  filter: saturate(0.85);
+}
+.gc .play-match__warrior:has(.play-match__warrior-btn:not(:disabled)) {
+  border-color: color-mix(in srgb, var(--arena) 55%, var(--gc-line));
 }
 .gc .play-match__hand {
   display: flex;
@@ -364,19 +406,53 @@
   color: #ffd7dd;
 }
 
-/* ---- Selected-card panel + choice prompts ------------------------------ */
+/* ---- Selected-card panel + choice prompts (game-modal feel) ------------- */
 .gc .play-match__selected,
 .gc .play-match__choice {
+  align-self: center;
+  width: 100%;
+  max-width: 460px;
+  padding: 0.8rem 0.9rem;
   border: 1px solid var(--arena);
-  border-radius: 12px;
+  border-radius: 14px;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--arena) 10%, transparent), transparent 50%),
+    linear-gradient(180deg, color-mix(in srgb, var(--arena) 14%, transparent), transparent 55%),
     var(--gc-panel);
-  box-shadow: 0 0 26px -12px var(--arena);
+  box-shadow: 0 0 34px -10px var(--arena), 0 18px 40px -22px #000;
+}
+/* Targeting/attack prompts read as a punchy modal card. */
+.gc .play-match__choice {
+  border-color: var(--f-sonic);
+  box-shadow: 0 0 34px -10px var(--f-sonic), 0 18px 40px -22px #000;
+  animation: arena-prompt 0.18s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+@keyframes arena-prompt {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .gc .play-match__choice .account__panel-heading,
 .gc .play-match__selected-title {
   color: var(--f-sonic);
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.gc .play-match__choice-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+}
+.gc .play-match__choice-cancel {
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--gc-dim);
+  background: none;
+  border: 1px solid var(--gc-line);
+  border-radius: 8px;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
 }
 
 /* ---- Callout / hints ---------------------------------------------------- */
@@ -496,19 +572,74 @@
 }
 .gc .match-result--win .account__title { color: var(--f-sonic); text-shadow: 0 0 22px rgba(242, 193, 29, 0.6); }
 .gc .match-result--loss .account__title { color: #ff7a86; }
+.gc .match-result .account__fields {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 0.8rem;
+  margin: 0.6rem 0;
+  color: var(--gc-dim);
+  font-size: 0.85rem;
+}
+.gc .match-result__recap {
+  margin: 0.6rem auto;
+  max-width: 520px;
+  text-align: left;
+  border: 1px solid var(--gc-line);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.7rem 0.9rem;
+}
+/* Reward progress / chooser (rendered by account-view) — highlighted. */
+.gc .match-result ~ .account__panel,
+.gc .match-result__reward {
+  border-color: var(--f-sonic);
+  box-shadow: 0 0 26px -12px var(--f-sonic);
+}
+.gc .match-result__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+.gc .match-result__actions button {
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.7rem 1.4rem;
+  border-radius: 10px;
+  cursor: pointer;
+  clip-path: polygon(5% 0, 100% 0, 95% 100%, 0 100%);
+}
+.gc .match-result__again {
+  color: #0a0206;
+  background: linear-gradient(180deg, #fff, var(--f-sonic));
+  border: 1px solid var(--f-sonic);
+  box-shadow: 0 0 24px -8px var(--f-sonic);
+}
+.gc .match-result__back {
+  color: var(--gc-ink);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--gc-line);
+}
 
-/* ---- Desktop: log becomes a side panel --------------------------------- */
+/* ---- Desktop: log becomes a side drawer -------------------------------- */
 @media (min-width: 920px) {
-  .gc .play-match {
+  .gc .arena {
     grid-template-columns: minmax(0, 1fr) 300px;
     column-gap: 0.7rem;
+    grid-template-areas:
+      "top  log"
+      "opp  log"
+      "lane log"
+      "mine log"
+      "dock log";
   }
-  .gc .play-match > * {
-    grid-column: 1;
-  }
-  .gc .play-match__log {
-    grid-column: 2;
-    grid-row: 1 / span 40;
+  .gc .arena__log {
     align-self: start;
     position: sticky;
     top: 0.4rem;
@@ -516,7 +647,7 @@
     display: flex;
     flex-direction: column;
   }
-  .gc .play-match__log-list {
+  .gc .arena__log .play-match__log-list {
     max-height: none;
     flex: 1;
   }
