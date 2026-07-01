@@ -539,52 +539,82 @@
   cursor: pointer;
 }
 
-/* ---- Pinned selected-card action bar (in the dock) --------------------- */
-/* In the dock these become compact, full-width horizontal bars so their
-   actions never grow tall enough to clip. Higher specificity (.arena__dock …)
-   overrides the centered game-modal styling above. */
-.gc .arena__dock .play-match__selected,
-.gc .arena__dock .play-match__choice {
+/* ---- Selected-card COMMAND STRIP (compact, one line, pinned in dock) ----- */
+/* A single horizontal line with a hard height cap: it can NEVER grow tall enough
+   to push the hand or the Enter Battle / End Turn bar out of view. Extra action
+   buttons scroll horizontally instead of wrapping downward. */
+.gc .arena__command {
   align-self: stretch;
   width: auto;
   max-width: none;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.6rem;
-  padding: 0.4rem 0.6rem;
-  border-radius: 10px;
-}
-/* Tiny card thumb + inline name/type/cost, then the action buttons. */
-.gc .arena__dock .play-match__selected-head {
-  display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.5rem;
-  flex: 0 1 auto;
+  padding: 0.3rem 0.5rem;
+  max-height: 3rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+.gc .arena__command .play-match__selected-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+/* Fixed tiny thumbnail — overrides the 3:4 card-art aspect so it stays small. */
+.gc .arena__command .play-match__selected-head .play-match__art {
+  width: 28px;
+  height: 38px;
+  aspect-ratio: auto;
+  object-fit: cover;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+.gc .arena__command .play-match__selected-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
   min-width: 0;
 }
-.gc .arena__dock .play-match__selected-head .play-match__art {
-  width: clamp(28px, 5vh, 44px);
-  height: auto;
-  border-radius: 4px;
-}
-.gc .arena__dock .play-match__selected-title {
+.gc .arena__command .play-match__selected-title {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
-.gc .arena__dock .play-match__selected-sub {
+.gc .arena__command .play-match__selected-sub {
   margin: 0;
   font-size: 0.72rem;
   color: var(--gc-dim);
+  white-space: nowrap;
 }
-.gc .arena__dock .play-match__selected-actions {
+.gc .arena__command .play-match__selected-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.4rem;
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
 }
+.gc .arena__command .play-match__selected-actions button {
+  white-space: nowrap;
+}
+
+/* Attack/target prompts in the dock: full width, capped height + internal
+   scroll so their options never push the hand/action bar out of view. */
+.gc .arena__dock .play-match__choice {
+  align-self: stretch;
+  max-width: none;
+  max-height: 34vh;
+  overflow-y: auto;
+}
+/* Compact the "Your hand" label so the dock stays short. */
+.gc .arena__dock .play-match__zone-label {
+  font-size: 0.55rem;
+  margin-bottom: 0.15rem;
+}
+
 /* Cancel/Deselect button. */
 .gc .play-match__selected-cancel {
   font: inherit;

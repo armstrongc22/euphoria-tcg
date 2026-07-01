@@ -1166,7 +1166,10 @@ export function renderPlayableMatch(
     controls: HTMLElement | null,
   ): HTMLElement => {
     const panel = document.createElement("section");
-    panel.className = "account__panel play-match__selected";
+    // Compact command strip (not a large card panel): a single horizontal line
+    // pinned in the dock, so it never consumes field space or hides the hand /
+    // Enter Battle / End Turn (see .arena__command in match-arena.css).
+    panel.className = "account__panel play-match__selected arena__command";
 
     const head = document.createElement("div");
     head.className = "play-match__selected-head";
