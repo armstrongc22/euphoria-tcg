@@ -1958,7 +1958,7 @@ body {
 .play-match__art {
   width: 100%;
   aspect-ratio: 3 / 4;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.06);
   display: block;
@@ -2438,7 +2438,7 @@ body {
   width: 4.5rem;
   flex: 0 0 auto;
   aspect-ratio: 3 / 4;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 7px;
 }
 .play-match__selected-title {
