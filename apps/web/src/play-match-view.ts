@@ -232,6 +232,12 @@ export function renderPlayableMatch(
 ): PlayableMatchBoard {
   const root = document.createElement("section") as PlayableMatchBoard;
   root.className = "account play-match";
+  // Faction accent hook for the arena styling (presentation only — the value is
+  // the player's faction; CSS maps it to a glow color). No gameplay effect.
+  root.dataset["faction"] = match.playerFaction;
+
+  // Battle-log collapse state (mobile drawer). UI-only; persists across paints.
+  let logCollapsed = false;
 
   // Stability switches (Feature B/C), read once. All default off; desktop is
   // unaffected unless a flag is set. Each isolates one suspected reload cause.
@@ -1916,9 +1922,21 @@ export function renderPlayableMatch(
   const logPanel = (state: GameState): HTMLElement => {
     const panel = document.createElement("section");
     panel.className = "account__panel play-match__log";
+    panel.classList.toggle("play-match__log--collapsed", logCollapsed);
     const heading = document.createElement("h3");
-    heading.className = "account__panel-heading";
-    heading.textContent = "Battle log";
+    heading.className = "account__panel-heading play-match__log-head";
+    heading.textContent = "Combat log";
+    // Collapse/expand toggle (used as a drawer handle on mobile). UI only.
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "play-match__log-toggle";
+    toggle.textContent = logCollapsed ? "Show" : "Hide";
+    toggle.setAttribute("aria-expanded", logCollapsed ? "false" : "true");
+    toggle.addEventListener("click", () => {
+      logCollapsed = !logCollapsed;
+      paint();
+    });
+    heading.append(toggle);
     panel.append(heading);
     const ul = document.createElement("ul");
     ul.className = "play-match__log-list";

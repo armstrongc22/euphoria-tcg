@@ -17,6 +17,7 @@
  */
 import "./styles.css";
 import "./game-shell.css";
+import "./match-arena.css";
 import { mountAccount } from "./account-view";
 import { createAuth, type AuthSession } from "@euphoria/core/auth";
 import { cards } from "@euphoria/core/cards";

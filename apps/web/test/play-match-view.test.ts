@@ -2137,3 +2137,46 @@ describe("renderPlayableMatch — onboarding hints (Feature D)", () => {
     expect(second.querySelector(".play-match__tutorial-hint")).toBeNull();
   });
 });
+
+describe("renderPlayableMatch — arena presentation", () => {
+  it("tags the board with the player's faction for arena accents", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    expect(root.dataset["faction"]).toBe("Sonic");
+    expect(root.classList.contains("play-match")).toBe(true);
+  });
+
+  it("renders a HUD banner with the turn and phase", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    const header = root.querySelector(".play-match__header");
+    expect(header).not.toBeNull();
+    expect(header!.textContent).toContain("Turn 1");
+    const phase = root.querySelector(".play-match__phase");
+    expect(phase).not.toBeNull();
+    expect(root.querySelector(".play-match__phase-state")).not.toBeNull();
+    expect(root.querySelector(".play-match__phase-sub")!.textContent).toContain("phase");
+  });
+
+  it("renders the hand, both seat zones, and the action buttons", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    expect(root.querySelectorAll(".play-match__card").length).toBeGreaterThan(0);
+    expect(root.querySelector(".play-match__zone--opponent")).not.toBeNull();
+    expect(root.querySelector(".play-match__zone--mine")).not.toBeNull();
+    expect(root.querySelector(".play-match__zone--hand")).not.toBeNull();
+    expect(root.querySelector(".play-match__enter")).not.toBeNull();
+    expect(root.querySelector(".play-match__end")).not.toBeNull();
+  });
+
+  it("renders the combat log and toggles its collapsed state", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    let log = root.querySelector(".play-match__log")!;
+    expect(log).not.toBeNull();
+    expect(log.querySelector(".play-match__log-list")).not.toBeNull();
+    const toggle = root.querySelector<HTMLButtonElement>(".play-match__log-toggle")!;
+    expect(toggle.textContent).toBe("Hide");
+    toggle.click();
+    // After collapsing, the (re-painted) log is marked collapsed and offers "Show".
+    log = root.querySelector(".play-match__log")!;
+    expect(log.classList.contains("play-match__log--collapsed")).toBe(true);
+    expect(root.querySelector(".play-match__log-toggle")!.textContent).toBe("Show");
+  });
+});
