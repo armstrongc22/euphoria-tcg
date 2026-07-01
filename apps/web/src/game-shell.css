@@ -520,6 +520,146 @@
   box-shadow: 0 0 16px -6px var(--gc-accent);
 }
 
+/* ---- Auth gate (login-gated beta entry) -------------------------------- */
+.gc-gate {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 2rem 1.25rem;
+}
+.gc-gate__card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 55%),
+    var(--gc-panel);
+  border: 1px solid var(--gc-line);
+  border-top: 3px solid var(--f-sonic);
+  padding: 1.6rem 1.5rem 1.4rem;
+  clip-path: polygon(0 0, 100% 0, 100% 92%, 95% 100%, 0 100%);
+  box-shadow: 0 0 46px -14px rgba(155, 92, 255, 0.6);
+  animation: gc-card-in 0.4s cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+.gc-gate__card--loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  border-top-color: var(--gc-line);
+  text-align: center;
+}
+.gc-gate__spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  border-top-color: var(--f-sonic);
+  animation: gc-spin 0.9s linear infinite;
+}
+.gc-gate__verifying {
+  margin: 0;
+  color: var(--gc-dim);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+.gc-gate__eyebrow {
+  margin: 0;
+  color: var(--gc-accent);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+.gc-gate__title {
+  margin: 0.3rem 0 0;
+  font-size: clamp(2rem, 9vw, 2.9rem);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 0 4px #fff, 0 0 20px rgba(242, 193, 29, 0.5), 4px 4px 0 var(--f-monk);
+  transform: skewX(-6deg);
+}
+.gc-gate__lead {
+  margin: 0.6rem 0 1.1rem;
+  color: var(--gc-dim);
+  font-size: 0.9rem;
+}
+.gc-gate__form {
+  display: flex;
+  flex-direction: column;
+}
+.gc-gate__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gc-dim);
+  margin-bottom: 0.3rem;
+}
+.gc-gate__input {
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--gc-ink);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--gc-line);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  margin-bottom: 0.9rem;
+}
+.gc-gate__input:focus {
+  outline: none;
+  border-color: var(--gc-accent);
+  box-shadow: 0 0 0 3px rgba(242, 193, 29, 0.18);
+}
+.gc-gate__error {
+  margin: 0 0 0.8rem;
+  color: #ff9aa6;
+  font-size: 0.82rem;
+}
+.gc-gate__actions {
+  display: flex;
+  gap: 0.6rem;
+}
+.gc-gate__btn {
+  flex: 1;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.03em;
+  color: var(--gc-ink);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--gc-line);
+  padding: 0.7rem 0.9rem;
+  cursor: pointer;
+  clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+.gc-gate__btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px -6px var(--gc-accent);
+}
+.gc-gate__btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.gc-gate__btn--primary {
+  color: #0a0206;
+  background: linear-gradient(180deg, #fff, var(--f-sonic));
+  border-color: var(--f-sonic);
+}
+.gc-gate__note {
+  margin: 1rem 0 0;
+  color: var(--gc-dim);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
 /* ---- Footer (build stamp / feedback) ----------------------------------- */
 .gc-foot {
   border-top: 1px solid var(--gc-line);
