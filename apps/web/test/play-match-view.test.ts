@@ -2324,3 +2324,40 @@ describe("renderPlayableMatch — pinned selected-card action bar", () => {
     expect(root.querySelector(".play-match__selected")).toBeNull();
   });
 });
+
+describe("renderPlayableMatch — selected-card command strip", () => {
+  function selectSummon(root: HTMLElement): void {
+    buttonByText(root, ".play-match__card-btn", "Summon")!
+      .closest<HTMLElement>(".play-match__card")!
+      .querySelector<HTMLElement>(".play-match__card-face")!
+      .click();
+  }
+
+  it("renders a compact command strip (not a large panel) in the dock", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    selectSummon(root);
+    const strip = root.querySelector(".arena__dock .arena__command");
+    expect(strip).not.toBeNull();
+    expect(
+      buttonByText(root, ".arena__command .play-match__selected-actions .play-match__card-btn", "Summon"),
+    ).toBeDefined();
+    expect(strip!.querySelector(".play-match__selected-inspect")).not.toBeNull();
+    expect(strip!.querySelector(".play-match__selected-cancel")).not.toBeNull();
+  });
+
+  it("keeps the hand and Enter Battle / End Turn visible while a card is selected", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    selectSummon(root);
+    expect(root.querySelectorAll(".arena__dock .play-match__card").length).toBeGreaterThan(0);
+    expect(root.querySelector(".arena__dock .play-match__enter")).not.toBeNull();
+    expect(root.querySelector(".arena__dock .play-match__end")).not.toBeNull();
+  });
+
+  it("does not leave a selected panel in the center lane or player field", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    selectSummon(root);
+    expect(root.querySelector(".arena__lane .play-match__selected")).toBeNull();
+    expect(root.querySelector(".arena__mine .play-match__selected")).toBeNull();
+    expect(root.querySelector(".arena__dock .arena__command")).not.toBeNull();
+  });
+});
