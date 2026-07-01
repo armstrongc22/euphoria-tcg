@@ -163,6 +163,8 @@ function buildArena(frag: DocumentFragment): HTMLElement {
     move(lane, sel);
   }
   move(mine, ".play-match__zone--mine");
+  // Contextual primary-action overlay floats over the player field.
+  move(mine, ".play-match__primary-action");
   // Command strip: attack/target prompts + the selected-card action bar, in a
   // row with a guaranteed readable height (never a crushed thin band).
   for (const p of Array.from(frag.querySelectorAll<HTMLElement>(".play-match__choice"))) {
@@ -1454,6 +1456,26 @@ export function renderPlayableMatch(
       const sourceEl = scope.querySelector<HTMLElement>(containerSel);
       const controls = sourceEl?.querySelector<HTMLElement>(controlsSel) ?? null;
       frag.append(selectedCardPanel(panelInfo, controls));
+
+      // Contextual PRIMARY-ACTION overlay near the player field: a bright green
+      // pill showing the selected card's primary verb (Summon / Play / Equip …).
+      // It mirrors the first enabled wired action button and forwards its click —
+      // no new gameplay logic. Hidden when the card has no legal action.
+      const primary =
+        controls?.querySelector<HTMLButtonElement>(
+          ".play-match__card-btn:not([disabled]), .play-match__warrior-btn:not([disabled])",
+        ) ?? null;
+      if (primary !== null) {
+        const cta = document.createElement("button");
+        cta.type = "button";
+        cta.className = "play-match__primary-action";
+        cta.textContent = primary.textContent ?? "Play";
+        cta.addEventListener("click", (e) => {
+          e.stopPropagation();
+          primary.click(); // fire the exact same wired action
+        });
+        frag.append(cta);
+      }
     } else if (selected !== null && panelInfo === null && !playing) {
       // The selected card/Warrior is gone (e.g. it resolved): drop the selection.
       selected = null;

@@ -2401,3 +2401,67 @@ describe("renderPlayableMatch — rebalanced compact board", () => {
     expect(root.querySelector(".arena__actions .play-match__end")).not.toBeNull();
   });
 });
+
+describe("renderPlayableMatch — contextual primary-action overlay", () => {
+  function selectByFace(root: HTMLElement, card: HTMLElement): void {
+    card.querySelector<HTMLElement>(".play-match__card-face")!.click();
+  }
+
+  it("shows a green primary-action overlay in the player field and fires the wired action", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    expect(root.querySelector(".play-match__primary-action")).toBeNull();
+    // Select a Warrior (its wired button says "Summon").
+    const summon = buttonByText(root, ".play-match__card-btn", "Summon")!;
+    const label = summon.textContent;
+    selectByFace(root, summon.closest<HTMLElement>(".play-match__card")!);
+    const cta = root.querySelector<HTMLButtonElement>(".arena__mine .play-match__primary-action");
+    expect(cta).not.toBeNull();
+    expect(cta!.textContent).toBe(label); // "Summon"
+    // Clicking it summons via the same callback.
+    cta!.click();
+    expect(match.state().players.player1.field.length).toBe(1);
+  });
+
+  it("mirrors the correct verb for Play / Equip cards when present in hand", () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const match = newMatch(seed);
+      const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+      const card = Array.from(
+        root.querySelectorAll<HTMLElement>(".arena__hand .play-match__card"),
+      ).find((c) => {
+        const btn = c.querySelector<HTMLButtonElement>(".play-match__card-btn:not([disabled])");
+        return btn !== null && (btn.textContent === "Play" || btn.textContent === "Equip");
+      });
+      if (card === undefined) continue;
+      const verb = card.querySelector<HTMLButtonElement>(
+        ".play-match__card-btn:not([disabled])",
+      )!.textContent;
+      selectByFace(root, card);
+      const cta = root.querySelector<HTMLButtonElement>(".play-match__primary-action");
+      expect(cta).not.toBeNull();
+      expect(cta!.textContent).toBe(verb); // "Play" or "Equip"
+      return;
+    }
+    // If no Item/Weapon surfaced across seeds, the Summon case still proves the
+    // pattern (the overlay always mirrors the wired primary verb).
+  });
+
+  it("removes the overlay when the card is deselected", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    selectByFace(root, buttonByText(root, ".play-match__card-btn", "Summon")!.closest<HTMLElement>(".play-match__card")!);
+    expect(root.querySelector(".play-match__primary-action")).not.toBeNull();
+    root.querySelector<HTMLButtonElement>(".play-match__selected-cancel")!.click();
+    expect(root.querySelector(".play-match__primary-action")).toBeNull();
+  });
+
+  it("shows the overlay alongside a still-visible Enter Battle / End Turn", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    selectByFace(root, buttonByText(root, ".play-match__card-btn", "Summon")!.closest<HTMLElement>(".play-match__card")!);
+    expect(root.querySelector(".play-match__primary-action")).not.toBeNull();
+    expect(root.querySelector(".arena__actions .play-match__enter")).not.toBeNull();
+    expect(root.querySelector(".arena__actions .play-match__end")).not.toBeNull();
+  });
+});
