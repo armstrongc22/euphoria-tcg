@@ -2495,3 +2495,44 @@ describe("renderPlayableMatch — field lane fills space (no cramped scroll)", (
     expect(arena.querySelector(".arena__mine .play-match__field")).not.toBeNull();
   });
 });
+
+describe("renderPlayableMatch — full-card display (no crop) + magnifier", () => {
+  it("renders hand cards as a full image wrapper with a magnifier", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    const card = root.querySelector<HTMLElement>(".arena__hand .play-match__card")!;
+    expect(card).not.toBeNull();
+    // Full image lives in an art-wrap (scaled with object-fit: contain via CSS).
+    const art = card.querySelector(".play-match__card-face .play-match__art-wrap .play-match__art");
+    expect(art).not.toBeNull();
+    // Magnifier/inspect affordance stays present.
+    expect(card.querySelector(".play-match__card-inspect")).not.toBeNull();
+  });
+
+  it("clicking the hand-card magnifier opens the inspect/zoom view", () => {
+    let inspected: unknown = null;
+    const root = renderPlayableMatch(newMatch(), {
+      onComplete: noop,
+      onQuit: noop,
+      onInspect: (card) => {
+        inspected = card;
+      },
+    });
+    const card = root.querySelector<HTMLElement>(".arena__hand .play-match__card")!;
+    card.querySelector<HTMLButtonElement>(".play-match__card-inspect")!.click();
+    expect(inspected).not.toBeNull();
+  });
+
+  it("renders a summoned Warrior as a full image tile with a magnifier", () => {
+    const match = newMatch();
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    buttonByText(root, ".play-match__card-btn", "Summon")!
+      .closest<HTMLElement>(".play-match__card")!
+      .querySelector<HTMLElement>(".play-match__card-face")!
+      .click();
+    root.querySelector<HTMLButtonElement>(".arena__mine .play-match__primary-action")!.click();
+    const warrior = root.querySelector<HTMLElement>(".arena__mine .play-match__warrior")!;
+    expect(warrior).not.toBeNull();
+    expect(warrior.querySelector(".play-match__art-wrap .play-match__art")).not.toBeNull();
+    expect(warrior.querySelector(".play-match__warrior-inspect")).not.toBeNull();
+  });
+});

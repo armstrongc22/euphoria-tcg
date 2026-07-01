@@ -125,11 +125,12 @@
   overflow-y: hidden;
   gap: 0.4rem;
 }
-/* Warriors fill the field height; width follows the art (3:4). */
+/* Warriors are FULL mini-cards scaled to fit the field height — the whole image
+   is contained (never cropped), width capped so tall rows don't over-inflate. */
 .gc .arena__opp .play-match__warrior,
 .gc .arena__mine .play-match__warrior {
   height: 100%;
-  width: auto;
+  width: clamp(84px, 7vw, 132px);
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -138,18 +139,26 @@
 .gc .arena__mine .play-match__warrior-face {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column; /* art-wrap on top, name/stats below */
 }
 .gc .arena__opp .play-match__art-wrap,
 .gc .arena__mine .play-match__art-wrap {
-  height: 100%;
+  position: relative;
+  flex: 1;
   min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .gc .arena__opp .play-match__art-wrap .play-match__art,
 .gc .arena__mine .play-match__art-wrap .play-match__art {
-  height: 100%;
+  max-height: 100%;
+  max-width: 100%;
   width: auto;
-  aspect-ratio: 3 / 4;
-  object-fit: cover;
+  height: auto;
+  aspect-ratio: auto; /* keep the image's real ratio */
+  object-fit: contain;
 }
 .gc .arena__opp .play-match__warrior-info,
 .gc .arena__mine .play-match__warrior-info {
@@ -412,11 +421,13 @@
   box-shadow: 0 -16px 30px -22px #000;
 }
 
-/* Reserve card-art space (2:3) so images don't cause layout shift, and show a
-   dark skeleton placeholder underneath while the thumbnail loads. */
+/* Reserve card-art space (~2:3) so images don't cause layout shift, and show a
+   dark skeleton placeholder while the thumbnail loads. `contain` keeps the WHOLE
+   card visible (never cropped); gameplay-zone overrides above drop the fixed
+   aspect so the image uses its real ratio. */
 .gc .play-match__art {
   aspect-ratio: 3 / 4;
-  object-fit: cover;
+  object-fit: contain;
   background: linear-gradient(160deg, #14181f, #0c0e14);
 }
 
@@ -679,7 +690,7 @@
   width: 30px;
   height: 40px;
   aspect-ratio: auto;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 4px;
   flex: 0 0 auto;
 }
@@ -743,12 +754,12 @@
   overflow-x: auto;
   overflow-y: hidden;
 }
-/* Cards fill the dock height; width follows the art (3:4). Bigger on tall/wide
-   screens, smaller on short ones (the row itself flexes). Horizontal scroll for
-   many cards; the art is never vertically clipped. */
+/* Full-card thumbnails: a responsive card width, with the WHOLE image contained
+   (never cropped) inside the dock height. Bigger on wide screens, smaller on
+   short ones; horizontal scroll for many cards; art never vertically clipped. */
 .gc .arena__hand .play-match__card {
+  width: clamp(96px, 8vw, 140px);
   height: 100%;
-  width: auto;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -756,12 +767,24 @@
 .gc .arena__hand .play-match__card-face {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column; /* art-wrap on top, name/cost below */
 }
-.gc .arena__hand .play-match__card-face .play-match__art {
-  height: 100%;
+.gc .arena__hand .play-match__art-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gc .arena__hand .play-match__art-wrap .play-match__art {
+  max-height: 100%;
+  max-width: 100%;
   width: auto;
-  aspect-ratio: 3 / 4;
-  object-fit: cover;
+  height: auto;
+  aspect-ratio: auto; /* keep the image's real ratio — no crop */
+  object-fit: contain;
 }
 /* Compact one-line caption — art stays visible; details live in inspect/zoom. */
 .gc .arena__hand .play-match__card-info {
