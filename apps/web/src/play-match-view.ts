@@ -294,8 +294,11 @@ export function renderPlayableMatch(
   // the player's faction; CSS maps it to a glow color). No gameplay effect.
   root.dataset["faction"] = match.playerFaction;
 
-  // Battle-log collapse state (mobile drawer). UI-only; persists across paints.
-  let logCollapsed = false;
+  // Battle-log collapse state (drawer). UI-only; persists across paints. On
+  // narrow screens (no room for the side-panel log) it starts collapsed so the
+  // battlefield + hand own the viewport; on desktop the log is a side column.
+  let logCollapsed =
+    typeof window !== "undefined" && window.innerWidth < 1100;
 
   // Warm the browser cache for the opening hand + on-board art up front so
   // gameplay visuals appear immediately (optimized thumbnails only — the

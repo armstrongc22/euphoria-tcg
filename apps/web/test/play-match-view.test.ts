@@ -2173,6 +2173,8 @@ describe("renderPlayableMatch — arena presentation", () => {
   });
 
   it("renders the combat log and toggles its collapsed state", () => {
+    // Wide viewport so the log starts expanded (desktop side panel).
+    Object.defineProperty(window, "innerWidth", { value: 1400, configurable: true });
     const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
     let log = root.querySelector(".play-match__log")!;
     expect(log).not.toBeNull();
@@ -2226,5 +2228,37 @@ describe("renderPlayableMatch — battlefield layout", () => {
     expect(summon).toBeDefined();
     summon!.click();
     expect(match.state().players.player1.field.length).toBe(1);
+  });
+});
+
+describe("renderPlayableMatch — viewport-constrained layout", () => {
+  function setWidth(px: number): void {
+    Object.defineProperty(window, "innerWidth", { value: px, configurable: true });
+  }
+
+  it("starts the combat log collapsed on narrow screens (board owns the view)", () => {
+    setWidth(760);
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    const log = root.querySelector(".play-match__log")!;
+    expect(log.classList.contains("play-match__log--collapsed")).toBe(true);
+    expect(root.querySelector(".play-match__log-toggle")!.textContent).toBe("Show");
+  });
+
+  it("keeps the combat log open on wide screens (side panel)", () => {
+    setWidth(1400);
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    const log = root.querySelector(".play-match__log")!;
+    expect(log.classList.contains("play-match__log--collapsed")).toBe(false);
+    expect(root.querySelector(".play-match__log-toggle")!.textContent).toBe("Hide");
+  });
+
+  it("still exposes fields, hand, and action buttons inside the arena regions", () => {
+    setWidth(1400);
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    expect(root.querySelector(".arena__opp .play-match__field")).not.toBeNull();
+    expect(root.querySelector(".arena__mine .play-match__field")).not.toBeNull();
+    expect(root.querySelector(".arena__dock .play-match__card")).not.toBeNull();
+    expect(root.querySelector(".arena__dock .play-match__enter")).not.toBeNull();
+    expect(root.querySelector(".arena__dock .play-match__end")).not.toBeNull();
   });
 });
