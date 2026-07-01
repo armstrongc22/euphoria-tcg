@@ -319,25 +319,6 @@ export function renderPlayableMatch(
     }
   }
 
-  // Warm the browser cache for the opening hand + on-board art up front so
-  // gameplay visuals appear immediately (optimized thumbnails only — the
-  // full-size zoom image is never preloaded). Best-effort; no gameplay effect.
-  if (!noArt()) {
-    try {
-      const s0 = match.state();
-      preloadCardArt(
-        [
-          ...s0.players.player1.hand,
-          ...s0.players.player1.field.map((w) => w.card),
-          ...s0.players.player2.field.map((w) => w.card),
-        ],
-        LIVE_ART_BASE,
-      );
-    } catch {
-      /* preload is best-effort */
-    }
-  }
-
   // Stability switches (Feature B/C), read once. All default off; desktop is
   // unaffected unless a flag is set. Each isolates one suspected reload cause.
   const flags = {
