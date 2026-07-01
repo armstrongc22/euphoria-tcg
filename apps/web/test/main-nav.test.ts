@@ -2,13 +2,20 @@
  * @vitest-environment jsdom
  *
  * Game-client shell integration: boots the real app (main.ts) into a jsdom
- * document and verifies the splash → menu → internal-screen navigation, plus the
- * hidden debug reveal. No Supabase env is set, so the app falls back to the
- * localStorage demo backend. The individual views (rules, lore, viewer, account,
- * etc.) have their own unit tests; here we only check the shell hosts and
- * switches between them.
+ * document and verifies (a) the login-gated entry — the beta shell does not
+ * appear until auth succeeds — (b) the splash → menu → internal-screen
+ * navigation once authenticated, and (c) the hidden debug reveal. No Supabase env
+ * is set, so the app uses the localStorage demo auth backend (signUp/signIn both
+ * return a session immediately). Individual views have their own unit tests; here
+ * we only check the gate + shell hosting.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+/** Drain microtasks and one timer tick so async boot/auth flows settle. */
+async function flush(): Promise<void> {
+  for (let i = 0; i < 6; i++) await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 /** Mounts a fresh #app and (re-)imports main.ts so its boot runs against it. */
 async function boot(): Promise<void> {
@@ -17,9 +24,7 @@ async function boot(): Promise<void> {
   sessionStorage.clear();
   vi.resetModules();
   await import("../src/main");
-  // Let the async boot (session restore + signup/starter mounts) settle.
-  await Promise.resolve();
-  await Promise.resolve();
+  await flush();
 }
 
 function el<T extends HTMLElement>(sel: string): T {
@@ -32,18 +37,59 @@ function view(id: string): HTMLElement {
   return el(`#view-${id}`);
 }
 
+/** Pass the auth gate (demo backend) via Create Account. */
+async function authenticate(): Promise<void> {
+  el<HTMLInputElement>("#gate-email").value = "tester@example.com";
+  el<HTMLInputElement>("#gate-password").value = "password1";
+  el<HTMLButtonElement>("#gate-create").click();
+  await flush();
+}
+
 /** Dismiss the splash and land on the main menu. */
 function enter(): void {
   el<HTMLButtonElement>("#gc-enter").click();
 }
 
-describe("game-client shell", () => {
+describe("beta auth gate", () => {
   beforeEach(async () => {
     await boot();
   });
 
-  it("shows the splash first, hiding the shell until entered", () => {
-    expect(el("#gc-splash")).toBeTruthy();
+  it("shows the auth gate and keeps the beta shell hidden on first load", () => {
+    expect(el("#gc-gate").hidden).toBe(false);
+    expect(el("#gc-shell").hidden).toBe(true);
+    expect(el("#gc-splash").hidden).toBe(true);
+    // The sign-in form is present (not just the loading card).
+    expect(document.querySelector("#gate-email")).not.toBeNull();
+    expect(document.querySelector("#gate-create")).not.toBeNull();
+  });
+
+  it("reveals the splash only after authentication", async () => {
+    expect(el("#gc-splash").hidden).toBe(true);
+    await authenticate();
+    expect(el("#gc-gate").hidden).toBe(true);
+    expect(el("#gc-splash").hidden).toBe(false);
+  });
+
+  it("rejects an invalid email without authenticating", async () => {
+    el<HTMLInputElement>("#gate-email").value = "nope";
+    el<HTMLInputElement>("#gate-password").value = "password1";
+    el<HTMLButtonElement>("#gate-signin").click();
+    await flush();
+    expect(el("#gc-gate").hidden).toBe(false);
+    expect(el("#gc-splash").hidden).toBe(true);
+    expect(el(".gc-gate__error").hidden).toBe(false);
+  });
+});
+
+describe("game-client shell (after auth)", () => {
+  beforeEach(async () => {
+    await boot();
+    await authenticate();
+  });
+
+  it("shows the splash before entering, shell still hidden", () => {
+    expect(el("#gc-splash").hidden).toBe(false);
     expect(el("#gc-shell").hidden).toBe(true);
     expect(sessionStorage.getItem("euphoria_beta_entered")).toBeNull();
   });
@@ -91,6 +137,13 @@ describe("game-client shell", () => {
     el<HTMLButtonElement>('[data-go="viewer"]').click();
     expect(view("viewer").hidden).toBe(false);
     expect(view("rules").hidden).toBe(true);
+  });
+
+  it("opens Settings with the future-ready OST area", () => {
+    enter();
+    el<HTMLButtonElement>('[data-go="settings"]').click();
+    expect(view("settings").hidden).toBe(false);
+    expect(view("settings").textContent).toContain("Soundtrack coming soon");
   });
 
   it("returns to the menu via the HUD Menu button", () => {
@@ -149,7 +202,7 @@ describe("hidden debug reveal (tap build stamp 5x)", () => {
     document.body.innerHTML = '<div id="app"></div>';
     vi.resetModules();
     await import("../src/main");
-    await Promise.resolve();
+    await flush();
     const node = el<HTMLButtonElement>("#build-stamp");
     expect(node.classList.contains("site-footer__stamp--debug")).toBe(true);
   });

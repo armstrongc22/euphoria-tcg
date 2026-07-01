@@ -32,6 +32,7 @@ import { getRecoveryStore } from "@euphoria/core/match-recovery";
 import { getPendingStore, syncPendingRewards } from "@euphoria/core/pending-reward";
 import { resetAllProgression } from "@euphoria/core/progression";
 import { nextRewardMilestone } from "@euphoria/core/rewards";
+import { mountAuthGate, authGateLoadingMarkup } from "./auth-gate";
 import type { StarterFaction } from "@euphoria/core/starter";
 
 // Build stamp (set by vite.config define): the deployed commit/timestamp, shown
@@ -91,8 +92,10 @@ const ORBS: ReadonlyArray<{ name: string; color: string }> = [
 ];
 
 app.innerHTML = `
-  <div class="gc" data-screen="splash">
-    <section class="gc-splash" id="gc-splash">
+  <div class="gc" data-screen="gate">
+    <section class="gc-gate" id="gc-gate">${authGateLoadingMarkup()}</section>
+
+    <section class="gc-splash" id="gc-splash" hidden>
       <div class="gc-splash__orbs" aria-hidden="true">
         ${ORBS.map(
           (o, i) =>
@@ -203,6 +206,7 @@ app.innerHTML = `
 `;
 
 const gc = document.querySelector<HTMLElement>(".gc")!;
+const gateEl = document.querySelector<HTMLElement>("#gc-gate")!;
 const splashEl = document.querySelector<HTMLElement>("#gc-splash")!;
 const shellEl = document.querySelector<HTMLElement>("#gc-shell")!;
 const menuEl = document.querySelector<HTMLElement>("#gc-menu")!;
@@ -271,7 +275,10 @@ if (buildStamp !== null) {
 }
 
 // The view/state currently on screen — read by the footer feedback context.
-let currentView: ViewId | "menu" | "splash" = "splash";
+let currentView: ViewId | "menu" | "splash" | "gate" = "gate";
+
+// The beta screens are login-gated: they only mount after auth is confirmed.
+let betaViewsMounted = false;
 
 // Pick the backend once: Supabase if configured, else the localStorage demo.
 const auth = createAuth();
@@ -350,9 +357,70 @@ function enterShell(): void {
   } catch {
     /* private mode — splash just shows each load */
   }
+  gateEl.hidden = true;
   splashEl.hidden = true;
   shellEl.hidden = false;
   showMenu();
+}
+
+// ---- Auth gate (login-gated beta access) ---------------------------------
+
+/** Show the full-screen auth gate; the beta shell stays unmounted/hidden. */
+function showGate(): void {
+  currentView = "gate";
+  gc.dataset.screen = "gate";
+  splashEl.hidden = true;
+  shellEl.hidden = true;
+  gateEl.hidden = false;
+  mountAuthGate(gateEl, { auth, onAuthed });
+}
+
+/** Reveal the post-auth splash/title screen (or jump to the menu if entered). */
+function showSplash(): void {
+  currentView = "splash";
+  gc.dataset.screen = "splash";
+  gateEl.hidden = true;
+  splashEl.hidden = false;
+  shellEl.hidden = true;
+}
+
+/** The beta screens mount here — only ever called once auth is confirmed. */
+function mountBetaViewsOnce(): void {
+  if (betaViewsMounted) return;
+  betaViewsMounted = true;
+  mountCardViewer(viewerEl);
+  mountRules(rulesEl);
+  mountLore(loreEl);
+}
+
+/**
+ * Enter the authenticated beta: mount the (previously ungated) views, seed the
+ * session-dependent screens, then reveal the splash — or jump straight to the
+ * menu if the splash was already dismissed this session.
+ */
+async function enterBeta(faction: StarterFaction | null): Promise<void> {
+  mountBetaViewsOnce();
+  await renderSignup();
+  mountStarter(faction);
+  gateEl.hidden = true;
+  let entered = false;
+  try {
+    entered = sessionStorage.getItem(ENTERED_KEY) === "1";
+  } catch {
+    entered = false;
+  }
+  if (entered) enterShell();
+  else showSplash();
+}
+
+/** Auth gate success: load the profile, retry pending rewards, reveal the beta. */
+function onAuthed(next: AuthSession): void {
+  session = next;
+  void (async () => {
+    const profile = await auth.getProfile(next).catch(() => null);
+    await syncPendingRewards(auth, next, getPendingStore()).catch(() => null);
+    await enterBeta(profile?.selected_faction ?? null);
+  })();
 }
 
 /** Menu status: sign-in state, selected faction, and win/reward progress. */
@@ -403,11 +471,10 @@ async function refreshAccount(): Promise<void> {
     // Onboarding next-step CTA can send the player to another screen.
     onNavigate: (screen) => showScreen(screen),
     onSignOut: () => {
+      // Logging out revokes beta access: hide the shell and return to the gate.
       session = null;
       currentFaction = null;
-      void renderSignup();
-      mountStarter(null);
-      showMenu();
+      showGate();
     },
   });
 }
@@ -524,30 +591,19 @@ document
     });
   });
 
-// Static content — mount once at boot (no session/profile needed).
-mountCardViewer(viewerEl);
-mountRules(rulesEl);
-mountLore(loreEl);
-
-// Boot: restore any existing session, then render signup/starter accordingly and
-// show the splash (or skip straight to the menu if already entered this session).
+// Boot: the beta is login-gated. Check for an existing session first — nothing
+// game-facing mounts until auth is confirmed. With a session, enter the beta;
+// without one, show the auth gate (the beta shell stays unmounted/hidden).
 void (async () => {
   session = await auth.getSession().catch(() => null);
-  const profile = session ? await auth.getProfile(session).catch(() => null) : null;
-  // Retry rewards that failed to save in a previous session (best-effort).
   if (session !== null) {
+    const profile = await auth.getProfile(session).catch(() => null);
+    // Retry rewards that failed to save in a previous session (best-effort).
     await syncPendingRewards(auth, session, getPendingStore()).catch(() => null);
+    await enterBeta(profile?.selected_faction ?? null);
+  } else {
+    showGate();
   }
-  await renderSignup();
-  mountStarter(profile?.selected_faction ?? null);
-
-  let entered = false;
-  try {
-    entered = sessionStorage.getItem(ENTERED_KEY) === "1";
-  } catch {
-    entered = false;
-  }
-  if (entered) enterShell();
 })();
 
 /** Mounts the card viewer (filters + grid + detail modal) into a container. */
