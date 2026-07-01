@@ -727,10 +727,77 @@
   }
 }
 
-/* ---- Reduced motion ----------------------------------------------------- */
+/* ---- Phase 3B: interaction clarity ------------------------------------- */
+
+/* Playable hand cards get a "ready" accent bar so actionable cards are obvious
+   at a glance (paired with the dimmed invalid state above). */
+.gc .play-match__card:has(.play-match__card-btn:not(:disabled))::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--arena);
+  box-shadow: 0 0 10px 1px var(--arena);
+  z-index: 2;
+}
+/* Warriors that can act (attack) get the same ready cue. */
+.gc .play-match__warrior:has(.play-match__warrior-btn:not(:disabled))::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--arena);
+  box-shadow: 0 0 10px 1px var(--arena);
+  z-index: 2;
+}
+
+/* Selected card/warrior lifts above its neighbors for unmistakable focus. */
+.gc .play-match__card--selected,
+.gc .play-match__warrior--selected {
+  z-index: 3;
+}
+
+/* Valid attack targets read as targets: a crosshair-style ring on top of the
+   pulsing glow, and a clearer targeting cursor. */
+.gc .play-match__warrior--target {
+  cursor: crosshair;
+  outline: 2px dashed var(--f-monk);
+  outline-offset: 2px;
+}
+
+/* Battle-log event highlight: the newest line pops so the eye lands on what just
+   happened; turn headers and actor tints stay from the base log styles. */
+.gc .play-match__log-list > .play-match__log-entry:last-child {
+  color: #fff;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  padding-block: 1px;
+}
+.gc .play-match__log-entry--you {
+  color: color-mix(in srgb, var(--arena) 55%, var(--gc-ink));
+}
+.gc .play-match__log-entry--opponent {
+  color: #ffb3bb;
+}
+
+/* ---- Reduced motion (comprehensive) ------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
-  .gc .play-match__warrior--target,
+  /* Kill every arena animation (target pulse, prompt slam-in, floating combat
+     text, attack beam) and the hover lifts — states stay legible without motion. */
+  .gc .play-match *,
+  .gc .arena *,
   .gc .match-result {
-    animation: none;
+    animation: none !important;
+    transition: none !important;
+  }
+  .gc .play-match__card:hover,
+  .gc .play-match__warrior:hover,
+  .gc .play-match__actionbar button:hover {
+    transform: none;
   }
 }
