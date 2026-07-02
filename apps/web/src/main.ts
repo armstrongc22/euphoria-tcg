@@ -15,9 +15,11 @@
  * reward logic, deck validation, auth backend, and Supabase persistence are
  * unchanged; each existing view mount function is reused verbatim.
  */
+import "./fx-tokens.css";
 import "./styles.css";
 import "./game-shell.css";
 import "./match-arena.css";
+import "./match-fx.css";
 import { mountAccount } from "./account-view";
 import { createAuth, type AuthSession } from "@euphoria/core/auth";
 import { cards } from "@euphoria/core/cards";

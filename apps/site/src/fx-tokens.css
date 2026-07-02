@@ -1,0 +1,63 @@
+/**
+ * Euphoria UX tokens (Phase A of docs/design/ux-reboot.md).
+ *
+ * Shared visual vocabulary for the site hub and the game client: stage
+ * colors, the eight faction energies, the global diagonal angle, motion
+ * durations/easings, and glow intensities. Purely declarative — importing
+ * this file changes nothing visually until a component uses a token.
+ *
+ * KEEP IN SYNC with apps/web/src/fx-tokens.css (identical content; the two
+ * apps build separately and cannot share a CSS module today). Faction hexes
+ * deliberately match the map's FACTION_COLORS (apps/site/src/map/markers.ts)
+ * so cards, map, and effects speak one palette.
+ */
+:root {
+  /* ---- stage (the dark broadcast base) -------------------------------- */
+  --eu-stage: #0a0c10;
+  --eu-stage-raised: #12151c;
+  --eu-ink: #f2f4f8;
+  --eu-hairline: rgba(195, 200, 210, 0.18);
+
+  /* ---- faction energy --------------------------------------------------
+     Dwarf green earth/metal · Monk red impact/flame · Surfer blue flow ·
+     Sonic yellow lightning · Shaman purple aura · Human bronze tactical ·
+     Neutral silver glow · Criminal black/shadow (its glitch accent is the
+     effect template's job, not a second color). */
+  --eu-energy-dwarf: #29d17a;
+  --eu-energy-monk: #ff2e4d;
+  --eu-energy-surfer: #2e8bff;
+  --eu-energy-sonic: #f2c11d;
+  --eu-energy-shaman: #9b5cff;
+  --eu-energy-human: #a9744f;
+  --eu-energy-neutral: #c3c8d2;
+  --eu-energy-criminal: #101318;
+
+  /* ---- geometry --------------------------------------------------------
+     ONE diagonal angle everywhere, so cuts read as a language, not noise. */
+  --eu-diagonal: 7deg;
+
+  /* ---- motion ----------------------------------------------------------
+     Every effect picks one of three durations; nothing bespoke. */
+  --eu-fx-fast: 160ms;
+  --eu-fx-base: 320ms;
+  --eu-fx-slow: 520ms;
+  --eu-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --eu-ease-impact: cubic-bezier(0.7, 0, 0.3, 1);
+
+  /* ---- glow ------------------------------------------------------------
+     Opacity levels for energy glows (multiplied into shadows/gradients). */
+  --eu-glow-soft: 0.35;
+  --eu-glow-strong: 0.8;
+}
+
+/* Reduced motion: durations collapse to zero and glows soften, so any
+   token-driven animation degrades without per-component work. Decorative FX
+   nodes are additionally suppressed at their source (match-fx). */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --eu-fx-fast: 0ms;
+    --eu-fx-base: 0ms;
+    --eu-fx-slow: 0ms;
+    --eu-glow-strong: 0.35;
+  }
+}
