@@ -1,17 +1,18 @@
 -- ============================================================================
--- Euphoria TCG — 1v1 private-invite PvP schema (Phase 1: lobby; Phase 2: match)
+-- Migration: 1v1 private-invite PvP — full schema (lobby + live-match sync)
 -- ============================================================================
--- ⚠ SUPERSEDED: the canonical, deployable copy of this schema now lives at
---   supabase/migrations/20260702120000_pvp_schema.sql
--- and is applied with `supabase db push` (see docs/supabase-migrations.md).
--- This file is kept as design documentation; put future schema CHANGES in a
--- new file under supabase/migrations/, never here.
+-- Canonical source for the PvP schema (supersedes the hand-run copy that lived
+-- in docs/pvp-schema.sql). Applied by `supabase db push` — locally or via the
+-- GitHub Actions workflow (.github/workflows/supabase-migrations.yml).
 --
--- Run this in the Supabase SQL editor (or via the CLI) on the beta project.
+-- IDEMPOTENT BY DESIGN: this schema may already exist on the beta project from
+-- the manual SQL-editor era. Every statement is guarded (IF NOT EXISTS,
+-- CREATE OR REPLACE, DROP ... IF EXISTS, exception-swallowing DO blocks), so
+-- applying this migration over an up-to-date database is a no-op.
+--
 -- It ONLY adds new objects (pvp_rooms, pvp_matches, join_pvp_room RPC) and does
 -- NOT touch the protected tables (profiles, match_history, owned_cards,
--- reward_events, active_decks, feedback_reports). Safe to run once; re-running
--- is guarded with IF NOT EXISTS / CREATE OR REPLACE where possible.
+-- reward_events, active_decks, feedback_reports) — see ENGINE_LOCK.md.
 --
 -- Security summary:
 --  * Only authenticated users can create rooms.
@@ -19,7 +20,11 @@
 --    can NOT read the rooms table (so codes can't be enumerated).
 --  * Joining goes through join_pvp_room(code), a SECURITY DEFINER function that
 --    validates the room server-side and seats the caller as player_two.
+--  * Matches: participants-only SELECT/UPDATE; INSERT is restricted to the
+--    room's creator (always seat player_one), for their own room only.
 --  * PvP grants NO rewards (this schema has no reward/ownership side effects).
+--
+-- Verify with: supabase/verify/pvp_policies.sql
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -47,7 +52,9 @@ create index if not exists pvp_rooms_room_code_idx on public.pvp_rooms (room_cod
 create index if not exists pvp_rooms_participants_idx
   on public.pvp_rooms (player_one, player_two);
 
--- Phase 2 (created now so the FK + RLS exist; unused until live sync lands).
+-- The live-match rows: ONE canonical deterministic game per duel —
+-- seed + both decks + ordered action_log; only the active player appends,
+-- guarded by the optimistic `version` column. Board state is never stored.
 create table if not exists public.pvp_matches (
   id uuid primary key default gen_random_uuid(),
   room_id uuid not null references public.pvp_rooms (id) on delete cascade,
@@ -124,6 +131,24 @@ create policy pvp_matches_update on public.pvp_matches
   using (auth.uid() in (player_one, player_two))
   with check (auth.uid() in (player_one, player_two));
 
+-- Matches: only the room's creator (always seat player_one) may create the
+-- match row, and only for a room they actually own. The client writes seed +
+-- both published decks + an empty action_log; from then on gameplay is
+-- UPDATE-only (action_log/version/status), covered by pvp_matches_update.
+drop policy if exists pvp_matches_insert on public.pvp_matches;
+create policy pvp_matches_insert on public.pvp_matches
+  for insert to authenticated
+  with check (
+    auth.uid() = player_one
+    and exists (
+      select 1 from public.pvp_rooms r
+      where r.id = room_id
+        and r.created_by = auth.uid()
+        and r.player_one = player_one
+        and r.player_two = player_two
+    )
+  );
+
 -- ---------------------------------------------------------------------------
 -- join_pvp_room(code) — SECURITY DEFINER so a non-member can seat themselves as
 -- player_two without ever being able to SELECT/enumerate the rooms table.
@@ -174,37 +199,25 @@ $$;
 grant execute on function public.join_pvp_room(text) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- Realtime (optional but recommended): stream row changes to the lobby.
--- If this errors because the publication doesn't exist on your project, skip it
--- — the client has a polling fallback.
+-- Realtime (optional but recommended): stream row changes to the lobby/arena.
+-- Wrapped so the migration never fails: "already in publication" and
+-- "publication does not exist" are both fine — the client has a polling
+-- fallback, and everything above still applies.
 -- ---------------------------------------------------------------------------
-alter publication supabase_realtime add table public.pvp_rooms;
-alter publication supabase_realtime add table public.pvp_matches;
+do $$
+begin
+  alter publication supabase_realtime add table public.pvp_rooms;
+exception
+  when duplicate_object then null;  -- already added
+  when undefined_object then null;  -- publication absent on this project
+end;
+$$;
 
--- ============================================================================
--- Phase 2 addendum — live-match sync (run this section too; safe to re-run)
--- ============================================================================
--- Phase 1 shipped pvp_matches with SELECT/UPDATE policies but NO INSERT policy,
--- so nobody could create a match row. Phase 2 adds it: only the room's creator
--- (who is always seat player_one) may create the match, and only for a room
--- they actually own. The client writes seed + both published decks + an empty
--- action_log; from then on gameplay is UPDATE-only (action_log/version/status),
--- already covered by pvp_matches_update.
---
--- Sync contract (enforced client-side, documented here): a match is ONE
--- canonical deterministic game — seed + both decks + ordered action_log; only
--- the active player appends, guarded by the optimistic `version` column. PvP
--- still grants NO rewards and never touches the protected tables.
-drop policy if exists pvp_matches_insert on public.pvp_matches;
-create policy pvp_matches_insert on public.pvp_matches
-  for insert to authenticated
-  with check (
-    auth.uid() = player_one
-    and exists (
-      select 1 from public.pvp_rooms r
-      where r.id = room_id
-        and r.created_by = auth.uid()
-        and r.player_one = player_one
-        and r.player_two = player_two
-    )
-  );
+do $$
+begin
+  alter publication supabase_realtime add table public.pvp_matches;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;

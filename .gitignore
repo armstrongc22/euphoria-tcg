@@ -17,3 +17,7 @@ dist/
 .env
 .env.local
 .env.*.local
+
+# Supabase CLI local state (never contains committed schema; can hold tokens)
+supabase/.temp/
+supabase/.branches/

@@ -1,0 +1,70 @@
+name: Apply Supabase migrations
+
+# Applies supabase/migrations/*.sql to the beta Supabase project with the
+# Supabase CLI (`supabase db push`). Runs on pushes to master that touch the
+# migrations directory, and on demand via workflow_dispatch (useful for the
+# first run, or to re-apply after adding secrets).
+#
+# The CLI records applied migrations in supabase_migrations.schema_migrations,
+# so each file is applied exactly once; our migrations are additionally written
+# to be idempotent, so applying them over a database that was set up by hand
+# (SQL-editor era) is safe. Verify afterwards with supabase/verify/pvp_policies.sql.
+#
+# Required repository configuration (Settings → Secrets and variables → Actions
+# → Secrets). Values are NEVER committed to the repo — see
+# docs/supabase-migrations.md for where each one comes from:
+#   SUPABASE_ACCESS_TOKEN  – personal access token (Supabase dashboard →
+#                            Account → Access Tokens). Scopes the CLI login.
+#   SUPABASE_PROJECT_ID    – the project ref (Project Settings → General →
+#                            Reference ID, e.g. "abcdefghijklmnopqrst").
+#   SUPABASE_DB_PASSWORD   – the database password (Project Settings →
+#                            Database). Used by `db push` to reach Postgres.
+#
+# NOTE: never add the service_role key here — migrations don't need it, and it
+# must never leave the Supabase dashboard.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "supabase/migrations/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One migration run at a time; let an in-progress apply finish.
+concurrency:
+  group: supabase-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Apply migrations
+        run: supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: List applied migrations
+        run: supabase migration list
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}

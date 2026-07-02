@@ -1,0 +1,7 @@
+# Supabase CLI project config. Deliberately minimal: the CLI only needs a local
+# project name here; the real project is selected at deploy time via
+# `supabase link --project-ref $SUPABASE_PROJECT_ID` (see
+# .github/workflows/supabase-migrations.yml and docs/supabase-migrations.md).
+# NO credentials belong in this file — tokens, DB passwords, and the project
+# ref live exclusively in GitHub Actions secrets.
+project_id = "euphoria-tcg"
