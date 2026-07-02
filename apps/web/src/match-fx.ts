@@ -14,9 +14,11 @@
  * replaces the root's children). A hard cap bounds concurrent nodes so a busy
  * playback can never pile up DOM.
  *
- * Kill switches, in order: the euphoriaNoAnim / low-power debug flags disable
- * the layer entirely at attach; prefers-reduced-motion suppresses every spawn
- * at event time (the static selected/target glows in match-fx.css remain).
+ * Kill switches, in order: the euphoriaNoAnim / low-power / safe-mode flags
+ * disable the layer entirely at attach; prefers-reduced-motion is checked per
+ * moment — it suppresses every decorative spawn (the static selected/target
+ * glows in match-fx.css remain) and swaps the attack-card super-move for its
+ * calm "lite" presentation.
  *
  * Faction energy comes from the Phase A tokens (--eu-energy-*). All factions
  * get the base templates; Monk is the tuned reference (hotter, flame-accented
@@ -26,7 +28,7 @@ import {
   MATCH_ANIM_EVENT,
   type MatchAnimDetail,
 } from "@euphoria/core/match-playback";
-import { lowPowerActive, noAnim } from "./debug-flags";
+import { FLAG_LOW_POWER, FLAG_NO_ANIM, flag, safeMode } from "./debug-flags";
 
 /** Factions the energy tokens cover; anything else falls back to Neutral. */
 const ENERGY_TOKENS: Record<string, string> = {
@@ -42,6 +44,29 @@ const ENERGY_TOKENS: Record<string, string> = {
 
 /** Never keep more than this many FX nodes alive at once. */
 const MAX_LIVE_FX = 6;
+
+/**
+ * View-level CustomEvent announcing "this attack was powered by an Attack
+ * card" — dispatched by the board (play-match-view) at the attack's visual
+ * moment, rendered here as the super-move cinematic. Like MATCH_ANIM_EVENT it
+ * always fires (a sound layer may want it); only the visuals are gated.
+ */
+export const ATTACK_CARD_FX_EVENT = "euphoria:attack-card-fx";
+
+/** Detail payload of {@link ATTACK_CARD_FX_EVENT}. */
+export interface AttackCardFxDetail {
+  readonly cardName: string;
+  /** Optimized card art; absent under the no-art flag (text face instead). */
+  readonly artUrl?: string;
+  readonly actor: "player" | "opponent";
+  /** The defender's tile, for the impact cue at the slam moment. */
+  readonly targetInstanceId?: string;
+}
+
+/** Full cinematic length; the impact cue lands at the slam beat inside it. */
+const SUPER_LIFETIME_MS = 720;
+const SUPER_IMPACT_AT_MS = 380;
+const SUPER_LITE_LIFETIME_MS = 460;
 
 /** Longest any node lives without its animation cleaning it up (ms). */
 const LIFETIMES: Record<string, number> = {
@@ -67,7 +92,12 @@ export function attachMatchFx(
   board: HTMLElement,
   options: MatchFxOptions,
 ): () => void {
-  if (noAnim() || lowPowerActive()) return () => {};
+  // Explicit stability flags kill the layer outright. prefers-reduced-motion
+  // is deliberately NOT checked here: it's a runtime check per moment, so it
+  // can suppress the decorative spawns while still allowing the calm "lite"
+  // attack-card presentation (and it reacts if the OS setting changes
+  // mid-match).
+  if (flag(FLAG_NO_ANIM) || flag(FLAG_LOW_POWER) || safeMode()) return () => {};
 
   let detached = false;
   const timers = new Set<ReturnType<typeof setTimeout>>();
@@ -187,6 +217,80 @@ export function attachMatchFx(
   };
   board.addEventListener(MATCH_ANIM_EVENT, onAnim);
 
+  // ---- Attack-card super-move cinematic ---------------------------------
+  // MvC-style activation: dim veil, faction speed lines, the chosen card
+  // streaking in from the actor's side to a center slam, a bold name ribbon,
+  // then an impact cue on the defender — all inside ~720ms, transform/opacity
+  // only. Under prefers-reduced-motion this becomes the "lite" read: a calm
+  // centered card pop + name + energy flash, no sweep, no shake. Repeated
+  // supers replace the live one instantly so spamming attacks stays snappy.
+  const onAttackCard = (event: Event): void => {
+    const detail = (event as CustomEvent<AttackCardFxDetail>).detail;
+    if (detail === undefined || detail === null || detached) return;
+    const faction = factionFor(detail.actor);
+    const lite = reducedMotion();
+    board.querySelectorAll(".match-fx-super").forEach((el) => el.remove());
+
+    const overlay = document.createElement("div");
+    overlay.className =
+      `match-fx-super match-fx-super--${detail.actor}` +
+      (lite ? " match-fx-super--lite" : "") +
+      (faction in ENERGY_TOKENS ? ` match-fx--${faction.toLowerCase()}` : "");
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.style.setProperty(
+      "--fx-energy",
+      ENERGY_TOKENS[faction] ?? ENERGY_TOKENS["Neutral"]!,
+    );
+
+    const veil = document.createElement("div");
+    veil.className = "match-fx-super__veil";
+    overlay.append(veil);
+
+    if (!lite) {
+      for (let i = 1; i <= 3; i += 1) {
+        const line = document.createElement("div");
+        line.className = `match-fx-super__line match-fx-super__line--${i}`;
+        overlay.append(line);
+      }
+    }
+
+    const card = document.createElement("div");
+    card.className = "match-fx-super__card";
+    if (detail.artUrl !== undefined) {
+      const art = document.createElement("img");
+      art.className = "match-fx-super__art";
+      art.src = detail.artUrl;
+      art.alt = "";
+      art.decoding = "async";
+      card.append(art);
+    } else {
+      card.classList.add("match-fx-super__card--text");
+      card.textContent = detail.cardName;
+    }
+    const name = document.createElement("p");
+    name.className = "match-fx-super__name";
+    name.textContent = detail.cardName;
+    overlay.append(card, name);
+    board.append(overlay);
+
+    if (!lite) {
+      // The slam beat: impact flash on the defender + the (throttled) shake.
+      const impactTimer = setTimeout(() => {
+        timers.delete(impactTimer);
+        if (detached) return;
+        spawn("match-fx--impact", tileOf(detail.targetInstanceId), faction);
+        microShake();
+      }, SUPER_IMPACT_AT_MS);
+      timers.add(impactTimer);
+    }
+    const cleanup = setTimeout(() => {
+      overlay.remove();
+      timers.delete(cleanup);
+    }, lite ? SUPER_LITE_LIFETIME_MS : SUPER_LIFETIME_MS);
+    timers.add(cleanup);
+  };
+  board.addEventListener(ATTACK_CARD_FX_EVENT, onAttackCard);
+
   // ---- turn-change wipe ------------------------------------------------
   // paint() rebuilds the board with one replaceChildren per frame, so a
   // childList observer on the root fires once per paint — a cheap signal to
@@ -229,8 +333,9 @@ export function attachMatchFx(
     detached = true;
     observer.disconnect();
     board.removeEventListener(MATCH_ANIM_EVENT, onAnim);
+    board.removeEventListener(ATTACK_CARD_FX_EVENT, onAttackCard);
     for (const timer of timers) clearTimeout(timer);
     timers.clear();
-    board.querySelectorAll(".match-fx").forEach((el) => el.remove());
+    board.querySelectorAll(".match-fx, .match-fx-super").forEach((el) => el.remove());
   };
 }

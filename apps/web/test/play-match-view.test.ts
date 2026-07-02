@@ -22,6 +22,7 @@ import {
   type MatchAnimDetail,
 } from "../src/play-match-view";
 import { createCardDetail } from "../src/detail";
+import { ATTACK_CARD_FX_EVENT, type AttackCardFxDetail } from "../src/match-fx";
 
 /** Minimal in-play Warrior for white-box board scenarios. */
 function wip(card: Card, instanceId: string): WarriorInPlay {
@@ -493,6 +494,43 @@ describe("renderPlayableMatch — Attack-card prompt (Bug B)", () => {
     // The Attack card was spent to the Out Deck.
     expect(match.state().players.player1.hand.some((c) => c.id === atk.id)).toBe(false);
     expect(match.state().players.player1.outDeck.some((c) => c.id === atk.id)).toBe(true);
+  });
+
+  it("plays the super-move cinematic for the Attack-card path only", () => {
+    const atk = anAttackCard();
+    const friendly = warriorOfFaction(atk.faction);
+
+    // Regular attack: no cinematic, no event.
+    {
+      const match = craftBattle(friendly, [atk], atk.cost + 1);
+      const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+      declareAttack(root);
+      buttonByText(root, ".play-match__choice-btn", "Regular Attack")!.click();
+      expect(root.querySelector(".match-fx-super")).toBeNull();
+      root.dispose();
+    }
+
+    // Attack-card path: the view announces the card and the FX layer renders
+    // the super overlay with its name, before/while damage resolves visually.
+    const match = craftBattle(friendly, [atk], atk.cost + 1);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const seen: AttackCardFxDetail[] = [];
+    root.addEventListener(ATTACK_CARD_FX_EVENT, (e) =>
+      seen.push((e as CustomEvent<AttackCardFxDetail>).detail),
+    );
+    declareAttack(root);
+    buttonByText(root, ".play-match__choice-btn", "Use This Attack")!.click();
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.cardName).toBe(atk.name);
+    expect(seen[0]!.actor).toBe("player");
+    const overlay = root.querySelector(".match-fx-super");
+    expect(overlay).not.toBeNull();
+    expect(overlay!.querySelector(".match-fx-super__name")!.textContent).toBe(atk.name);
+    // The match itself resolved exactly as before (presentation-only).
+    expect(match.state().events.map((e) => e.type)).toContain("attackCardUsed");
+    root.dispose();
+    expect(root.querySelector(".match-fx-super")).toBeNull();
   });
 
   it("does not prompt for an off-faction Attack card", () => {

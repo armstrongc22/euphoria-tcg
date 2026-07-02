@@ -13,7 +13,11 @@ import {
   type MatchAnimDetail,
 } from "@euphoria/core/match-playback";
 import { FLAG_NO_ANIM, setFlag } from "../src/debug-flags";
-import { attachMatchFx } from "../src/match-fx";
+import {
+  attachMatchFx,
+  ATTACK_CARD_FX_EVENT,
+  type AttackCardFxDetail,
+} from "../src/match-fx";
 
 function makeBoard(): HTMLElement {
   const board = document.createElement("section");
@@ -240,5 +244,117 @@ describe("attachMatchFx — faction signatures", () => {
     fire(board, { kind: "directAttack", actor: "player", targetPlayer: "player2" });
     expect(board.querySelectorAll(".match-fx--impact").length).toBeGreaterThan(0);
     detach();
+  });
+});
+
+describe("attachMatchFx — attack-card super move", () => {
+  const superDetail = (over: Partial<AttackCardFxDetail> = {}): AttackCardFxDetail => ({
+    cardName: "Serf's Bondage",
+    artUrl: "/beta/cards/x.png",
+    actor: "player",
+    targetInstanceId: "warrior-1",
+    ...over,
+  });
+  const fireSuper = (board: HTMLElement, detail: AttackCardFxDetail): void => {
+    board.dispatchEvent(new CustomEvent(ATTACK_CARD_FX_EVENT, { detail }));
+  };
+
+  it("renders veil, speed lines, card art, and the name in the actor's energy", () => {
+    const board = makeBoard();
+    const detach = attachMatchFx(board, OPTS);
+    fireSuper(board, superDetail());
+    const overlay = board.querySelector<HTMLElement>(".match-fx-super")!;
+    expect(overlay).not.toBeNull();
+    expect(overlay.classList.contains("match-fx-super--player")).toBe(true);
+    expect(overlay.classList.contains("match-fx--monk")).toBe(true);
+    expect(overlay.style.getPropertyValue("--fx-energy")).toBe("var(--eu-energy-monk)");
+    expect(overlay.querySelectorAll(".match-fx-super__line")).toHaveLength(3);
+    expect(overlay.querySelector<HTMLImageElement>(".match-fx-super__art")!.src).toContain("x.png");
+    expect(overlay.querySelector(".match-fx-super__name")!.textContent).toBe("Serf's Bondage");
+    expect(overlay.getAttribute("aria-hidden")).toBe("true");
+    detach();
+  });
+
+  it("uses the opponent entry side + their faction for opponent supers", () => {
+    const board = makeBoard();
+    const detach = attachMatchFx(board, OPTS);
+    fireSuper(board, superDetail({ actor: "opponent" }));
+    const overlay = board.querySelector<HTMLElement>(".match-fx-super")!;
+    expect(overlay.classList.contains("match-fx-super--opponent")).toBe(true);
+    expect(overlay.style.getPropertyValue("--fx-energy")).toBe("var(--eu-energy-dwarf)");
+    detach();
+  });
+
+  it("falls back to a text card face without art", () => {
+    const board = makeBoard();
+    const detach = attachMatchFx(board, OPTS);
+    fireSuper(board, superDetail({ artUrl: undefined }));
+    const face = board.querySelector(".match-fx-super__card--text")!;
+    expect(face.textContent).toBe("Serf's Bondage");
+    expect(board.querySelector(".match-fx-super__art")).toBeNull();
+    detach();
+  });
+
+  it("lands the impact cue + shake at the slam beat, then cleans up", () => {
+    vi.useFakeTimers();
+    try {
+      const board = makeBoard();
+      const animate = vi.fn();
+      (board as HTMLElement & { animate?: unknown }).animate = animate;
+      const detach = attachMatchFx(board, OPTS);
+      fireSuper(board, superDetail());
+      expect(board.querySelector(".match-fx--impact")).toBeNull(); // not yet
+      vi.advanceTimersByTime(400);
+      expect(board.querySelector(".match-fx--impact")).not.toBeNull();
+      expect(animate).toHaveBeenCalledTimes(1); // the slam shake
+      vi.advanceTimersByTime(500);
+      expect(board.querySelector(".match-fx-super")).toBeNull(); // overlay gone
+      detach();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("replaces a live super instead of stacking", () => {
+    const board = makeBoard();
+    const detach = attachMatchFx(board, OPTS);
+    fireSuper(board, superDetail());
+    fireSuper(board, superDetail({ cardName: "Pisubaipa" }));
+    const overlays = board.querySelectorAll(".match-fx-super");
+    expect(overlays).toHaveLength(1);
+    expect(overlays[0]!.querySelector(".match-fx-super__name")!.textContent).toBe("Pisubaipa");
+    detach();
+  });
+
+  it("reduced motion gets the calm lite variant: no lines, no shake", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: true }));
+    try {
+      const board = makeBoard();
+      const animate = vi.fn();
+      (board as HTMLElement & { animate?: unknown }).animate = animate;
+      const detach = attachMatchFx(board, OPTS);
+      fireSuper(board, superDetail());
+      const overlay = board.querySelector<HTMLElement>(".match-fx-super")!;
+      expect(overlay.classList.contains("match-fx-super--lite")).toBe(true);
+      expect(overlay.querySelectorAll(".match-fx-super__line")).toHaveLength(0);
+      vi.advanceTimersByTime(500);
+      expect(animate).not.toHaveBeenCalled(); // no impact shake in lite
+      expect(board.querySelector(".match-fx-super")).toBeNull(); // shorter life
+      detach();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("detach removes a live super overlay and its listener", () => {
+    const board = makeBoard();
+    const detach = attachMatchFx(board, OPTS);
+    fireSuper(board, superDetail());
+    expect(board.querySelector(".match-fx-super")).not.toBeNull();
+    detach();
+    expect(board.querySelector(".match-fx-super")).toBeNull();
+    fireSuper(board, superDetail());
+    expect(board.querySelector(".match-fx-super")).toBeNull();
   });
 });
