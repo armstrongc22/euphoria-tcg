@@ -363,3 +363,210 @@
     transition: none;
   }
 }
+
+/* ---- Attack-card super-move cinematic -------------------------------------
+   MvC-style activation, ≤720ms, transform/opacity only: dim veil, faction
+   speed lines, the chosen card streaking diagonally to a center slam, a bold
+   name ribbon. Direction follows the actor (player enters from bottom-left,
+   opponent from top-right). The --lite variant (reduced motion) is a calm
+   centered pop with explicit short durations (the token durations collapse to
+   0 under the media query, which would erase it). */
+.gc .match-fx-super {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  overflow: hidden;
+  pointer-events: none;
+}
+.gc .match-fx-super__veil {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 7, 11, 0.55);
+  opacity: 0;
+  animation: eu-super-veil 720ms var(--eu-ease-out) forwards;
+}
+@keyframes eu-super-veil {
+  0% { opacity: 0; }
+  18% { opacity: 1; }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.gc .match-fx-super__line {
+  position: absolute;
+  left: -25%;
+  width: 150%;
+  height: 5px;
+  background: linear-gradient(90deg, transparent, var(--fx-energy), #fff, var(--fx-energy), transparent);
+  transform: rotate(calc(-1 * var(--eu-diagonal)));
+  opacity: 0;
+  animation: eu-super-line 460ms var(--eu-ease-impact) forwards;
+}
+.gc .match-fx-super__line--1 { top: 28%; animation-delay: 0ms; }
+.gc .match-fx-super__line--2 { top: 50%; height: 8px; animation-delay: 55ms; }
+.gc .match-fx-super__line--3 { top: 72%; animation-delay: 110ms; }
+.gc .match-fx-super--opponent .match-fx-super__line {
+  transform: rotate(var(--eu-diagonal)) scaleX(-1);
+}
+@keyframes eu-super-line {
+  0% { opacity: 0; translate: -18% 0; }
+  25% { opacity: 0.9; }
+  100% { opacity: 0; translate: 22% 0; }
+}
+
+.gc .match-fx-super__card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(150px, 30vmin, 280px);
+  aspect-ratio: 63 / 88;
+  border-radius: 10px;
+  border: 2px solid var(--fx-energy);
+  background: var(--eu-stage-raised);
+  box-shadow:
+    0 0 34px -2px var(--fx-energy),
+    0 18px 44px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  opacity: 0;
+  animation: eu-super-card-player 720ms var(--eu-ease-impact) forwards;
+}
+.gc .match-fx-super--opponent .match-fx-super__card {
+  animation-name: eu-super-card-opponent;
+}
+.gc .match-fx-super__art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.gc .match-fx-super__card--text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  text-align: center;
+  color: var(--eu-ink);
+  font-weight: 900;
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+@keyframes eu-super-card-player {
+  0% {
+    opacity: 0;
+    transform: translate(calc(-50% - 60vw), calc(-50% + 34vh)) rotate(-16deg) scale(0.8);
+  }
+  32% {
+    opacity: 1;
+    transform: translate(calc(-50% + 2vw), calc(-50% - 1vh)) rotate(-3deg) scale(1.04);
+  }
+  46% {
+    transform: translate(-50%, -50%) rotate(-6deg) scale(1);
+  }
+  82% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(-6deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(-6deg) scale(1.08);
+  }
+}
+@keyframes eu-super-card-opponent {
+  0% {
+    opacity: 0;
+    transform: translate(calc(-50% + 60vw), calc(-50% - 34vh)) rotate(16deg) scale(0.8);
+  }
+  32% {
+    opacity: 1;
+    transform: translate(calc(-50% - 2vw), calc(-50% + 1vh)) rotate(3deg) scale(1.04);
+  }
+  46% {
+    transform: translate(-50%, -50%) rotate(6deg) scale(1);
+  }
+  82% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(6deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(6deg) scale(1.08);
+  }
+}
+
+.gc .match-fx-super__name {
+  position: absolute;
+  left: 50%;
+  top: 76%;
+  margin: 0;
+  padding: 0.3rem 1.1rem;
+  transform: translateX(-50%) rotate(calc(-1 * var(--eu-diagonal)));
+  color: var(--eu-ink);
+  font-weight: 900;
+  font-size: clamp(1.05rem, 3.6vmin, 1.7rem);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-bottom: 3px solid var(--fx-energy);
+  background: linear-gradient(100deg, transparent, rgba(6, 7, 11, 0.85) 22%, rgba(6, 7, 11, 0.85) 78%, transparent);
+  text-shadow: 0 0 16px var(--fx-energy);
+  opacity: 0;
+  animation: eu-super-name 720ms var(--eu-ease-out) forwards;
+}
+@keyframes eu-super-name {
+  0% { opacity: 0; translate: 0 14px; }
+  22% { opacity: 0; }
+  40% { opacity: 1; translate: 0 0; }
+  84% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Mobile: no room for a 60vw sweep — the card slam-pops at center instead. */
+@media (max-width: 640px) {
+  .gc .match-fx-super__card,
+  .gc .match-fx-super--opponent .match-fx-super__card {
+    animation-name: eu-super-card-mobile;
+  }
+  @keyframes eu-super-card-mobile {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -44%) scale(0.55);
+    }
+    30% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.06);
+    }
+    44% {
+      transform: translate(-50%, -50%) scale(1);
+    }
+    82% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(1.05);
+    }
+  }
+}
+
+/* Lite (prefers-reduced-motion): calm centered pop + name + soft flash. The
+   general "hide .match-fx" reduced-motion rule below does NOT apply here —
+   this variant IS the reduced-motion presentation, with fixed short
+   durations and no travel. */
+.gc .match-fx-super--lite .match-fx-super__veil {
+  background: rgba(6, 7, 11, 0.3);
+  animation: eu-super-veil 440ms ease-out forwards;
+}
+.gc .match-fx-super--lite .match-fx-super__card {
+  animation: eu-super-lite-card 440ms ease-out forwards;
+}
+.gc .match-fx-super--lite .match-fx-super__name {
+  animation: eu-super-name 440ms ease-out forwards;
+}
+@keyframes eu-super-lite-card {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
