@@ -18,7 +18,10 @@
 import "./styles.css";
 import "./game-shell.css";
 import "./match-arena.css";
+import "./duel.css";
 import { mountAccount } from "./account-view";
+import { mountDuel } from "./duel-view";
+import { parseInviteCode } from "@euphoria/core/pvp";
 import { createAuth, type AuthSession } from "@euphoria/core/auth";
 import { cards } from "@euphoria/core/cards";
 import { renderControls } from "./controls";
@@ -59,6 +62,7 @@ type ScreenId =
   | "splash"
   | "menu"
   | "match"
+  | "duel"
   | "rewards"
   | "deck"
   | "collection"
@@ -72,6 +76,7 @@ const SCREEN_TITLES: Record<ScreenId, string> = {
   splash: "Euphoria",
   menu: "Main Menu",
   match: "Match Arena",
+  duel: "1v1 Duel",
   rewards: "Rewards & Account",
   deck: "Deck Editor",
   collection: "Collection",
@@ -126,6 +131,10 @@ let session: AuthSession | null = null;
 let currentFaction: StarterFaction | null = null;
 // The faction a pending match should launch with (set before showing "match").
 let playFaction: StarterFaction | null = null;
+// An invite code from the URL (/beta/?invite=CODE). Consumed once the user is
+// logged in (the Auth Gate shows first if they're signed out), then cleared.
+let pendingInvite: string | null =
+  typeof window !== "undefined" ? parseInviteCode(window.location) : null;
 // For the footer feedback context.
 let currentView: ScreenId = "auth";
 
@@ -236,6 +245,23 @@ function renderActiveScreen(
       // must equal the profile faction for the board to launch.
       void mountAccount(root, accountOptions(playFaction ?? currentFaction ?? undefined));
       break;
+    case "duel": {
+      // 1v1 private-invite lobby. Consumes a pending invite (from the URL) once.
+      const invite = pendingInvite;
+      pendingInvite = null;
+      if (session !== null) {
+        mountDuel(root, {
+          auth,
+          session,
+          base: import.meta.env.BASE_URL,
+          pendingInvite: invite,
+          onExit: () => renderActiveScreen("menu"),
+        });
+      } else {
+        renderActiveScreen("menu");
+      }
+      break;
+    }
     case "rewards":
       // The account hub: stats, rewards, owned cards, account + sign out.
       void mountAccount(root, accountOptions(undefined));
@@ -358,6 +384,10 @@ function renderMenu(): HTMLElement {
         <span class="gc-action__label">▶ Start Match</span>
         <span class="gc-action__hint">Battle the AI with your deck</span>
       </button>
+      <button type="button" class="gc-action" data-go="duel">
+        <span class="gc-action__label">1v1 Duel</span>
+        <span class="gc-action__hint">Invite a friend to a private match</span>
+      </button>
       <button type="button" class="gc-action" data-go="deckbuilder">
         <span class="gc-action__label">Deck Editor</span>
         <span class="gc-action__hint">Build & save your deck</span>
@@ -399,6 +429,9 @@ function onMenuGo(go: string): void {
       } else {
         renderActiveScreen("starter");
       }
+      break;
+    case "duel":
+      renderActiveScreen("duel");
       break;
     case "deckbuilder":
       renderActiveScreen("deck");
@@ -533,6 +566,11 @@ async function onLoggedIn(next: AuthSession, fresh: boolean): Promise<void> {
   const profile = await auth.getProfile(next).catch(() => null);
   currentFaction = profile?.selected_faction ?? null;
   await syncPendingRewards(auth, next, getPendingStore()).catch(() => null);
+  // An invite link takes priority: go straight to the duel lobby to auto-join.
+  if (pendingInvite !== null) {
+    renderActiveScreen("duel");
+    return;
+  }
   // Fresh logins always see the splash; a restored session respects "entered".
   renderActiveScreen(!fresh && enteredThisSession() ? "menu" : "splash");
 }
