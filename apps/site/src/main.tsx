@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { router } from "./router";
+import "./fx-tokens.css";
 import "./styles.css";
 
 const rootEl = document.getElementById("root");

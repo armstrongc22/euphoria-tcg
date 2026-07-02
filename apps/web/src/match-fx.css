@@ -1,0 +1,242 @@
+/**
+ * Match FX styles (Phase B prototype — see match-fx.ts and
+ * docs/design/ux-reboot.md). Everything here is decorative and additive:
+ * ephemeral energy nodes spawned by the FX layer, plus stronger treatments
+ * for the board's EXISTING selected/target/floating-text classes. Deleting
+ * this file (and the match-fx attach) restores the previous look exactly.
+ *
+ * All colors/durations/easings come from the Phase A tokens (fx-tokens.css);
+ * each node carries its faction color in --fx-energy.
+ */
+
+/* ---- ephemeral FX nodes -------------------------------------------------- */
+.gc .match-fx {
+  position: absolute;
+  z-index: 40;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  opacity: 0; /* keyframes raise it; if a timer outlives them, stay invisible */
+}
+
+/* Summon: an energy ring bursting out of the ground slot. */
+.gc .match-fx--burst {
+  width: 110px;
+  height: 110px;
+  border: 3px solid var(--fx-energy);
+  border-radius: 50%;
+  box-shadow:
+    0 0 24px 2px var(--fx-energy),
+    inset 0 0 18px 0 var(--fx-energy);
+  animation: eu-fx-burst var(--eu-fx-slow) var(--eu-ease-out) forwards;
+}
+@keyframes eu-fx-burst {
+  0% {
+    opacity: var(--eu-glow-strong);
+    transform: translate(-50%, -50%) scale(0.35);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.3);
+  }
+}
+
+/* Attack / damage / direct hit: a hard radial impact flash. */
+.gc .match-fx--impact {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--eu-ink) 0%,
+    var(--fx-energy) 30%,
+    transparent 68%
+  );
+  animation: eu-fx-impact var(--eu-fx-base) var(--eu-ease-impact) forwards;
+}
+@keyframes eu-fx-impact {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  25% {
+    opacity: var(--eu-glow-strong);
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.18);
+  }
+}
+
+/* Heal / buff / revive: a soft column of energy drifting upward. */
+.gc .match-fx--rise {
+  width: 90px;
+  height: 130px;
+  border-radius: 45%;
+  background: linear-gradient(to top, var(--fx-energy), transparent 80%);
+  animation: eu-fx-rise var(--eu-fx-slow) var(--eu-ease-out) forwards;
+}
+@keyframes eu-fx-rise {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -38%) scale(0.85);
+  }
+  30% {
+    opacity: var(--eu-glow-soft);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -68%) scale(1);
+  }
+}
+
+/* Destroy: a dark collapse ring — ink swallowing the slot. */
+.gc .match-fx--shatter {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 2px solid var(--fx-energy);
+  background: radial-gradient(circle, var(--eu-stage) 40%, transparent 70%);
+  animation: eu-fx-shatter var(--eu-fx-base) var(--eu-ease-impact) forwards;
+}
+@keyframes eu-fx-shatter {
+  0% {
+    opacity: var(--eu-glow-strong);
+    transform: translate(-50%, -50%) scale(1.1) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) rotate(8deg);
+  }
+}
+
+/* Turn change: a full-board diagonal energy sweep in the new side's color. */
+.gc .match-fx--turn {
+  inset: 0;
+  transform: none;
+  background: linear-gradient(
+    calc(90deg + var(--eu-diagonal)),
+    transparent 20%,
+    var(--fx-energy) 50%,
+    transparent 80%
+  );
+  background-size: 260% 100%;
+  animation: eu-fx-turn var(--eu-fx-slow) var(--eu-ease-out) forwards;
+}
+@keyframes eu-fx-turn {
+  0% {
+    opacity: 0;
+    background-position: 120% 0;
+  }
+  35% {
+    opacity: 0.22;
+  }
+  100% {
+    opacity: 0;
+    background-position: -20% 0;
+  }
+}
+
+/* ---- Monk tuning (the prototype's reference faction) ---------------------
+   Hotter, punchier: a white-hot core on impacts, a flame-lick second ring on
+   summons. Other factions use the base templates until their pass lands. */
+.gc .match-fx--monk.match-fx--burst {
+  box-shadow:
+    0 0 30px 4px var(--fx-energy),
+    inset 0 0 26px 2px var(--fx-energy);
+  border-width: 4px;
+}
+.gc .match-fx--monk.match-fx--impact {
+  background: radial-gradient(
+    circle,
+    #fff 0%,
+    var(--fx-energy) 26%,
+    #7a0d1f 46%,
+    transparent 68%
+  );
+}
+
+/* ---- selected-card glow (strengthens the existing classes) --------------- */
+.gc .play-match__card--selected {
+  border-color: var(--arena);
+  box-shadow:
+    0 0 0 1px var(--arena),
+    0 0 26px -4px var(--arena);
+  transform: translateY(-3px);
+  transition:
+    transform var(--eu-fx-fast) var(--eu-ease-out),
+    box-shadow var(--eu-fx-fast) var(--eu-ease-out);
+  animation: eu-fx-selected 1.6s ease-in-out infinite;
+}
+.gc .play-match__warrior--selected {
+  box-shadow:
+    0 0 0 1px var(--arena),
+    0 0 26px -4px var(--arena);
+  animation: eu-fx-selected 1.6s ease-in-out infinite;
+}
+@keyframes eu-fx-selected {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px var(--arena),
+      0 0 22px -6px var(--arena);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px var(--arena),
+      0 0 30px -2px var(--arena);
+  }
+}
+
+/* ---- valid-target pulse (strengthens the existing --target class) -------- */
+.gc .play-match__warrior--target {
+  animation: eu-fx-target 1.2s ease-in-out infinite;
+}
+@keyframes eu-fx-target {
+  0%,
+  100% {
+    box-shadow: 0 0 18px -6px var(--f-monk);
+  }
+  50% {
+    box-shadow: 0 0 30px -2px var(--f-monk);
+  }
+}
+
+/* ---- floating combat text (damage/heal popups) ---------------------------- */
+.gc .play-match__float {
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+}
+.gc .play-match__float--damage {
+  color: var(--eu-energy-monk);
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.9),
+    0 0 14px var(--eu-energy-monk);
+}
+.gc .play-match__float--heal,
+.gc .play-match__float--buff {
+  color: var(--eu-energy-dwarf);
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.9),
+    0 0 14px var(--eu-energy-dwarf);
+}
+
+/* ---- reduced motion -------------------------------------------------------
+   The FX layer already skips spawning under reduced motion; this is the
+   belt-and-suspenders CSS side. Selected/target keep a static glow (state
+   stays visible), only the pulsing/lift stops. */
+@media (prefers-reduced-motion: reduce) {
+  .gc .match-fx {
+    display: none !important;
+  }
+  .gc .play-match__card--selected,
+  .gc .play-match__warrior--selected,
+  .gc .play-match__warrior--target {
+    animation: none;
+  }
+  .gc .play-match__card--selected {
+    transform: none;
+    transition: none;
+  }
+}

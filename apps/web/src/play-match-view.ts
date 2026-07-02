@@ -62,6 +62,7 @@ import {
   noPlayback,
   renderedLogCap,
 } from "./debug-flags";
+import { attachMatchFx } from "./match-fx";
 
 /** Base path Vite serves card art from (see cardImageUrl). */
 const LIVE_ART_BASE = import.meta.env.BASE_URL;
@@ -303,6 +304,14 @@ export function renderPlayableMatch(
   // Faction accent hook for the arena styling (presentation only — the value is
   // the player's faction; CSS maps it to a glow color). No gameplay effect.
   root.dataset["faction"] = match.playerFaction;
+
+  // Decorative FX layer (Phase B prototype): listens to the board's own anim
+  // events and spawns short-lived energy nodes. Purely additive — it never
+  // touches game state, and the no-anim/low-power flags turn it into a no-op.
+  const detachFx = attachMatchFx(root, {
+    playerFaction: match.playerFaction,
+    opponentFaction: match.opponentFaction,
+  });
 
   // Battle-log collapse state (drawer). UI-only; persists across paints. On
   // narrow screens (no room for the side-panel log) it starts collapsed so the
@@ -597,6 +606,7 @@ export function renderPlayableMatch(
     disposed = true;
     playback = null;
     floaters = [];
+    detachFx();
     if (pendingTimer !== undefined) {
       clearTimeout(pendingTimer);
       pendingTimer = undefined;
