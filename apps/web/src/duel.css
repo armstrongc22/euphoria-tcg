@@ -1,0 +1,117 @@
+/* 1v1 Duel lobby — matches the arcade game-client aesthetic (gc-* palette). */
+.gc-duel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  width: min(560px, 100%);
+  margin: 0 auto;
+}
+.gc-duel .gc-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.gc-duel__error {
+  margin: 0;
+  color: #ffb3bb;
+  font-weight: 700;
+}
+.gc-duel__notice {
+  margin: 0;
+  color: var(--f-sonic, #f2c11d);
+  font-weight: 600;
+}
+.gc-duel__join {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--gc-line, rgba(255, 255, 255, 0.12));
+}
+.gc-duel__label {
+  font-size: 0.75rem;
+  color: var(--gc-dim, #9aa);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.gc-duel__join-row {
+  display: flex;
+  gap: 0.5rem;
+}
+.gc-duel__input,
+.gc-duel__link {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--gc-line, rgba(255, 255, 255, 0.15));
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--gc-ink, #fff);
+}
+.gc-duel__link {
+  font-size: 0.78rem;
+  color: var(--gc-dim, #9aa);
+}
+.gc-duel__code {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.gc-duel__code-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gc-dim, #9aa);
+}
+.gc-duel__code-value {
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--f-sonic, #f2c11d);
+}
+.gc-duel__seats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.gc-duel__seat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--gc-line, rgba(255, 255, 255, 0.12));
+  background: rgba(255, 255, 255, 0.03);
+}
+.gc-duel__seat.is-empty {
+  opacity: 0.6;
+  border-style: dashed;
+}
+.gc-duel__seat.is-filled {
+  border-left: 3px solid var(--gc-accent, #6dffa8);
+}
+.gc-duel__seat-name {
+  font-weight: 700;
+}
+.gc-duel__seat-state {
+  font-size: 0.82rem;
+  color: var(--gc-dim, #9aa);
+}
+.gc-duel__go {
+  margin: 0;
+  font-weight: 800;
+  color: var(--gc-accent, #6dffa8);
+  text-align: center;
+}
+.gc-btn--small {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+}
