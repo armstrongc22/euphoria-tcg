@@ -254,6 +254,8 @@ function renderActiveScreen(
           auth,
           session,
           base: import.meta.env.BASE_URL,
+          pool: cards,
+          faction: currentFaction,
           pendingInvite: invite,
           onExit: () => renderActiveScreen("menu"),
         });

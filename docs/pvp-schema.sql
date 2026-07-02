@@ -174,3 +174,31 @@ grant execute on function public.join_pvp_room(text) to authenticated;
 -- ---------------------------------------------------------------------------
 alter publication supabase_realtime add table public.pvp_rooms;
 alter publication supabase_realtime add table public.pvp_matches;
+
+-- ============================================================================
+-- Phase 2 addendum — live-match sync (run this section too; safe to re-run)
+-- ============================================================================
+-- Phase 1 shipped pvp_matches with SELECT/UPDATE policies but NO INSERT policy,
+-- so nobody could create a match row. Phase 2 adds it: only the room's creator
+-- (who is always seat player_one) may create the match, and only for a room
+-- they actually own. The client writes seed + both published decks + an empty
+-- action_log; from then on gameplay is UPDATE-only (action_log/version/status),
+-- already covered by pvp_matches_update.
+--
+-- Sync contract (enforced client-side, documented here): a match is ONE
+-- canonical deterministic game — seed + both decks + ordered action_log; only
+-- the active player appends, guarded by the optimistic `version` column. PvP
+-- still grants NO rewards and never touches the protected tables.
+drop policy if exists pvp_matches_insert on public.pvp_matches;
+create policy pvp_matches_insert on public.pvp_matches
+  for insert to authenticated
+  with check (
+    auth.uid() = player_one
+    and exists (
+      select 1 from public.pvp_rooms r
+      where r.id = room_id
+        and r.created_by = auth.uid()
+        and r.player_one = player_one
+        and r.player_two = player_two
+    )
+  );

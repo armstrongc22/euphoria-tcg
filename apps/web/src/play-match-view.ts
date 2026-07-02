@@ -40,7 +40,13 @@ import {
 } from "@euphoria/game-engine";
 import { cardImageUrl, cardThumbUrl, preloadCardArt } from "@euphoria/core/cards";
 import type { MatchSummary } from "@euphoria/core/match";
-import { OPPONENT_SEAT, PLAYER_SEAT, type PlayableMatch } from "@euphoria/core/play-match";
+import {
+  OPPONENT_SEAT,
+  PLAYER_SEAT,
+  type MatchFrame,
+  type PlayableMatch,
+} from "@euphoria/core/play-match";
+import { mirrorPlayableMatch, swapSeats } from "@euphoria/core/seat-mirror";
 import {
   battleLogEntries,
   toPlaybackSteps,
@@ -247,6 +253,24 @@ export interface PlayableMatchViewOptions {
   readonly scheduler?: PlaybackScheduler;
   /** Override per-step delay (ms); defaults to each step's own duration. */
   readonly stepDelayMs?: number;
+  /**
+   * Which canonical seat the local player occupies (PvP duels). The default —
+   * "player1" — is the AI/local flow, which is rendered untouched. "player2"
+   * (the duel joiner) renders the SAME canonical game from the other side: the
+   * match is wrapped with the seat mirror so the board, the battle log, and the
+   * playback callouts all read the joiner as "you".
+   */
+  readonly viewerSeat?: "player1" | "player2";
+  /**
+   * PvP only: the opponent's actions arriving from the sync layer. Non-empty
+   * frame batches are played back exactly like an AI reply; an empty batch
+   * means "state changed with no new actions" (opponent conceded) — repaint so
+   * the game-over path runs. Frames arrive CANONICAL; the view mirrors them for
+   * a player2 viewer. The subscription is released on dispose().
+   */
+  readonly remote?: {
+    readonly subscribe: (cb: (frames: MatchFrame[]) => void) => () => void;
+  };
 }
 
 /** Callbacks for the board. */
@@ -294,10 +318,15 @@ export interface PlayableMatchBoard extends HTMLElement {
  * are the supplied callbacks.
  */
 export function renderPlayableMatch(
-  match: PlayableMatch,
+  sourceMatch: PlayableMatch,
   actions: PlayableMatchActions,
   options: PlayableMatchViewOptions = {},
 ): PlayableMatchBoard {
+  // Joiner POV (PvP): mirror the canonical game at this boundary so every read
+  // below — board, log helpers, playback — sees the viewer as seat player1.
+  // The AI/local flow (no viewerSeat) uses the match untouched.
+  const mirrored = options.viewerSeat === "player2";
+  const match = mirrored ? mirrorPlayableMatch(sourceMatch) : sourceMatch;
   const root = document.createElement("section") as PlayableMatchBoard;
   root.className = "account play-match";
   // Faction accent hook for the arena styling (presentation only — the value is
@@ -395,6 +424,8 @@ export function renderPlayableMatch(
   // Set while the opponent's turn is animating: input is locked and the board
   // renders the step's snapshot instead of the live state.
   let playback: { steps: PlaybackStep[]; index: number } | null = null;
+  // PvP: releases the remote-frames subscription on dispose.
+  let remoteUnsub: (() => void) | null = null;
   // The current-action callout text (player action or current playback step).
   let callout: string | null = null;
   // Floating combat texts to overlay on the current paint.
@@ -597,6 +628,10 @@ export function renderPlayableMatch(
     disposed = true;
     playback = null;
     floaters = [];
+    if (remoteUnsub !== null) {
+      remoteUnsub();
+      remoteUnsub = null;
+    }
     if (pendingTimer !== undefined) {
       clearTimeout(pendingTimer);
       pendingTimer = undefined;
@@ -657,6 +692,39 @@ export function renderPlayableMatch(
       for (const step of steps) applyStepEffects(step);
     }
   };
+
+  // --- PvP: the opponent's actions arriving from the sync layer -------------
+  // Each batch plays back exactly like an AI reply. A batch may arrive while a
+  // previous one is still animating (the opponent keeps acting); appending to
+  // the running queue is safe because scheduleNext re-checks the length every
+  // step. An EMPTY batch is a state change with no actions (a concede): repaint
+  // so the normal game-over path (isOver → onComplete) runs.
+  if (options.remote !== undefined) {
+    remoteUnsub = options.remote.subscribe((canonical) => {
+      if (disposed) return;
+      const frames = mirrored ? swapSeats(canonical) : canonical;
+      const steps = toPlaybackSteps(frames);
+      if (steps.length === 0) {
+        paint();
+        return;
+      }
+      clearSelections();
+      error = null;
+      if (playback !== null) {
+        playback.steps.push(...steps);
+        return;
+      }
+      if (flags.noPlayback) {
+        floaters = [];
+        callout = steps[steps.length - 1]!.message;
+        paint();
+        for (const step of steps) applyStepEffects(step);
+      } else {
+        floaters = [];
+        startPlayback(steps);
+      }
+    });
+  }
 
   // --- legal-action indexes, rebuilt each paint -----------------------------
   interface ActionIndex {

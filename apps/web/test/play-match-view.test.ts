@@ -2587,3 +2587,139 @@ describe("renderPlayableMatch — larger cards + reclaimed status row", () => {
     expect(root.querySelector(".arena__actions .play-match__end")).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// PvP (Phase 2): viewerSeat mirroring + remote-frame playback
+// ---------------------------------------------------------------------------
+import { createPvpMatch, type PvpPlayableMatch } from "@euphoria/core/pvp-match";
+import type { PvpClient, PvpMatch } from "@euphoria/core/pvp";
+
+/** In-memory pvp_matches row shared by both duel controllers (see core tests). */
+function fakeDuelClient(): { client: PvpClient; row: () => PvpMatch } {
+  let row: PvpMatch = {
+    id: "match-1",
+    room_id: "room-1",
+    player_one: "user-a",
+    player_two: "user-b",
+    seed: 5,
+    player_one_deck: { faction: "Sonic", entries: null },
+    player_two_deck: { faction: "Dwarf", entries: null },
+    current_player: "user-a",
+    status: "active",
+    action_log: [],
+    version: 0,
+    winner: null,
+  };
+  const subs = new Set<(m: PvpMatch) => void>();
+  const unsupported = (): never => {
+    throw new Error("lobby operation not used here");
+  };
+  const client: PvpClient = {
+    createRoom: unsupported,
+    joinByCode: unsupported,
+    getRoom: unsupported,
+    setReady: unsupported,
+    leaveRoom: unsupported,
+    subscribeRoom: unsupported,
+    startMatch: unsupported,
+    getMatch: async () => row,
+    pushMatch: async (_id, expectedVersion, patch) => {
+      if (row.version !== expectedVersion) {
+        return { ok: false, conflict: true, message: "conflict" };
+      }
+      row = { ...row, ...patch, version: expectedVersion + 1 };
+      for (const cb of [...subs]) cb(row);
+      return { ok: true, match: row };
+    },
+    subscribeMatch: (_id, onChange) => {
+      subs.add(onChange);
+      return () => subs.delete(onChange);
+    },
+  };
+  return { client, row: () => row };
+}
+
+const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
+
+function duelPair(): { creator: PvpPlayableMatch; joiner: PvpPlayableMatch } {
+  const { client, row } = fakeDuelClient();
+  const creator = createPvpMatch({ match: row(), userId: "user-a", pool: cards, client, retryDelayMs: 0 });
+  const joiner = createPvpMatch({ match: row(), userId: "user-b", pool: cards, client, retryDelayMs: 0 });
+  return { creator, joiner };
+}
+
+describe("renderPlayableMatch — PvP viewerSeat (joiner POV)", () => {
+  it("renders the joiner's own hand and an opponent's-turn banner", () => {
+    const { creator, joiner } = duelPair();
+    const board = renderPlayableMatch(
+      joiner,
+      { onComplete: noop, onQuit: noop },
+      { viewerSeat: "player2", remote: { subscribe: joiner.subscribeRemote } },
+    );
+    // Canonically player1 (the creator) moves first: the joiner waits.
+    expect(board.querySelector(".play-match__phase-state")!.textContent).toBe(
+      "Opponent's turn",
+    );
+    // The hand shown is the JOINER's (5 cards; the creator drew to 6).
+    const handCards = board.querySelectorAll(".play-match__hand .play-match__card");
+    expect(handCards.length).toBe(joiner.state().players.player2.hand.length);
+    expect(handCards.length).not.toBe(creator.state().players.player1.hand.length);
+    // Faction accent + header are viewer-relative.
+    expect(board.dataset["faction"]).toBe("Dwarf");
+    board.dispose();
+  });
+
+  it("plays the opponent's synced action back and unlocks the joiner's turn", async () => {
+    const { creator, joiner } = duelPair();
+    const board = renderPlayableMatch(
+      joiner,
+      { onComplete: noop, onQuit: noop },
+      {
+        viewerSeat: "player2",
+        remote: { subscribe: joiner.subscribeRemote },
+        scheduler: (cb) => cb(), // run playback steps synchronously
+      },
+    );
+    const end = creator.legalActions().find((a) => a.kind === "endTurn")!;
+    expect(creator.apply(end).ok).toBe(true);
+    await settle(); // push + subscription + playback (sync scheduler)
+    expect(board.querySelector(".play-match__phase-state")!.textContent).toBe(
+      "Your move",
+    );
+    const endBtn = board.querySelector<HTMLButtonElement>(".play-match__end")!;
+    expect(endBtn.disabled).toBe(false);
+    board.dispose();
+  });
+
+  it("completes on the joiner's board when the opponent concedes", async () => {
+    const { creator, joiner } = duelPair();
+    const onComplete = vi.fn();
+    const board = renderPlayableMatch(
+      joiner,
+      { onComplete, onQuit: noop },
+      { viewerSeat: "player2", remote: { subscribe: joiner.subscribeRemote } },
+    );
+    await creator.concede();
+    await settle();
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const summary = onComplete.mock.calls[0]![0] as { playerWon: boolean; highlights: string[] };
+    expect(summary.playerWon).toBe(true);
+    expect(summary.highlights[0]).toMatch(/conceded/i);
+    board.dispose();
+  });
+
+  it("stops reacting to remote frames after dispose", async () => {
+    const { creator, joiner } = duelPair();
+    const onComplete = vi.fn();
+    const board = renderPlayableMatch(
+      joiner,
+      { onComplete, onQuit: noop },
+      { viewerSeat: "player2", remote: { subscribe: joiner.subscribeRemote } },
+    );
+    board.dispose();
+    const end = creator.legalActions().find((a) => a.kind === "endTurn")!;
+    creator.apply(end);
+    await settle();
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+});

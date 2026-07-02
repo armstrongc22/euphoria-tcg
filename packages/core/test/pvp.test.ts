@@ -13,7 +13,12 @@ import {
   canJoinRoom,
   readyColumnFor,
   bothReady,
+  coerceDeckPayload,
   createPvpClient,
+  deckColumnFor,
+  seatOf,
+  uidAtSeat,
+  type PvpMatch,
   type PvpRoom,
 } from "../src/pvp";
 
@@ -29,6 +34,8 @@ function room(over: Partial<PvpRoom> = {}): PvpRoom {
     player_two: null,
     player_one_ready: false,
     player_two_ready: false,
+    player_one_deck: null,
+    player_two_deck: null,
     status: "waiting",
     match_id: null,
     expires_at: new Date(Date.now() + 60_000).toISOString(),
@@ -168,5 +175,155 @@ describe("createPvpClient", () => {
     const client = createPvpClient(session, { client: fake })!;
     await client.setReady(room(), true);
     expect(update).toHaveBeenCalledWith({ player_one_ready: true });
+  });
+
+  it("setReady publishes the duel deck on ready-up and clears it on cancel", async () => {
+    const single = vi.fn().mockResolvedValue({ data: room(), error: null });
+    const select = vi.fn().mockReturnValue({ single });
+    const eq = vi.fn().mockReturnValue({ select });
+    const update = vi.fn().mockReturnValue({ eq });
+    const fake = { from: vi.fn().mockReturnValue({ update }) } as unknown as SupabaseClient;
+    const client = createPvpClient(session, { client: fake })!;
+    const deck = { faction: "Sonic" as const, entries: null };
+    await client.setReady(room(), true, deck);
+    expect(update).toHaveBeenLastCalledWith({ player_one_ready: true, player_one_deck: deck });
+    await client.setReady(room(), false);
+    expect(update).toHaveBeenLastCalledWith({ player_one_ready: false, player_one_deck: null });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2: seats, deck payloads, and the live-match client operations
+// ---------------------------------------------------------------------------
+
+function matchRow(over: Partial<PvpMatch> = {}): PvpMatch {
+  return {
+    id: "match-1",
+    room_id: "room-1",
+    player_one: A,
+    player_two: B,
+    seed: 42,
+    player_one_deck: { faction: "Sonic", entries: null },
+    player_two_deck: { faction: "Dwarf", entries: null },
+    current_player: A,
+    status: "active",
+    action_log: [],
+    version: 0,
+    winner: null,
+    ...over,
+  };
+}
+
+describe("seatOf / uidAtSeat / deckColumnFor", () => {
+  it("maps the creator to player1 and the joiner to player2", () => {
+    const m = matchRow();
+    expect(seatOf(m, A)).toBe("player1");
+    expect(seatOf(m, B)).toBe("player2");
+    expect(seatOf(m, "stranger")).toBeNull();
+    expect(uidAtSeat(m, "player1")).toBe(A);
+    expect(uidAtSeat(m, "player2")).toBe(B);
+  });
+
+  it("maps deck columns to room membership", () => {
+    const r = room({ player_two: B });
+    expect(deckColumnFor(r, A)).toBe("player_one_deck");
+    expect(deckColumnFor(r, B)).toBe("player_two_deck");
+    expect(deckColumnFor(r, "stranger")).toBeNull();
+  });
+});
+
+describe("coerceDeckPayload", () => {
+  it("accepts a starter payload and a custom-entries payload", () => {
+    expect(coerceDeckPayload({ faction: "Sonic", entries: null })).toEqual({
+      faction: "Sonic",
+      entries: null,
+    });
+    expect(
+      coerceDeckPayload({ faction: "Monk", entries: [{ slug: "kit", quantity: 2 }] }),
+    ).toEqual({ faction: "Monk", entries: [{ slug: "kit", quantity: 2 }] });
+  });
+
+  it("rejects malformed payloads", () => {
+    expect(coerceDeckPayload(null)).toBeNull();
+    expect(coerceDeckPayload("Sonic")).toBeNull();
+    expect(coerceDeckPayload({ faction: "Shaman", entries: null })).toBeNull(); // not a starter faction
+    expect(coerceDeckPayload({ faction: "Sonic", entries: [{ slug: 3, quantity: 1 }] })).toBeNull();
+    expect(coerceDeckPayload({ faction: "Sonic", entries: [{ slug: "kit", quantity: 0 }] })).toBeNull();
+    expect(coerceDeckPayload({ faction: "Sonic", entries: [{ slug: "kit", quantity: 1.5 }] })).toBeNull();
+  });
+});
+
+describe("createPvpClient — match operations", () => {
+  const session = { userId: A, email: "a@x.dev" };
+
+  it("startMatch inserts the canonical match and activates the room", async () => {
+    const inserted = matchRow();
+    const single = vi.fn().mockResolvedValue({ data: inserted, error: null });
+    const select = vi.fn().mockReturnValue({ single });
+    const insert = vi.fn().mockReturnValue({ select });
+    const roomEq = vi.fn().mockResolvedValue({ error: null });
+    const update = vi.fn().mockReturnValue({ eq: roomEq });
+    const from = vi.fn((table: string) =>
+      table === "pvp_matches" ? { insert } : { update },
+    );
+    const fake = { from } as unknown as SupabaseClient;
+    const client = createPvpClient(session, { client: fake })!;
+    const readyRoom = room({
+      player_two: B,
+      player_one_ready: true,
+      player_two_ready: true,
+      player_one_deck: { faction: "Sonic", entries: null },
+      player_two_deck: { faction: "Dwarf", entries: null },
+    });
+    const m = await client.startMatch(readyRoom, 42);
+    expect(m.id).toBe("match-1");
+    const payload = insert.mock.calls[0]![0] as Record<string, unknown>;
+    expect(payload.player_one).toBe(A);
+    expect(payload.player_two).toBe(B);
+    expect(payload.seed).toBe(42);
+    expect(payload.current_player).toBe(A); // player1 moves first
+    expect(payload.action_log).toEqual([]);
+    expect(update).toHaveBeenCalledWith({ status: "active", match_id: "match-1" });
+  });
+
+  it("startMatch refuses a non-creator and a room with no opponent", async () => {
+    const fake = { from: vi.fn() } as unknown as SupabaseClient;
+    const joiner = createPvpClient({ userId: B, email: "b@x.dev" }, { client: fake })!;
+    await expect(joiner.startMatch(room({ player_two: B }), 1)).rejects.toThrow(/creator/);
+    const creator = createPvpClient(session, { client: fake })!;
+    await expect(creator.startMatch(room(), 1)).rejects.toThrow(/opponent/);
+  });
+
+  it("pushMatch writes log + version with the optimistic version filter", async () => {
+    const pushed = matchRow({ version: 1, action_log: [{ kind: "endTurn" }] as never });
+    const maybeSingle = vi.fn().mockResolvedValue({ data: pushed, error: null });
+    const select = vi.fn().mockReturnValue({ maybeSingle });
+    const eqVersion = vi.fn().mockReturnValue({ select });
+    const eqId = vi.fn().mockReturnValue({ eq: eqVersion });
+    const update = vi.fn().mockReturnValue({ eq: eqId });
+    const fake = { from: vi.fn().mockReturnValue({ update }) } as unknown as SupabaseClient;
+    const client = createPvpClient(session, { client: fake })!;
+    const res = await client.pushMatch("match-1", 0, {
+      action_log: [{ kind: "endTurn" } as never],
+      current_player: B,
+    });
+    expect(res.ok).toBe(true);
+    const payload = update.mock.calls[0]![0] as Record<string, unknown>;
+    expect(payload.version).toBe(1);
+    expect(eqId).toHaveBeenCalledWith("id", "match-1");
+    expect(eqVersion).toHaveBeenCalledWith("version", 0);
+  });
+
+  it("pushMatch reports a conflict when the version filter matches nothing", async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const select = vi.fn().mockReturnValue({ maybeSingle });
+    const eqVersion = vi.fn().mockReturnValue({ select });
+    const eqId = vi.fn().mockReturnValue({ eq: eqVersion });
+    const update = vi.fn().mockReturnValue({ eq: eqId });
+    const fake = { from: vi.fn().mockReturnValue({ update }) } as unknown as SupabaseClient;
+    const client = createPvpClient(session, { client: fake })!;
+    const res = await client.pushMatch("match-1", 3, { action_log: [], current_player: null });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.conflict).toBe(true);
   });
 });

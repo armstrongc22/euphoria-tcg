@@ -115,3 +115,35 @@
   padding: 0.35rem 0.6rem;
   font-size: 0.8rem;
 }
+
+/* ---- Phase 2: live duel arena + result -------------------------------- */
+.gc-duel--arena {
+  display: block;
+  width: 100%;
+}
+.gc-duel__sync-error {
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ff7a7a;
+  border-radius: 6px;
+  background: rgba(160, 30, 30, 0.25);
+  color: #ffb3b3;
+  font-size: 0.85rem;
+  text-align: center;
+}
+.gc-duel__result {
+  text-align: center;
+}
+.gc-duel__result-verdict {
+  margin: 0.25rem 0 0.75rem;
+  font-weight: 700;
+}
+.gc-duel__result-lines {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+  color: var(--gc-dim, #9aa);
+}
