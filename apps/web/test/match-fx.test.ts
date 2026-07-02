@@ -175,3 +175,70 @@ describe("attachMatchFx — kill switches", () => {
     expect(board.querySelector(".match-fx")).toBeNull();
   });
 });
+
+describe("attachMatchFx — faction signatures", () => {
+  const FACTIONS: ReadonlyArray<[string, string]> = [
+    ["Dwarf", "dwarf"],
+    ["Monk", "monk"],
+    ["Surfer", "surfer"],
+    ["Sonic", "sonic"],
+    ["Shaman", "shaman"],
+    ["Human", "human"],
+    ["Neutral", "neutral"],
+    ["Criminal", "criminal"],
+  ];
+
+  it("stamps every recognized faction's modifier and energy token", () => {
+    for (const [faction, slug] of FACTIONS) {
+      const board = makeBoard();
+      const detach = attachMatchFx(board, {
+        playerFaction: faction,
+        opponentFaction: "Neutral",
+      });
+      fire(board, { kind: "summon", actor: "player", targetInstanceId: "warrior-1" });
+      const node = board.querySelector<HTMLElement>(".match-fx--burst")!;
+      expect(node.classList.contains(`match-fx--${slug}`)).toBe(true);
+      expect(node.style.getPropertyValue("--fx-energy")).toBe(
+        `var(--eu-energy-${slug})`,
+      );
+      detach();
+      board.remove();
+    }
+  });
+
+  it("falls back to the base template + Neutral energy for unknown factions", () => {
+    const board = makeBoard();
+    const detach = attachMatchFx(board, {
+      playerFaction: "Mystery",
+      opponentFaction: "Neutral",
+    });
+    fire(board, { kind: "summon", actor: "player", targetInstanceId: "warrior-1" });
+    const node = board.querySelector<HTMLElement>(".match-fx--burst")!;
+    expect(node.className).toBe("match-fx match-fx--burst"); // no modifier
+    expect(node.style.getPropertyValue("--fx-energy")).toBe("var(--eu-energy-neutral)");
+    detach();
+  });
+
+  it("Dwarf hits request the micro-shake without crashing where WAAPI is absent", () => {
+    const board = makeBoard();
+    const animate = vi.fn();
+    (board as HTMLElement & { animate?: unknown }).animate = animate;
+    const detach = attachMatchFx(board, {
+      playerFaction: "Dwarf",
+      opponentFaction: "Monk",
+    });
+    fire(board, { kind: "damage", actor: "player", targetInstanceId: "warrior-1" });
+    expect(animate).toHaveBeenCalledTimes(1);
+    // Throttled: an immediate second hit shakes once, not twice.
+    fire(board, { kind: "damage", actor: "player", targetInstanceId: "warrior-1" });
+    expect(animate).toHaveBeenCalledTimes(1);
+    // Non-Dwarf actors never shake.
+    fire(board, { kind: "damage", actor: "opponent", targetInstanceId: "warrior-1" });
+    expect(animate).toHaveBeenCalledTimes(1);
+    // And a board without Element.animate (jsdom default) is a silent no-op.
+    delete (board as unknown as { animate?: unknown }).animate;
+    fire(board, { kind: "directAttack", actor: "player", targetPlayer: "player2" });
+    expect(board.querySelectorAll(".match-fx--impact").length).toBeGreaterThan(0);
+    detach();
+  });
+});

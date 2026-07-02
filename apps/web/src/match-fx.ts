@@ -96,8 +96,12 @@ export function attachMatchFx(
     if (detached || anchor === null) return;
     if (board.querySelectorAll(".match-fx").length >= MAX_LIVE_FX) return;
     const el = document.createElement("div");
-    el.className =
-      `match-fx ${kindClass}` + (faction === "Monk" ? " match-fx--monk" : "");
+    // Every recognized faction stamps its modifier so CSS can skin the shared
+    // template (Monk flame, Sonic streak, Criminal glitch, …). Unknown
+    // factions get the base template in Neutral energy.
+    const modifier =
+      faction in ENERGY_TOKENS ? ` match-fx--${faction.toLowerCase()}` : "";
+    el.className = `match-fx ${kindClass}${modifier}`;
     el.setAttribute("aria-hidden", "true");
     el.style.setProperty(
       "--fx-energy",
@@ -127,6 +131,30 @@ export function attachMatchFx(
       ? null
       : board.querySelector(`[data-seat="${player}"]`);
 
+  // Dwarf signature: a short, small board shake on heavy hits. WAAPI with the
+  // same guards as the view's playAnim (jsdom / old browsers: silent no-op),
+  // throttled so back-to-back hits can't compound into judder. Decorative
+  // only — it animates transform and always returns to identity.
+  let lastShakeAt = 0;
+  const microShake = (): void => {
+    const now = Date.now();
+    if (now - lastShakeAt < 400) return;
+    lastShakeAt = now;
+    try {
+      board.animate(
+        [
+          { transform: "translate(0, 0)" },
+          { transform: "translate(3px, -2px)" },
+          { transform: "translate(-3px, 2px)" },
+          { transform: "translate(0, 0)" },
+        ],
+        { duration: 180, easing: "ease-out" },
+      );
+    } catch {
+      /* Element.animate unavailable — skip the shake */
+    }
+  };
+
   const onAnim = (event: Event): void => {
     const detail = (event as CustomEvent<MatchAnimDetail>).detail;
     if (detail === undefined || detail === null || reducedMotion()) return;
@@ -139,6 +167,7 @@ export function attachMatchFx(
       case "attack":
       case "damage":
         spawn("match-fx--impact", tile, faction);
+        if (faction === "Dwarf") microShake();
         break;
       case "heal":
       case "buff":
@@ -150,6 +179,7 @@ export function attachMatchFx(
         break;
       case "directAttack":
         spawn("match-fx--impact", seatOf(detail.targetPlayer), faction);
+        if (faction === "Dwarf") microShake();
         break;
       default:
         break; // draw / play / equip / debuff / info: no decoration yet
