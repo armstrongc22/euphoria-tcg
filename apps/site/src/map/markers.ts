@@ -497,7 +497,7 @@ export const STARTER_MARKERS: readonly MapMarker[] = [
     territory: "Surfer Nation",
     factionAffinity: ["Surfer"],
     spoilerLevel: 0,
-    description: "The capital city of the Dwarf nation.",
+    description: "The capital city of the Surfer nation.",
   },
   {
     id: "twilight-islands",
@@ -767,7 +767,7 @@ export const STARTER_MARKERS: readonly MapMarker[] = [
     markerSymbol: "scroll",
     x: 766,
     y: 471,
-    territory: "Oko Dessert",
+    territory: "Oko Desert",
     factionAffinity: [],
     spoilerLevel: 0,
     description: "The site of the quadrennial Caelum Furor tournament.",
