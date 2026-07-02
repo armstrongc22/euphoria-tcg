@@ -165,16 +165,18 @@ function buildArena(frag: DocumentFragment): HTMLElement {
   move(mine, ".play-match__zone--mine");
   // Contextual primary-action overlay floats over the player field.
   move(mine, ".play-match__primary-action");
-  // Command strip: attack/target prompts + the selected-card action bar, in a
-  // row with a guaranteed readable height (never a crushed thin band).
-  for (const p of Array.from(frag.querySelectorAll<HTMLElement>(".play-match__choice"))) {
-    strip.append(p);
-  }
+  // Command strip hosts the selected-card action bar.
   move(strip, ".play-match__selected");
   move(hand, ".play-match__zone--hand");
   move(acts, ".play-match__actionbar");
 
   grid.append(top, opp, lane, mine, strip, hand, acts);
+
+  // Attack/target prompts overlay the battlefield CENTER as a game modal (added
+  // last so they render on top) — not squeezed into a scrolling strip row.
+  for (const p of Array.from(frag.querySelectorAll<HTMLElement>(".play-match__choice"))) {
+    grid.append(p);
+  }
 
   const log = frag.querySelector<HTMLElement>(".play-match__log");
   if (log !== null) {
@@ -964,42 +966,74 @@ export function renderPlayableMatch(
     if (variants === undefined || variants.length === 0) return null;
 
     const panel = document.createElement("section");
-    panel.className = "account__panel play-match__choice";
+    panel.className = "account__panel play-match__choice play-match__choice--attack";
     const heading = document.createElement("h3");
-    heading.className = "account__panel-heading";
-    heading.textContent = "Use an Attack card?";
+    heading.className = "account__panel-heading play-match__choice-title";
+    heading.textContent = "Attack Option";
     panel.append(heading);
+
+    // Attacker / target context line (presentation only — reads board state).
+    const pa = pendingAttack;
+    const attacker = me.field.find((w) => w.instanceId === pa.attacker);
+    const defender = match
+      .state()
+      .players.player2.field.find((w) => w.instanceId === pa.defender);
+    const sub = document.createElement("p");
+    sub.className = "play-match__choice-sub";
+    sub.innerHTML =
+      `<span>Attacker <strong>${escapeHtml(attacker?.card.name ?? "Warrior")}</strong></span>` +
+      `<span>Target <strong>${escapeHtml(defender?.card.name ?? "Direct attack")}</strong></span>`;
+    panel.append(sub);
 
     const regular =
       variants.find((a) => a.kind === "attack" && a.skipAttackCard === true) ??
       variants.find((a) => a.kind === "attack" && a.selectedAttackCardId === undefined);
     if (regular !== undefined) {
-      panel.append(choiceBtn("Regular attack (no card)", () => dispatchAttack(regular)));
+      const b = choiceBtn("Regular Attack", () => dispatchAttack(regular));
+      b.classList.add("play-match__choice-btn--primary");
+      panel.append(b);
     }
+
+    // Compatible Attack cards as readable chips (thumbnail + name/cost + Use).
+    const cards = document.createElement("div");
+    cards.className = "play-match__choice-cards";
     for (const variant of variants) {
       if (variant.kind !== "attack" || variant.selectedAttackCardId === undefined) continue;
       const card = me.hand.find((c) => c.id === variant.selectedAttackCardId);
-      const row = document.createElement("div");
-      row.className = "play-match__choice-option";
+      const chip = document.createElement("div");
+      chip.className = "play-match__choice-option play-match__choice-chip";
       if (card !== undefined) {
+        const art = cardArt(card, `atk:${card.id}`);
+        art.classList.add("play-match__choice-chip-art");
+        chip.append(art);
+        const meta = document.createElement("div");
+        meta.className = "play-match__choice-chip-meta";
+        meta.innerHTML =
+          `<span class="play-match__choice-chip-name play-match__card-name">${escapeHtml(card.name)}</span>` +
+          `<span class="play-match__choice-chip-sub play-match__card-meta">${escapeHtml(card.type)} · ◆${card.cost}</span>`;
+        chip.append(meta);
         const look = document.createElement("button");
         look.type = "button";
-        look.className = "play-match__card-inspect";
+        look.className = "play-match__card-inspect play-match__choice-chip-inspect";
         look.title = "View card details";
-        look.innerHTML =
-          `<span class="play-match__card-name">${escapeHtml(card.name)}</span>` +
-          `<span class="play-match__card-meta">Attack · ◆${card.cost}</span>`;
-        look.addEventListener("click", () => inspect(card));
-        row.append(look);
+        look.setAttribute("aria-label", `Inspect ${card.name}`);
+        look.textContent = "🔍";
+        look.addEventListener("click", (e) => {
+          e.stopPropagation();
+          inspect(card);
+        });
+        chip.append(look);
       }
-      row.append(
-        choiceBtn(
-          card !== undefined ? `Use ${card.name}` : "Use Attack card",
-          () => dispatchAttack(variant),
-        ),
+      const use = choiceBtn(
+        card !== undefined ? "Use This Attack" : "Use Attack card",
+        () => dispatchAttack(variant),
       );
-      panel.append(row);
+      use.classList.add("play-match__choice-btn--use");
+      chip.append(use);
+      cards.append(chip);
     }
+    panel.append(cards);
+
     panel.append(
       cancelRow(() => {
         pendingAttack = null;

@@ -462,7 +462,7 @@ describe("renderPlayableMatch — Attack-card prompt (Bug B)", () => {
     declareAttack(root);
     const panel = root.querySelector(".play-match__choice");
     expect(panel).not.toBeNull();
-    expect(panel!.textContent).toContain("Use an Attack card?");
+    expect(panel!.textContent).toContain("Attack Option");
     expect(panel!.textContent).toContain(atk.name);
   });
 
@@ -472,7 +472,7 @@ describe("renderPlayableMatch — Attack-card prompt (Bug B)", () => {
     const match = craftBattle(friendly, [atk], atk.cost + 1);
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
     declareAttack(root);
-    buttonByText(root, ".play-match__choice-btn", "Regular attack (no card)")!.click();
+    buttonByText(root, ".play-match__choice-btn", "Regular Attack")!.click();
 
     const events = match.state().events.map((e) => e.type);
     expect(events).toContain("warriorAttacked");
@@ -486,7 +486,7 @@ describe("renderPlayableMatch — Attack-card prompt (Bug B)", () => {
     const match = craftBattle(friendly, [atk], atk.cost + 1);
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
     declareAttack(root);
-    buttonByText(root, ".play-match__choice-btn", `Use ${atk.name}`)!.click();
+    buttonByText(root, ".play-match__choice-btn", "Use This Attack")!.click();
 
     const events = match.state().events.map((e) => e.type);
     expect(events).toContain("attackCardUsed");
@@ -527,6 +527,30 @@ describe("renderPlayableMatch — Attack-card prompt (Bug B)", () => {
     root.querySelector<HTMLButtonElement>(".play-match__direct")!.click();
     expect(root.querySelector(".play-match__choice")).toBeNull();
     expect(match.state().events.map((e) => e.type)).toContain("directAttacked");
+  });
+
+  it("renders the attack prompt as a game modal overlaying the board (not a strip)", () => {
+    const atk = anAttackCard();
+    const friendly = warriorOfFaction(atk.faction);
+    const match = craftBattle(friendly, [atk], atk.cost + 1);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    declareAttack(root);
+    // Game-modal structure: an --attack modifier panel, overlaying the arena
+    // (direct child of .arena), NOT parked in the cramped command strip.
+    const panel = root.querySelector<HTMLElement>(".play-match__choice--attack")!;
+    expect(panel).not.toBeNull();
+    expect(root.querySelector(".arena > .play-match__choice--attack")).not.toBeNull();
+    expect(root.querySelector(".arena__strip .play-match__choice")).toBeNull();
+    // Clear "Regular Attack" primary + a readable attack-card chip with a Use button.
+    expect(panel.querySelector(".play-match__choice-btn--primary")!.textContent).toBe("Regular Attack");
+    const chip = panel.querySelector<HTMLElement>(".play-match__choice-cards .play-match__choice-chip")!;
+    expect(chip).not.toBeNull();
+    expect(chip.textContent).toContain(atk.name);
+    expect(chip.querySelector(".play-match__choice-btn--use")!.textContent).toBe("Use This Attack");
+    // Magnifier stays available on the attack-card chip.
+    expect(chip.querySelector(".play-match__choice-chip-inspect")).not.toBeNull();
+    // Cancel is offered.
+    expect(panel.querySelector(".play-match__choice-cancel")).not.toBeNull();
   });
 });
 
@@ -1315,7 +1339,7 @@ describe("renderPlayableMatch — attack-time secondary target (Gylippus/Scythe/
     });
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
     declareAttackOnFirst(root); // attacks e1 (the defender)
-    buttonByText(root, ".play-match__choice-btn", `Use ${gylippus.name}`)!.click();
+    buttonByText(root, ".play-match__choice-btn", "Use This Attack")!.click();
 
     const panel = root.querySelector(".play-match__choice");
     expect(panel!.textContent).toContain("deal extra damage to a second enemy");
@@ -1337,7 +1361,7 @@ describe("renderPlayableMatch — attack-time secondary target (Gylippus/Scythe/
       .currentHealth;
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
     declareAttackOnFirst(root);
-    buttonByText(root, ".play-match__choice-btn", `Use ${gylippus.name}`)!.click();
+    buttonByText(root, ".play-match__choice-btn", "Use This Attack")!.click();
     buttonByText(root, ".play-match__choice-btn", `Target ${eB.name}`)!.click();
 
     const after = match.state().players.player2.field.find((w) => w.instanceId === "e2")
@@ -1359,7 +1383,7 @@ describe("renderPlayableMatch — attack-time secondary target (Gylippus/Scythe/
       .currentHealth;
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
     declareAttackOnFirst(root);
-    buttonByText(root, ".play-match__choice-btn", `Use ${gylippus.name}`)!.click();
+    buttonByText(root, ".play-match__choice-btn", "Use This Attack")!.click();
     buttonByText(root, ".play-match__choice-btn", "Skip (attack without it)")!.click();
 
     const after = match.state().players.player2.field.find((w) => w.instanceId === "e2")
@@ -1379,7 +1403,7 @@ describe("renderPlayableMatch — attack-time secondary target (Gylippus/Scythe/
     });
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
     declareAttackOnFirst(root);
-    buttonByText(root, ".play-match__choice-btn", `Use ${gylippus.name}`)!.click();
+    buttonByText(root, ".play-match__choice-btn", "Use This Attack")!.click();
     buttonByText(root, ".play-match__choice-cancel", "Cancel")!.click();
 
     const s = match.state();
