@@ -134,3 +134,133 @@ export function prefersReducedMotion(): boolean {
     return false;
   }
 }
+
+/* ---- Phase E polish: cinematic, territories, routes, terrain --------------- */
+
+/** Ease-out cubic for the entry flight (pure, clamped). */
+export function easeOutCubic(t: number): number {
+  const x = Math.min(1, Math.max(0, t));
+  return 1 - Math.pow(1 - x, 3);
+}
+
+/**
+ * The entry cinematic's start pose: far higher and further south than the
+ * take-off pose, so mounting the mode reads as diving down toward the map.
+ * The camera lerps from here to {@link initialPose} over the intro.
+ */
+export function entryPose(worldDepth: number): { x: number; y: number; z: number } {
+  return { x: 0, y: worldDepth * 1.7, z: worldDepth * 1.35 };
+}
+
+/** Linear pose interpolation for the entry dive (eased `t` in [0,1]). */
+export function lerpPose(
+  from: { x: number; y: number; z: number },
+  to: { x: number; y: number; z: number },
+  t: number,
+): { x: number; y: number; z: number } {
+  return {
+    x: from.x + (to.x - from.x) * t,
+    y: from.y + (to.y - from.y) * t,
+    z: from.z + (to.z - from.z) * t,
+  };
+}
+
+/** One faction territory glow pool under a territory-holding marker. */
+export interface TerritoryPool {
+  readonly x: number;
+  readonly z: number;
+  readonly color: string;
+  /** Pool radius in world units (grows a little with the marker's scale). */
+  readonly radius: number;
+}
+
+/**
+ * Territory overlays: every 3D-visible marker that names a `territory` AND has
+ * a lead faction contributes a soft faction-colored pool on the ground — the
+ * "energy on the land" read without inventing borders. Toggleable in the HUD.
+ */
+export function territoryPools(
+  markers: readonly MapMarker[],
+  imageWidth: number,
+  imageHeight: number,
+): TerritoryPool[] {
+  const out: TerritoryPool[] = [];
+  for (const pin of pinPlacements(markers, imageWidth, imageHeight)) {
+    const lead = pin.marker.factionAffinity[0];
+    if (pin.marker.territory.trim() === "" || lead === undefined) continue;
+    out.push({
+      x: pin.x,
+      z: pin.z,
+      color: factionColor(lead),
+      radius: 0.55 * Math.sqrt(pin.scale),
+    });
+  }
+  return out;
+}
+
+/** One route trail: ordered ground points + the trail's energy color. */
+export interface RouteTrail {
+  readonly name: string;
+  readonly color: string;
+  readonly points: ReadonlyArray<{ x: number; z: number }>;
+}
+
+/**
+ * Route trails from EXISTING schema, no new fields: markers of type
+ * "route point" that share a tag starting with `route:` (e.g. `route:silk`)
+ * form one trail, joined in marker-array order (the order notation mode
+ * export/import preserves — the authoring convention). Trails need at least
+ * two points; the color comes from the first waypoint's lead faction. With no
+ * route-point markers in the data (true today) this renders nothing.
+ */
+export function routeTrails(
+  markers: readonly MapMarker[],
+  imageWidth: number,
+  imageHeight: number,
+): RouteTrail[] {
+  const groups = new Map<string, Array<{ x: number; z: number; faction: string | undefined }>>();
+  for (const pin of pinPlacements(markers, imageWidth, imageHeight)) {
+    if (pin.marker.type !== "route point") continue;
+    const routeTag = pin.marker.tags.find((t) => t.toLowerCase().startsWith("route:"));
+    if (routeTag === undefined) continue;
+    const key = routeTag.toLowerCase();
+    const list = groups.get(key) ?? [];
+    list.push({ x: pin.x, z: pin.z, faction: pin.marker.factionAffinity[0] });
+    groups.set(key, list);
+  }
+  const out: RouteTrail[] = [];
+  for (const [name, points] of groups) {
+    if (points.length < 2) continue;
+    out.push({
+      name,
+      color: factionColor(points[0]!.faction ?? "Neutral"),
+      points: points.map((p) => ({ x: p.x, z: p.z })),
+    });
+  }
+  return out;
+}
+
+/**
+ * Terrain sampling for the OPTIONAL heightmap (drop a grayscale
+ * `public/maps/euphoria-heightmap.png` into the repo — white = high — and the
+ * flight scene lifts; absent, the plane stays flat). Pure: reads a decoded
+ * RGBA pixel buffer so it's testable without canvas.
+ * Returns ground height in world units at normalized (u,v), 0..maxLift.
+ */
+export function heightAt(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  u: number,
+  v: number,
+  maxLift: number,
+): number {
+  if (width <= 0 || height <= 0 || pixels.length < width * height * 4) return 0;
+  const px = Math.min(width - 1, Math.max(0, Math.round(u * (width - 1))));
+  const py = Math.min(height - 1, Math.max(0, Math.round(v * (height - 1))));
+  const value = pixels[(py * width + px) * 4] ?? 0; // red channel of grayscale
+  return (value / 255) * maxLift;
+}
+
+/** How far the optional heightmap can lift the terrain (world units). */
+export const MAX_TERRAIN_LIFT = 0.35;
