@@ -60,20 +60,27 @@
   --arena-hand-min: clamp(168px, 24vh, 290px);
   --arena-strip-h: clamp(46px, 6vh, 58px);
   --arena-actions-h: clamp(46px, 6vh, 56px);
+  /* Per-field row sizing, overridable independently (mobile compresses an
+     EMPTY field without touching the occupied one). */
+  --arena-row-opp: minmax(var(--arena-field-min), 1fr);
+  --arena-row-mine: minmax(var(--arena-field-min), 1fr);
   flex: 1;
   min-height: 0;
   display: grid;
   gap: var(--arena-gap);
-  grid-template-columns: 1fr;
+  /* minmax(0, …), NOT bare 1fr: a bare fr track can never shrink below its
+     rows' min-content, so one wide row silently widened the whole column past
+     a phone viewport and pushed End Turn off the right edge. */
+  grid-template-columns: minmax(0, 1fr);
   /* Fields AND hand flex to fill ALL available height (fr units) with readable
      minimums. The HAND carries the most weight (cards are height-driven, so a
      taller row = bigger cards); the center status row is gone (info is in the
      HUD), reclaiming that height for the cards. */
   grid-template-rows:
     auto                                       /* top: compact HUD */
-    minmax(var(--arena-field-min), 1fr)        /* opponent field */
+    var(--arena-row-opp)                       /* opponent field */
     auto                                       /* lane: transient status only */
-    minmax(var(--arena-field-min), 1fr)        /* player field */
+    var(--arena-row-mine)                      /* player field */
     auto                                       /* command strip (0 when empty) */
     minmax(var(--arena-hand-min), 1.7fr)       /* hand dock — biggest cards */
     /* Primary actions grow by the device's bottom safe area, so End Turn is
@@ -98,6 +105,11 @@
 .gc .arena__hand { grid-area: hand; min-height: 0; }
 .gc .arena__actions { grid-area: actions; min-height: 0; }
 .gc .arena__log { grid-area: log; }
+/* Grid items must be allowed to shrink to the track (belt to the minmax(0,…)
+   braces above) — otherwise wide content re-widens the column. */
+.gc .arena > * {
+  min-width: 0;
+}
 
 /* Opponent/player areas: field scrolls internally, never collapses. */
 .gc .arena__opp,
@@ -1477,24 +1489,54 @@
     gap: 0.15rem;
   }
 
-  /* 6) Primary actions: equal-width, full-height thumb targets. */
+  /* 6) Primary actions: a TRUE two-column grid (minmax(0,1fr) columns), so
+     Enter Battle and End Turn always share the viewport width — neither can
+     push the other off the right edge. The decorative skew clip is dropped on
+     phones: every pixel is tap target. */
   .gc .arena__actions .play-match__actionbar {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     gap: 0.35rem;
+    margin-top: 0.2rem;
   }
   .gc .arena__actions .play-match__actionbar button {
-    flex: 1 1 0;
     min-width: 0;
-    font-size: 0.86rem;
-    padding: 0.3rem 0.4rem;
+    font-size: 0.84rem;
+    letter-spacing: 0.02em;
+    padding: 0.3rem 0.25rem;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    clip-path: none;
   }
 
-  /* 7) Combat log: a thin collapsed bar in the grid; when OPENED it becomes a
-     bottom-sheet OVERLAY (fixed, above the board) so reading the log can
-     never push Enter Battle / End Turn off-screen. */
+  /* 7) Combat log. COLLAPSED: a small floating chip above the action bar —
+     out of the document flow entirely (position:absolute), so its grid row is
+     0px and it steals no board height. OPENED: a fixed bottom-sheet OVERLAY
+     above the board, so reading it never displaces Enter Battle / End Turn. */
+  .gc .gc-screen-root:has(.arena) > .play-match {
+    position: relative; /* the chip anchors to the board */
+  }
   .gc .arena__log .play-match__log-head {
     padding: 0.3rem 0.6rem;
     font-size: 0.62rem;
+  }
+  .gc .arena__log.play-match__log--collapsed {
+    position: absolute;
+    right: 0.4rem;
+    bottom: calc(var(--arena-actions-h) + env(safe-area-inset-bottom, 0px) + 0.5rem);
+    z-index: 55;
+    width: auto;
+    max-height: none;
+    border-radius: 999px;
+    background: rgba(7, 8, 13, 0.9);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  }
+  .gc .arena__log.play-match__log--collapsed .play-match__log-head {
+    border-bottom: 0;
+    padding: 0.28rem 0.4rem 0.28rem 0.7rem;
+    gap: 0.4rem;
   }
   .gc .arena__log:not(.play-match__log--collapsed) {
     position: fixed;
@@ -1512,6 +1554,36 @@
   }
   .gc .arena__log:not(.play-match__log--collapsed) .play-match__log-list {
     max-height: none;
+  }
+
+  /* 8) Empty fields compress (min 46px, small flex share) so their height
+     flows to the hand and to whichever field actually has Warriors; summoning
+     lets the row grow back to card size. */
+  .gc .arena:has(.arena__opp .play-match__empty) {
+    --arena-row-opp: minmax(46px, 0.4fr);
+  }
+  .gc .arena:has(.arena__mine .play-match__empty) {
+    --arena-row-mine: minmax(46px, 0.4fr);
+  }
+
+  /* 9) In-match shell diet: the deck-status note ("Using your custom deck."),
+     the app footer, and HUD bulk make way for the board. The note still shows
+     on the account screen; Menu/Account stay, just tighter. */
+  .gc .account__deck-note:has(+ .play-match) {
+    display: none;
+  }
+  .gc:has(.arena) .gc-foot {
+    display: none;
+  }
+  .gc:has(.arena) .gc-hud {
+    padding: 0.3rem 0.55rem;
+  }
+  .gc:has(.arena) .gc-hud__btn {
+    font-size: 0.72rem;
+    padding: 0.25rem 0.5rem;
+  }
+  .gc:has(.arena) .gc-hud__title {
+    font-size: 0.8rem;
   }
 }
 
