@@ -295,7 +295,7 @@ describe("attachMatchFx — attack-card super move", () => {
     detach();
   });
 
-  it("lands the impact cue + shake at the slam beat, then cleans up", () => {
+  it("reveals, then GOes, lands the impact in the final third, and cleans up", async () => {
     vi.useFakeTimers();
     try {
       const board = makeBoard();
@@ -303,12 +303,90 @@ describe("attachMatchFx — attack-card super move", () => {
       (board as HTMLElement & { animate?: unknown }).animate = animate;
       const detach = attachMatchFx(board, OPTS);
       fireSuper(board, superDetail());
+      const overlay = board.querySelector<HTMLElement>(".match-fx-super")!;
+      // Reveal beat: on screen but not sweeping yet; desktop GO pacing set.
+      expect(overlay.classList.contains("match-fx-super--go")).toBe(false);
+      expect(overlay.style.getPropertyValue("--super-go")).toBe("900ms");
+      // After the minimum beat (+ decode timeout at worst) the sweep starts.
+      await vi.advanceTimersByTimeAsync(300);
+      expect(overlay.classList.contains("match-fx-super--go")).toBe(true);
       expect(board.querySelector(".match-fx--impact")).toBeNull(); // not yet
-      vi.advanceTimersByTime(400);
+      // The impact lands in the GO phase's final third (900 × 0.66 = 594).
+      await vi.advanceTimersByTimeAsync(600);
       expect(board.querySelector(".match-fx--impact")).not.toBeNull();
       expect(animate).toHaveBeenCalledTimes(1); // the slam shake
-      vi.advanceTimersByTime(500);
-      expect(board.querySelector(".match-fx-super")).toBeNull(); // overlay gone
+      // Cleanup just after the GO fade (900ms + slack).
+      await vi.advanceTimersByTimeAsync(400);
+      expect(board.querySelector(".match-fx-super")).toBeNull();
+      detach();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("holds the reveal until the art decodes, then flips to GO", async () => {
+    vi.useFakeTimers();
+    const proto = HTMLImageElement.prototype as { decode?: () => Promise<void> };
+    const original = proto.decode;
+    let resolveDecode: (() => void) | undefined;
+    proto.decode = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveDecode = resolve;
+        }),
+    );
+    try {
+      const board = makeBoard();
+      const detach = attachMatchFx(board, OPTS);
+      fireSuper(board, superDetail());
+      const overlay = board.querySelector<HTMLElement>(".match-fx-super")!;
+      // Past the minimum beat but the art is still decoding: keep holding.
+      await vi.advanceTimersByTimeAsync(200);
+      expect(overlay.classList.contains("match-fx-super--go")).toBe(false);
+      resolveDecode!();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(overlay.classList.contains("match-fx-super--go")).toBe(true);
+      detach();
+    } finally {
+      proto.decode = original;
+      vi.useRealTimers();
+    }
+  });
+
+  it("never stalls on a hung decode: the timeout starts the sweep", async () => {
+    vi.useFakeTimers();
+    const proto = HTMLImageElement.prototype as { decode?: () => Promise<void> };
+    const original = proto.decode;
+    proto.decode = vi.fn(() => new Promise<void>(() => {})); // never settles
+    try {
+      const board = makeBoard();
+      const detach = attachMatchFx(board, OPTS);
+      fireSuper(board, superDetail());
+      const overlay = board.querySelector<HTMLElement>(".match-fx-super")!;
+      await vi.advanceTimersByTimeAsync(200);
+      expect(overlay.classList.contains("match-fx-super--go")).toBe(false);
+      await vi.advanceTimersByTimeAsync(80); // the 250ms decode timeout passed
+      expect(overlay.classList.contains("match-fx-super--go")).toBe(true);
+      detach();
+    } finally {
+      proto.decode = original;
+      vi.useRealTimers();
+    }
+  });
+
+  it("a replaced super never GOes or fires its impact", async () => {
+    vi.useFakeTimers();
+    try {
+      const board = makeBoard();
+      const detach = attachMatchFx(board, OPTS);
+      fireSuper(board, superDetail());
+      const first = board.querySelector<HTMLElement>(".match-fx-super")!;
+      fireSuper(board, superDetail({ cardName: "Pisubaipa" })); // replaces it
+      await vi.advanceTimersByTimeAsync(300);
+      expect(first.classList.contains("match-fx-super--go")).toBe(false);
+      const live = board.querySelectorAll(".match-fx-super");
+      expect(live).toHaveLength(1);
+      expect(live[0]!.classList.contains("match-fx-super--go")).toBe(true);
       detach();
     } finally {
       vi.useRealTimers();

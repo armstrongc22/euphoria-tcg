@@ -63,10 +63,35 @@ export interface AttackCardFxDetail {
   readonly targetInstanceId?: string;
 }
 
-/** Full cinematic length; the impact cue lands at the slam beat inside it. */
-const SUPER_LIFETIME_MS = 720;
-const SUPER_IMPACT_AT_MS = 380;
+/**
+ * Super-move pacing. The cinematic is two phases:
+ *  1. REVEAL — the card pops in on the actor's side and HOLDS while its art
+ *     decodes (image.decode() raced against a hard timeout, so a slow network
+ *     can never stall the show). Minimum hold keeps the beat readable even
+ *     when the art is instant/absent.
+ *  2. GO — the sweep/slam (CSS keyframes sized by the --super-go custom
+ *     property so JS timers and CSS agree), with the faction impact flash in
+ *     the final third and cleanup just after the fade.
+ * Desktop totals ≈ 1.08–1.15s; small screens ≈ 0.88–0.95s; the reduced-motion
+ * "lite" variant stays a quick calm pop (~460ms) — never the long form.
+ */
+const SUPER_REVEAL_MIN_MS = 180;
+const SUPER_DECODE_TIMEOUT_MS = 250;
+const SUPER_GO_MS = 900;
+const SUPER_GO_MOBILE_MS = 700;
+/** Impact lands at this fraction of the GO phase (the final third). */
+const SUPER_IMPACT_FRACTION = 0.66;
+const SUPER_CLEANUP_SLACK_MS = 80;
 const SUPER_LITE_LIFETIME_MS = 460;
+
+/** Small-screen check for the shorter mobile pacing; safe anywhere. */
+function smallScreen(): boolean {
+  try {
+    return window.innerWidth <= 640;
+  } catch {
+    return false;
+  }
+}
 
 /** Longest any node lives without its animation cleaning it up (ms). */
 const LIFETIMES: Record<string, number> = {
@@ -218,12 +243,23 @@ export function attachMatchFx(
   board.addEventListener(MATCH_ANIM_EVENT, onAnim);
 
   // ---- Attack-card super-move cinematic ---------------------------------
-  // MvC-style activation: dim veil, faction speed lines, the chosen card
-  // streaking in from the actor's side to a center slam, a bold name ribbon,
-  // then an impact cue on the defender — all inside ~720ms, transform/opacity
-  // only. Under prefers-reduced-motion this becomes the "lite" read: a calm
-  // centered card pop + name + energy flash, no sweep, no shake. Repeated
-  // supers replace the live one instantly so spamming attacks stays snappy.
+  // MvC-style activation in two beats: the veil dims and the chosen card
+  // pops in on the actor's side and HOLDS (a readable reveal while its art
+  // decodes), then it streaks to a center slam behind faction speed lines and
+  // a bold name ribbon, with the impact cue on the defender in the final
+  // third — transform/opacity only. Under prefers-reduced-motion this stays
+  // the quick "lite" read: a calm centered card pop + name + energy flash, no
+  // sweep, no shake, no long form. Repeated supers replace the live one
+  // instantly so spamming attacks stays snappy.
+  const wait = (ms: number): Promise<void> =>
+    new Promise((resolve) => {
+      const t = setTimeout(() => {
+        timers.delete(t);
+        resolve();
+      }, ms);
+      timers.add(t);
+    });
+
   const onAttackCard = (event: Event): void => {
     const detail = (event as CustomEvent<AttackCardFxDetail>).detail;
     if (detail === undefined || detail === null || detached) return;
@@ -256,8 +292,9 @@ export function attachMatchFx(
 
     const card = document.createElement("div");
     card.className = "match-fx-super__card";
+    let art: HTMLImageElement | null = null;
     if (detail.artUrl !== undefined) {
-      const art = document.createElement("img");
+      art = document.createElement("img");
       art.className = "match-fx-super__art";
       art.src = detail.artUrl;
       art.alt = "";
@@ -273,21 +310,44 @@ export function attachMatchFx(
     overlay.append(card, name);
     board.append(overlay);
 
-    if (!lite) {
-      // The slam beat: impact flash on the defender + the (throttled) shake.
+    if (lite) {
+      const cleanup = setTimeout(() => {
+        overlay.remove();
+        timers.delete(cleanup);
+      }, SUPER_LITE_LIFETIME_MS);
+      timers.add(cleanup);
+      return;
+    }
+
+    // Full cinematic: hold the reveal until the art is ready — image.decode()
+    // raced against a hard timeout so a slow/failed load can never stall the
+    // show — but never shorter than the minimum dramatic beat. Then flip to
+    // the GO phase (CSS reads the duration from --super-go so the keyframes
+    // and these timers stay in lockstep).
+    const goMs = smallScreen() ? SUPER_GO_MOBILE_MS : SUPER_GO_MS;
+    overlay.style.setProperty("--super-go", `${goMs}ms`);
+    const artReady: Promise<unknown> =
+      art !== null && typeof art.decode === "function"
+        ? Promise.race([art.decode().catch(() => {}), wait(SUPER_DECODE_TIMEOUT_MS)])
+        : Promise.resolve();
+    void (async () => {
+      await Promise.all([wait(SUPER_REVEAL_MIN_MS), artReady]);
+      // Detached, or already replaced by a newer super: this one is done.
+      if (detached || !overlay.isConnected) return;
+      overlay.classList.add("match-fx-super--go");
       const impactTimer = setTimeout(() => {
         timers.delete(impactTimer);
         if (detached) return;
         spawn("match-fx--impact", tileOf(detail.targetInstanceId), faction);
         microShake();
-      }, SUPER_IMPACT_AT_MS);
+      }, Math.round(goMs * SUPER_IMPACT_FRACTION));
       timers.add(impactTimer);
-    }
-    const cleanup = setTimeout(() => {
-      overlay.remove();
-      timers.delete(cleanup);
-    }, lite ? SUPER_LITE_LIFETIME_MS : SUPER_LIFETIME_MS);
-    timers.add(cleanup);
+      const cleanup = setTimeout(() => {
+        overlay.remove();
+        timers.delete(cleanup);
+      }, goMs + SUPER_CLEANUP_SLACK_MS);
+      timers.add(cleanup);
+    })();
   };
   board.addEventListener(ATTACK_CARD_FX_EVENT, onAttackCard);
 
