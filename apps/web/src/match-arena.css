@@ -1373,19 +1373,29 @@
     --arena-actions-h: 52px;
   }
 
-  /* 1) Compact HUD: drop the brand, tighten type — one thin row. */
-  .gc .play-match__hud-brand {
+  /* 1) Compact HUD: drop the brand AND the turn/phase text (the phase banner
+     directly below already says "Turn N — X phase") — one thin row of
+     title … Concede | Report, side by side. The title is the only child
+     allowed to shrink, so the buttons can never be pushed past the edge. */
+  .gc .play-match__hud-brand,
+  .gc .play-match__hud-turn {
     display: none;
   }
   .gc .play-match__header {
     padding: 0.25rem 0.4rem;
-    gap: 0.3rem 0.5rem;
+    gap: 0.3rem 0.4rem;
   }
   .gc .play-match__hud-title {
     font-size: 0.78rem;
+    flex: 1 1 auto;
+    min-width: 0;
   }
-  .gc .play-match__hud-turn {
-    font-size: 0.7rem;
+  .gc .play-match__hud .play-match__quit {
+    margin-left: auto;
+  }
+  .gc .play-match__hud .play-match__quit,
+  .gc .play-match__hud .play-match__report {
+    white-space: nowrap;
   }
 
   /* 2) Compact center lane (phase banner + notices). */
