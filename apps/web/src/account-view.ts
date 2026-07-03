@@ -747,13 +747,6 @@ export async function mountAccount(
         clearRecovery("conceded"); // conceding abandons the in-progress match
         void showAccount();
       },
-      // HUD Home (confirmed in the board's own dialog): back to the public
-      // site WITHOUT clearing recovery — the match resumes on return.
-      onExitSite: () => {
-        window.location.assign(
-          import.meta.env.BASE_URL.replace(/beta\/$/, "") || "/",
-        );
-      },
       onInspect: (card) => detail.open(card),
       onAction: () => persistMatch(match, chosen),
       onReportIssue: () =>

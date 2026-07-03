@@ -1336,53 +1336,14 @@
 }
 
 /* ---- Mobile rehab ----------------------------------------------------------
-   1) The HUD Home button + its leave-match confirmation dialog.
-   2) Safe-area padding so End Turn / the hand dock never sit under a phone's
+   1) Safe-area padding so End Turn / the hand dock never sit under a phone's
       home indicator.
-   3) Short/narrow viewport safety: compact row minimums at phone widths, and
+   2) Short/narrow viewport safety: compact row minimums at phone widths, and
       when the viewport is shorter than the board's minimum stack (landscape
-      phones), the game area scrolls INTERNALLY instead of clipping actions. */
-.gc .play-match__home {
-  white-space: nowrap;
-}
-.gc .play-match__confirm {
-  position: absolute;
-  inset: 0;
-  z-index: 70;
-  display: grid;
-  place-items: center;
-  background: rgba(6, 7, 11, 0.7);
-}
-.gc .play-match__confirm-box {
-  width: min(92vw, 380px);
-  padding: 1.1rem 1.2rem;
-  background: var(--eu-stage-raised, #12151c);
-  border: 1px solid var(--eu-hairline, rgba(195, 200, 210, 0.18));
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 0.8rem), calc(100% - 0.8rem) 100%, 0 100%);
-}
-.gc .play-match__confirm-line {
-  margin: 0 0 0.9rem;
-  font-weight: 800;
-  color: var(--gc-ink, #f2f4f8);
-}
-.gc .play-match__confirm-row {
-  display: flex;
-  gap: 0.6rem;
-  justify-content: flex-end;
-}
-.gc .play-match__confirm-row button {
-  font: inherit;
-  font-weight: 700;
-  padding: 0.55rem 1rem;
-  border: 1px solid var(--eu-hairline, rgba(195, 200, 210, 0.18));
-  background: transparent;
-  color: var(--gc-ink, #f2f4f8);
-  cursor: pointer;
-}
-.gc .play-match__confirm-leave {
-  border-color: var(--f-monk, #ff2e4d);
-  box-shadow: 0 0 14px -6px var(--f-monk, #ff2e4d);
-}
+      phones), the game area scrolls INTERNALLY instead of clipping actions.
+   (The HUD "Home" exit button + confirm dialog were removed — the way out of
+   the beta is the main menu's "← Exit to Site"; in-match, Concede owns the
+   corner.) */
 
 /* Thumb zone: keep the primary action row + hand clear of browser chrome. */
 .gc .arena__actions {
