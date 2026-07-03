@@ -106,6 +106,12 @@ describe("single active screen", () => {
         "Settings",
       ]),
     );
+
+    // Mobile rehab: the beta always offers a way back OUT to the public site.
+    const links = Array.from(document.querySelectorAll(".gc-link")).map(
+      (n) => n.textContent,
+    );
+    expect(links).toContain("← Exit to Site");
   });
 
   it("replaces the menu with Collection (menu removed from DOM)", () => {

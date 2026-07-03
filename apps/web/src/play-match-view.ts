@@ -284,6 +284,13 @@ export interface PlayableMatchActions {
    * summary. Omitted in pure tests.
    */
   readonly onReportIssue?: () => void;
+  /**
+   * Fired when the player confirms "Leave match and return to site?" from the
+   * HUD's Home button (mobile rehab: an obvious way OUT of the beta). The mount
+   * navigates to the public site; the in-progress match stays resumable via the
+   * normal recovery flow. Omitted where the exit isn't wired (pure tests).
+   */
+  readonly onExitSite?: () => void;
 }
 
 /**
@@ -391,6 +398,9 @@ export function renderPlayableMatch(
   let panelInfo: { title: string; sub: string; card: Card } | null = null;
   let error: string | null = null;
   let completed = false;
+  // "Leave match and return to site?" confirmation (HUD Home button). UI-only;
+  // leaving never touches match state — the match stays resumable.
+  let confirmExit = false;
 
   // --- onboarding hints (Feature D) ----------------------------------------
   // Lightweight contextual hints. Hidden permanently via the tutorial flag
@@ -1409,7 +1419,53 @@ export function renderPlayableMatch(
       report.addEventListener("click", actions.onReportIssue);
       header.append(report);
     }
+    if (actions.onExitSite !== undefined) {
+      const home = document.createElement("button");
+      home.type = "button";
+      home.className = "account__signout play-match__home";
+      home.textContent = "Home";
+      home.setAttribute("aria-label", "Return to the Euphoria Universe site");
+      home.addEventListener("click", () => {
+        confirmExit = true;
+        paint();
+      });
+      header.append(home);
+    }
     frag.append(header);
+
+    // The leave-match confirmation: a small centered dialog over the board.
+    // Leaving navigates away without touching match state (recovery resumes
+    // it); staying just clears the flag.
+    if (confirmExit && actions.onExitSite !== undefined) {
+      const ask = document.createElement("div");
+      ask.className = "play-match__confirm";
+      ask.setAttribute("role", "alertdialog");
+      ask.setAttribute("aria-label", "Leave match?");
+      const box = document.createElement("div");
+      box.className = "play-match__confirm-box";
+      const line = document.createElement("p");
+      line.className = "play-match__confirm-line";
+      line.textContent = "Leave match and return to site?";
+      const row = document.createElement("div");
+      row.className = "play-match__confirm-row";
+      const leave = document.createElement("button");
+      leave.type = "button";
+      leave.className = "play-match__confirm-leave";
+      leave.textContent = "Leave match";
+      leave.addEventListener("click", () => actions.onExitSite?.());
+      const stay = document.createElement("button");
+      stay.type = "button";
+      stay.className = "play-match__confirm-stay";
+      stay.textContent = "Keep playing";
+      stay.addEventListener("click", () => {
+        confirmExit = false;
+        paint();
+      });
+      row.append(stay, leave);
+      box.append(line, row);
+      ask.append(box);
+      frag.append(ask);
+    }
 
     // Prominent turn/phase banner (Feature E): names what's expected of the
     // player — their move, opponent acting, or a specific choice in progress.

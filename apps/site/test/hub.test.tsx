@@ -27,13 +27,17 @@ describe("Home — the universe hub", () => {
     expect(html).toContain("hub-panel--beta");
     expect(html).toContain("hub-chip--live");
     expect((html.match(/hub-cabinet--/g) ?? []).length).toBe(3);
-    // Cabinet art resolves from the live pool (real image sources).
-    expect(html).toContain(".png");
+    // Mobile rehab: cabinets load the ~60KB optimized thumbs, NOT the ~3MB
+    // full PNGs that stalled mobile connections.
+    expect((html.match(/optimized\/[\w-]+\/[\w-]+\.webp/g) ?? []).length).toBe(3);
+    expect(html).not.toContain('src="/monk/'); // no full-art srcs on the hub
   });
 
-  it("renders the world section with the base map and live marker pins", () => {
+  it("renders the world section with the LIGHT map teaser and live marker pins", () => {
     expect(html).toContain("hub-panel--world");
-    expect(html).toContain("maps/euphoria-base-map.png");
+    // Mobile rehab: the ~150KB teaser, not the 2.8MB full base map.
+    expect(html).toContain("maps/euphoria-base-map-teaser.webp");
+    expect(html).not.toContain("maps/euphoria-base-map.png");
     expect((html.match(/hub-map__pin/g) ?? []).length).toBeGreaterThanOrEqual(4);
     expect(html).toContain('href="/map"');
   });
