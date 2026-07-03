@@ -1320,3 +1320,82 @@
     transform: none;
   }
 }
+
+/* ---- Mobile rehab ----------------------------------------------------------
+   1) The HUD Home button + its leave-match confirmation dialog.
+   2) Safe-area padding so End Turn / the hand dock never sit under a phone's
+      home indicator.
+   3) Short/narrow viewport safety: compact row minimums at phone widths, and
+      when the viewport is shorter than the board's minimum stack (landscape
+      phones), the game area scrolls INTERNALLY instead of clipping actions. */
+.gc .play-match__home {
+  white-space: nowrap;
+}
+.gc .play-match__confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  background: rgba(6, 7, 11, 0.7);
+}
+.gc .play-match__confirm-box {
+  width: min(92vw, 380px);
+  padding: 1.1rem 1.2rem;
+  background: var(--eu-stage-raised, #12151c);
+  border: 1px solid var(--eu-hairline, rgba(195, 200, 210, 0.18));
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 0.8rem), calc(100% - 0.8rem) 100%, 0 100%);
+}
+.gc .play-match__confirm-line {
+  margin: 0 0 0.9rem;
+  font-weight: 800;
+  color: var(--gc-ink, #f2f4f8);
+}
+.gc .play-match__confirm-row {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+.gc .play-match__confirm-row button {
+  font: inherit;
+  font-weight: 700;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--eu-hairline, rgba(195, 200, 210, 0.18));
+  background: transparent;
+  color: var(--gc-ink, #f2f4f8);
+  cursor: pointer;
+}
+.gc .play-match__confirm-leave {
+  border-color: var(--f-monk, #ff2e4d);
+  box-shadow: 0 0 14px -6px var(--f-monk, #ff2e4d);
+}
+
+/* Thumb zone: keep the primary action row + hand clear of browser chrome. */
+.gc .arena__actions {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Phones: tighter row minimums so the whole board fits a ~390×660 viewport. */
+@media (max-width: 430px) {
+  .gc .play-match {
+    --arena-field-min: clamp(92px, 13vh, 150px);
+    --arena-hand-min: clamp(148px, 22vh, 230px);
+    --arena-strip-h: clamp(40px, 5.5vh, 50px);
+    --arena-actions-h: clamp(44px, 6vh, 52px);
+  }
+  .gc .arena__hand .play-match__card {
+    width: clamp(128px, 38vw, 170px);
+  }
+}
+
+/* Landscape phones / very short screens: the minimum stack can't fit, so the
+   game area itself scrolls (controlled, inside the app shell) rather than
+   clipping End Turn off-screen. */
+@media (max-height: 560px) {
+  .gc .gc-screen-root:has(.arena) {
+    overflow-y: auto;
+  }
+  .gc .gc-screen-root:has(.arena) > .play-match {
+    min-height: 560px;
+  }
+}

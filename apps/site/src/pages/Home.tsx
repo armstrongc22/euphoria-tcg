@@ -1,12 +1,18 @@
 import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
-import { cards, cardImageUrl } from "@euphoria/core/cards";
+import { cards, cardImageUrl, cardThumbUrl } from "@euphoria/core/cards";
 import { BETA_URL } from "../beta";
 import { InterestForm } from "../signup/InterestForm";
 import { STARTER_MARKERS, factionColor, type MapMarker } from "../map/markers";
 
 const BASE = import.meta.env.BASE_URL;
-const MAP_SRC = `${BASE}maps/euphoria-base-map.png`;
+/**
+ * Mobile rehab: the hub loads LIGHT assets — the ~150KB downscaled map teaser
+ * (not the 2.8MB full map) and ~60KB optimized card thumbs (not the ~3MB full
+ * PNGs, which stalled and blanked the homepage on mobile connections). The
+ * full-size art stays exactly where it belongs: card inspect and the real map.
+ */
+const MAP_TEASER_SRC = `${BASE}maps/euphoria-base-map-teaser.webp`;
 
 /**
  * The three "cabinet" cards in the beta promo: one striking Warrior per
@@ -74,7 +80,20 @@ export function Home() {
                 } as CSSProperties
               }
             >
-              <img src={cardImageUrl(card, BASE)} alt="" loading="lazy" />
+              <img
+                src={cardThumbUrl(card, BASE)}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                width={420}
+                height={588}
+                onError={(e) => {
+                  // Thumb missing → fall back to the full art (once).
+                  const img = e.currentTarget;
+                  const full = cardImageUrl(card, BASE);
+                  if (img.src !== full) img.src = full;
+                }}
+              />
             </figure>
           ))}
         </div>
@@ -115,7 +134,15 @@ export function Home() {
           className="hub-panel__media hub-map"
           aria-label="Open the interactive map"
         >
-          <img src={MAP_SRC} alt="" loading="lazy" className="hub-map__img" />
+          <img
+            src={MAP_TEASER_SRC}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            width={900}
+            height={1125}
+            className="hub-map__img"
+          />
           {teaserMarkers.map((m) => (
             <span
               key={m.id}

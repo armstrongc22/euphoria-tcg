@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { NavLink, Link, useLocation } from "react-router-dom";
 import { BETA_URL } from "../beta";
 
@@ -14,6 +15,17 @@ const SECONDARY: ReadonlyArray<{ to: string; label: string }> = [
   { to: "/cards", label: "Cards" },
   { to: "/shop", label: "Shop" },
   { to: "/blog", label: "Blog" },
+];
+
+/**
+ * The mobile sheet carries the FULL site navigation (mobile rehab): the three
+ * big destination panels, then the quiet row — Home first, and the Founder
+ * list (which lives on the Manga page's Kickstarter section).
+ */
+const SHEET_MINOR: ReadonlyArray<{ to: string; label: string }> = [
+  { to: "/", label: "Home" },
+  ...SECONDARY,
+  { to: "/manga", label: "Founder List" },
 ];
 
 /**
@@ -94,36 +106,47 @@ export function Nav() {
         {sheetOpen ? "Close" : "Menu"}
       </button>
 
-      {sheetOpen ? (
-        <div className="hub-sheet-backdrop" onClick={() => setSheetOpen(false)}>
-          <nav
-            id="hub-sheet"
-            className="hub-sheet"
-            aria-label="Menu"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {PRIMARY.map((link, i) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                className={`hub-sheet__panel hub-sheet__panel--${i + 1}`}
+      {/* The sheet is PORTALED to <body>: .eu-nav's backdrop-filter makes the
+          header a containing block for position:fixed, which used to clip the
+          whole menu into the header strip (the "only Play the Beta" bug). */}
+      {sheetOpen
+        ? createPortal(
+            <div className="hub-sheet-backdrop" onClick={() => setSheetOpen(false)}>
+              <nav
+                id="hub-sheet"
+                className="hub-sheet"
+                aria-label="Menu"
+                onClick={(e) => e.stopPropagation()}
               >
-                {link.label}
-              </NavLink>
-            ))}
-            <div className="hub-sheet__row">
-              {SECONDARY.map((link) => (
-                <NavLink key={link.to} to={link.to} className="hub-sheet__minor">
-                  {link.label}
-                </NavLink>
-              ))}
-            </div>
-            <a href={BETA_URL} className="hub-btn hub-btn--primary hub-sheet__cta">
-              Play the Beta
-            </a>
-          </nav>
-        </div>
-      ) : null}
+                {PRIMARY.map((link, i) => (
+                  <NavLink
+                    key={link.to}
+                    to={link.to}
+                    className={`hub-sheet__panel hub-sheet__panel--${i + 1}`}
+                  >
+                    {link.label}
+                  </NavLink>
+                ))}
+                <div className="hub-sheet__row">
+                  {SHEET_MINOR.map((link) => (
+                    <NavLink
+                      key={link.label}
+                      to={link.to}
+                      end={link.to === "/"}
+                      className="hub-sheet__minor"
+                    >
+                      {link.label}
+                    </NavLink>
+                  ))}
+                </div>
+                <a href={BETA_URL} className="hub-btn hub-btn--primary hub-sheet__cta">
+                  Play the Beta
+                </a>
+              </nav>
+            </div>,
+            document.body,
+          )
+        : null}
     </header>
   );
 }

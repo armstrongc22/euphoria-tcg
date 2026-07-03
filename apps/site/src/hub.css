@@ -480,3 +480,23 @@
     transition: none;
   }
 }
+
+/* ---- Mobile rehab: sheet nav states + tap sizing --------------------------- */
+.hub-sheet__panel[aria-current="page"] {
+  background: linear-gradient(
+    calc(90deg + var(--eu-diagonal)),
+    rgba(242, 244, 248, 0.12),
+    var(--eu-stage-raised) 60%
+  );
+  box-shadow: inset 0 0 0 1px rgba(242, 244, 248, 0.25);
+}
+.hub-sheet__row {
+  flex-wrap: wrap;
+}
+.hub-sheet__minor {
+  padding: 0.55rem 0.7rem; /* honest thumb targets for the quiet row */
+}
+.hub-sheet__minor[aria-current="page"] {
+  color: var(--eu-ink);
+  border-bottom: 2px solid var(--eu-energy-neutral);
+}

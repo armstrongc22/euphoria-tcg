@@ -2625,3 +2625,37 @@ describe("renderPlayableMatch — larger cards + reclaimed status row", () => {
     expect(root.querySelector(".arena__actions .play-match__end")).not.toBeNull();
   });
 });
+
+describe("renderPlayableMatch — HUD Home / exit to site (mobile rehab)", () => {
+  it("renders no Home button unless the exit is wired", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    expect(root.querySelector(".play-match__home")).toBeNull();
+    root.dispose();
+  });
+
+  it("asks for confirmation and only leaves when confirmed", () => {
+    const onExitSite = vi.fn();
+    const root = renderPlayableMatch(newMatch(), {
+      onComplete: noop,
+      onQuit: noop,
+      onExitSite,
+    });
+    const home = root.querySelector<HTMLButtonElement>(".play-match__home")!;
+    expect(home).not.toBeNull();
+    home.click();
+    const dialog = root.querySelector(".play-match__confirm")!;
+    expect(dialog).not.toBeNull();
+    expect(dialog.textContent).toContain("Leave match and return to site?");
+    expect(onExitSite).not.toHaveBeenCalled();
+    // Keep playing → dialog closes, nothing fired, board still live.
+    root.querySelector<HTMLButtonElement>(".play-match__confirm-stay")!.click();
+    expect(root.querySelector(".play-match__confirm")).toBeNull();
+    expect(onExitSite).not.toHaveBeenCalled();
+    expect(root.querySelector(".play-match__end")).not.toBeNull();
+    // Ask again and confirm → the exit fires (navigation is the mount's job).
+    root.querySelector<HTMLButtonElement>(".play-match__home")!.click();
+    root.querySelector<HTMLButtonElement>(".play-match__confirm-leave")!.click();
+    expect(onExitSite).toHaveBeenCalledTimes(1);
+    root.dispose();
+  });
+});

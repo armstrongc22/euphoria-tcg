@@ -84,6 +84,9 @@ const SCREEN_TITLES: Record<ScreenId, string> = {
 };
 
 const MAP_URL = `${import.meta.env.BASE_URL.replace(/beta\/$/, "")}map`;
+/** The public Euphoria Universe site the beta is hosted under (mobile rehab:
+    every screen can now get back OUT of the beta, not just via World Map). */
+const SITE_URL = import.meta.env.BASE_URL.replace(/beta\/$/, "") || "/";
 const ENTERED_KEY = "euphoria_beta_entered";
 
 const ORBS: ReadonlyArray<{ color: string }> = [
@@ -384,6 +387,7 @@ function renderMenu(): HTMLElement {
     <div class="gc-menu__secondary">
       <button type="button" class="gc-link" data-go="rules">Rules</button>
       <button type="button" class="gc-link" data-go="lore">Lore</button>
+      <button type="button" class="gc-link" data-go="exit-site">← Exit to Site</button>
     </div>
   `;
   for (const btn of s.querySelectorAll<HTMLButtonElement>("[data-go]")) {
@@ -413,6 +417,11 @@ function onMenuGo(go: string): void {
       break;
     case "map":
       window.location.assign(MAP_URL);
+      break;
+    case "exit-site":
+      // Back to the public Universe hub. Safe from the menu — no match is
+      // running here (an interrupted match stays resumable via recovery).
+      window.location.assign(SITE_URL);
       break;
     case "settings":
       renderActiveScreen("settings");
