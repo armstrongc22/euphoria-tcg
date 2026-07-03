@@ -29,7 +29,7 @@ export function MapModeSwitcher({ mode, onChange }: MapModeSwitcherProps) {
         className={`eu-map-mode${mode === "3d" ? " eu-map-mode--active" : ""}`}
         onClick={() => onChange("3d")}
       >
-        3D Preview
+        3D Flight
         <span className="eu-map-mode__tag">beta</span>
       </button>
     </div>
