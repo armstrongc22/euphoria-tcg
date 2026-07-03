@@ -2307,6 +2307,25 @@ describe("renderPlayableMatch — viewport-constrained layout", () => {
     expect(root.querySelector(".play-match__log-toggle")!.textContent).toBe("Show");
   });
 
+  it("keeps BOTH primary actions in the guaranteed action region on phones", () => {
+    setWidth(390);
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    // One action bar in the dedicated grid region, holding exactly the two
+    // primary buttons (the mobile CSS lays them out as equal minmax(0,1fr)
+    // grid columns, so neither can push the other past the viewport).
+    const bars = root.querySelectorAll(".arena__actions .play-match__actionbar");
+    expect(bars).toHaveLength(1);
+    const buttons = bars[0]!.querySelectorAll("button");
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]!.classList.contains("play-match__enter")).toBe(true);
+    expect(buttons[1]!.classList.contains("play-match__end")).toBe(true);
+    // And the collapsed log (a floating chip on phones) still exposes its opener.
+    expect(
+      root.querySelector(".play-match__log--collapsed .play-match__log-toggle"),
+    ).not.toBeNull();
+    root.dispose();
+  });
+
   it("keeps the combat log open on wide screens (side panel)", () => {
     setWidth(1400);
     const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
