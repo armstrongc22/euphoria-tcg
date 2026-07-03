@@ -435,10 +435,13 @@ export function StaticMap2D({ markers, onMarkersChange }: StaticMap2DProps) {
                 visibleMarkers.map((m) => {
                   const faction = m.factionAffinity[0];
                   const active = m.id === highlightedId;
+                  // Selected = its lore card is open: the strongest state
+                  // (locked-on halo), one step above hover's radiance.
+                  const selected = popup !== null && popup.id === m.id;
                   return (
                     <span
                       key={m.id}
-                      className={`eu-map-marker${faction !== undefined ? " eu-map-marker--faction" : ""}${active ? " eu-map-marker--active" : ""}`}
+                      className={`eu-map-marker${faction !== undefined ? " eu-map-marker--faction" : ""}${active ? " eu-map-marker--active" : ""}${selected ? " eu-map-marker--selected" : ""}`}
                       data-id={m.id}
                       data-type={m.type}
                       style={
