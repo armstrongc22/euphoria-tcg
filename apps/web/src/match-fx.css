@@ -365,12 +365,16 @@
 }
 
 /* ---- Attack-card super-move cinematic -------------------------------------
-   MvC-style activation, ≤720ms, transform/opacity only: dim veil, faction
-   speed lines, the chosen card streaking diagonally to a center slam, a bold
-   name ribbon. Direction follows the actor (player enters from bottom-left,
-   opponent from top-right). The --lite variant (reduced motion) is a calm
-   centered pop with explicit short durations (the token durations collapse to
-   0 under the media query, which would erase it). */
+   MvC-style activation in two beats, transform/opacity only. REVEAL: the card
+   pops in on the actor's side and holds while its art decodes (match-fx.ts
+   flips the phase). GO (.match-fx-super--go, duration from --super-go —
+   900ms desktop / 700ms small screens, set by JS so CSS and the impact/cleanup
+   timers agree): speed lines fire, the card streaks diagonally to a center
+   slam and stands for the read, the name ribbon lands, everything fades.
+   Direction follows the actor (player enters from bottom-left, opponent from
+   top-right). The --lite variant (reduced motion) never enters the GO phase —
+   it stays a calm centered pop with explicit short durations (the token
+   durations collapse to 0 under the media query, which would erase it). */
 .gc .match-fx-super {
   position: absolute;
   inset: 0;
@@ -383,12 +387,12 @@
   inset: 0;
   background: rgba(6, 7, 11, 0.55);
   opacity: 0;
-  animation: eu-super-veil 720ms var(--eu-ease-out) forwards;
+  animation: eu-super-veil 1250ms var(--eu-ease-out) forwards;
 }
 @keyframes eu-super-veil {
   0% { opacity: 0; }
-  18% { opacity: 1; }
-  78% { opacity: 1; }
+  10% { opacity: 1; }
+  85% { opacity: 1; }
   100% { opacity: 0; }
 }
 
@@ -400,7 +404,9 @@
   background: linear-gradient(90deg, transparent, var(--fx-energy), #fff, var(--fx-energy), transparent);
   transform: rotate(calc(-1 * var(--eu-diagonal)));
   opacity: 0;
-  animation: eu-super-line 460ms var(--eu-ease-impact) forwards;
+}
+.gc .match-fx-super--go .match-fx-super__line {
+  animation: eu-super-line 520ms var(--eu-ease-impact) forwards;
 }
 .gc .match-fx-super__line--1 { top: 28%; animation-delay: 0ms; }
 .gc .match-fx-super__line--2 { top: 50%; height: 8px; animation-delay: 55ms; }
@@ -428,10 +434,38 @@
     0 18px 44px rgba(0, 0, 0, 0.6);
   overflow: hidden;
   opacity: 0;
-  animation: eu-super-card-player 720ms var(--eu-ease-impact) forwards;
+  /* REVEAL: pop in on the actor's side and hold (fill: forwards) until JS
+     flips to the GO phase once the art is ready. */
+  animation: eu-super-reveal-player 260ms var(--eu-ease-out) forwards;
 }
 .gc .match-fx-super--opponent .match-fx-super__card {
+  animation-name: eu-super-reveal-opponent;
+}
+.gc .match-fx-super--go .match-fx-super__card {
+  animation: eu-super-card-player var(--super-go, 900ms) var(--eu-ease-impact) forwards;
+}
+.gc .match-fx-super--opponent.match-fx-super--go .match-fx-super__card {
   animation-name: eu-super-card-opponent;
+}
+@keyframes eu-super-reveal-player {
+  0% {
+    opacity: 0;
+    transform: translate(calc(-50% - 26vw), calc(-50% + 17vh)) rotate(-14deg) scale(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% - 18vw), calc(-50% + 11vh)) rotate(-9deg) scale(0.96);
+  }
+}
+@keyframes eu-super-reveal-opponent {
+  0% {
+    opacity: 0;
+    transform: translate(calc(-50% + 26vw), calc(-50% - 17vh)) rotate(14deg) scale(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + 18vw), calc(-50% - 11vh)) rotate(9deg) scale(0.96);
+  }
 }
 .gc .match-fx-super__art {
   width: 100%;
@@ -453,17 +487,17 @@
 }
 @keyframes eu-super-card-player {
   0% {
-    opacity: 0;
-    transform: translate(calc(-50% - 60vw), calc(-50% + 34vh)) rotate(-16deg) scale(0.8);
-  }
-  32% {
     opacity: 1;
-    transform: translate(calc(-50% + 2vw), calc(-50% - 1vh)) rotate(-3deg) scale(1.04);
+    transform: translate(calc(-50% - 18vw), calc(-50% + 11vh)) rotate(-9deg) scale(0.96);
   }
-  46% {
+  26% {
+    opacity: 1;
+    transform: translate(calc(-50% + 2vw), calc(-50% - 1vh)) rotate(-3deg) scale(1.06);
+  }
+  38% {
     transform: translate(-50%, -50%) rotate(-6deg) scale(1);
   }
-  82% {
+  84% {
     opacity: 1;
     transform: translate(-50%, -50%) rotate(-6deg) scale(1);
   }
@@ -474,17 +508,17 @@
 }
 @keyframes eu-super-card-opponent {
   0% {
-    opacity: 0;
-    transform: translate(calc(-50% + 60vw), calc(-50% - 34vh)) rotate(16deg) scale(0.8);
-  }
-  32% {
     opacity: 1;
-    transform: translate(calc(-50% - 2vw), calc(-50% + 1vh)) rotate(3deg) scale(1.04);
+    transform: translate(calc(-50% + 18vw), calc(-50% - 11vh)) rotate(9deg) scale(0.96);
   }
-  46% {
+  26% {
+    opacity: 1;
+    transform: translate(calc(-50% - 2vw), calc(-50% + 1vh)) rotate(3deg) scale(1.06);
+  }
+  38% {
     transform: translate(-50%, -50%) rotate(6deg) scale(1);
   }
-  82% {
+  84% {
     opacity: 1;
     transform: translate(-50%, -50%) rotate(6deg) scale(1);
   }
@@ -511,35 +545,52 @@
   background: linear-gradient(100deg, transparent, rgba(6, 7, 11, 0.85) 22%, rgba(6, 7, 11, 0.85) 78%, transparent);
   text-shadow: 0 0 16px var(--fx-energy);
   opacity: 0;
-  animation: eu-super-name 720ms var(--eu-ease-out) forwards;
+}
+.gc .match-fx-super--go .match-fx-super__name {
+  animation: eu-super-name var(--super-go, 900ms) var(--eu-ease-out) forwards;
 }
 @keyframes eu-super-name {
   0% { opacity: 0; translate: 0 14px; }
-  22% { opacity: 0; }
-  40% { opacity: 1; translate: 0 0; }
-  84% { opacity: 1; }
+  20% { opacity: 0; }
+  36% { opacity: 1; translate: 0 0; }
+  86% { opacity: 1; }
   100% { opacity: 0; }
 }
 
-/* Mobile: no room for a 60vw sweep — the card slam-pops at center instead. */
+/* Mobile: no room for a sweep — the card reveals small at center, then
+   slam-pops. JS also picks the shorter GO duration (700ms) here. */
 @media (max-width: 640px) {
   .gc .match-fx-super__card,
   .gc .match-fx-super--opponent .match-fx-super__card {
+    animation-name: eu-super-reveal-mobile;
+  }
+  .gc .match-fx-super--go .match-fx-super__card,
+  .gc .match-fx-super--opponent.match-fx-super--go .match-fx-super__card {
     animation-name: eu-super-card-mobile;
+  }
+  @keyframes eu-super-reveal-mobile {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -46%) scale(0.55);
+    }
+    100% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(0.82);
+    }
   }
   @keyframes eu-super-card-mobile {
     0% {
-      opacity: 0;
-      transform: translate(-50%, -44%) scale(0.55);
-    }
-    30% {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1.06);
+      transform: translate(-50%, -50%) scale(0.82);
     }
-    44% {
+    28% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.08);
+    }
+    42% {
       transform: translate(-50%, -50%) scale(1);
     }
-    82% {
+    84% {
       opacity: 1;
       transform: translate(-50%, -50%) scale(1);
     }
