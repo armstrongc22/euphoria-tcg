@@ -70,6 +70,7 @@ import {
 import {
   attachMatchFx,
   ATTACK_CARD_FX_EVENT,
+  SUPER_PLAYBACK_HOLD_MS,
   type AttackCardFxDetail,
 } from "./match-fx";
 
@@ -495,6 +496,13 @@ export function renderPlayableMatch(
     }
   };
 
+  // Set when the step that just animated fired the super-move cinematic:
+  // scheduleNext extends THAT step's dwell so the next repaint (which replaces
+  // the board's children, super overlay included) can't cut the cinematic
+  // short. This is what keeps opponent supers playing at full length — the
+  // player's own attacks have no follow-up repaint and always ran in full.
+  let stepFiredSuper = false;
+
   const fireAttackCardFx = (step: PlaybackStep): void => {
     if (step.anim !== "attack") return;
     const index = attackStepsSeen;
@@ -508,6 +516,7 @@ export function renderPlayableMatch(
       actor: head.actor,
       targetInstanceId: step.targetInstanceId,
     };
+    stepFiredSuper = true;
     root.dispatchEvent(new CustomEvent<AttackCardFxDetail>(ATTACK_CARD_FX_EVENT, { detail }));
   };
 
@@ -657,6 +666,12 @@ export function renderPlayableMatch(
   const scheduleNext = (): void => {
     if (playback === null || disposed) return;
     const step = playback.steps[playback.index]!;
+    // If this step's attack fired the super-move cinematic, dwell long enough
+    // for it to finish before the next repaint replaces the board's children —
+    // otherwise opponent supers get wiped mid-sweep (the player's own attacks
+    // have no follow-up repaint, so both sides now run at the same full speed).
+    const superHold = stepFiredSuper ? SUPER_PLAYBACK_HOLD_MS : 0;
+    stepFiredSuper = false;
     schedule(() => {
       // The board may have been disposed (unmounted) while this was queued.
       if (disposed || playback === null) return;
@@ -671,7 +686,7 @@ export function renderPlayableMatch(
         applyStepEffects(playback.steps[playback.index]!);
         scheduleNext();
       }
-    }, options.stepDelayMs ?? step.durationMs);
+    }, (options.stepDelayMs ?? step.durationMs) + superHold);
   };
 
   // Cleanup hook: cancel the pending playback timer and stop further re-renders.
@@ -719,6 +734,7 @@ export function renderPlayableMatch(
     // Persist the move for crash/refresh recovery before any playback animates.
     actions.onAction?.();
     collectAttackCardFx(res.frames);
+    stepFiredSuper = false; // fresh cycle — no stale hold from a prior action
     const steps = toPlaybackSteps(res.frames);
     const passedTurn = res.frames.some((f) => f.actor === "opponent");
     if (passedTurn && steps.length > 0 && flags.noPlayback) {

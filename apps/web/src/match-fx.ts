@@ -82,6 +82,18 @@ const SUPER_GO_MOBILE_MS = 700;
 /** Impact lands at this fraction of the GO phase (the final third). */
 const SUPER_IMPACT_FRACTION = 0.66;
 const SUPER_CLEANUP_SLACK_MS = 80;
+
+/**
+ * Extra dwell the BOARD adds to a playback step whose attack fired the super
+ * (see play-match-view's scheduleNext). During the opponent's turn the next
+ * step's repaint replaces the board's children — which used to wipe the
+ * cinematic mid-sweep, so opponent supers never played out while the
+ * player's own (no follow-up repaint) ran in full. Sized so worst case
+ * (reveal-with-decode-timeout + desktop GO + slack ≈ 1.23s) completes within
+ * the attack step's own 750ms + this hold: both sides now see the identical,
+ * full-speed cinematic.
+ */
+export const SUPER_PLAYBACK_HOLD_MS = 650;
 const SUPER_LITE_LIFETIME_MS = 460;
 
 /** Small-screen check for the shorter mobile pacing; safe anywhere. */
