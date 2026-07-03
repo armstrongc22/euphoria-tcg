@@ -22,7 +22,11 @@ import {
   type MatchAnimDetail,
 } from "../src/play-match-view";
 import { createCardDetail } from "../src/detail";
-import { ATTACK_CARD_FX_EVENT, type AttackCardFxDetail } from "../src/match-fx";
+import {
+  ATTACK_CARD_FX_EVENT,
+  SUPER_PLAYBACK_HOLD_MS,
+  type AttackCardFxDetail,
+} from "../src/match-fx";
 
 /** Minimal in-play Warrior for white-box board scenarios. */
 function wip(card: Card, instanceId: string): WarriorInPlay {
@@ -2651,6 +2655,83 @@ describe("renderPlayableMatch — HUD stays lean (no Home/exit button)", () => {
     expect(root.querySelector(".play-match__confirm")).toBeNull();
     // Concede owns the corner.
     expect(root.querySelector(".play-match__quit")).not.toBeNull();
+    root.dispose();
+  });
+});
+
+describe("renderPlayableMatch — opponent attack-card super plays in full", () => {
+  it("holds the playback step so the cinematic isn't wiped by the next repaint", () => {
+    // A stub match whose one action returns an OPPONENT reply that used an
+    // Attack card: attackCardUsed (the collector's source) followed by its
+    // warriorAttacked (the step the cinematic fires on). Built over a real
+    // game state so painting/resolvers work.
+    const inner = newMatch();
+    const state = inner.state();
+    const atk = cards.find((c) => c.type === "Attack")!;
+    state.players.player2.outDeck = [...state.players.player2.outDeck, atk];
+    state.players.player1.field = [wip(state.players.player1.hand[0]!, "f1")];
+    state.players.player2.field = [wip(state.players.player2.deck[0]!, "e1")];
+
+    const frames = [
+      {
+        state,
+        events: [
+          {
+            type: "attackCardUsed",
+            player: "player2",
+            cardId: atk.id,
+            attackerInstanceId: "e1",
+            cost: atk.cost,
+          },
+          {
+            type: "warriorAttacked",
+            attackerInstanceId: "e1",
+            defenderInstanceId: "f1",
+            damage: 500,
+          },
+        ],
+        actor: "opponent" as const,
+      },
+    ];
+    const stub = {
+      playerFaction: inner.playerFaction,
+      opponentFaction: inner.opponentFaction,
+      seed: inner.seed,
+      state: () => state,
+      isOver: () => false,
+      legalActions: () => [{ kind: "endTurn" }],
+      apply: () => ({ ok: true as const, frames }),
+      history: () => [],
+      summary: inner.summary,
+    } as unknown as ReturnType<typeof createPlayableMatch>;
+
+    const delays: number[] = [];
+    const queued: Array<() => void> = [];
+    const root = renderPlayableMatch(
+      stub,
+      { onComplete: noop, onQuit: noop },
+      {
+        scheduler: (cb, ms) => {
+          delays.push(ms);
+          queued.push(cb);
+        },
+      },
+    );
+    root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+
+    // Step 1 ("used <card>", anim: play) — no cinematic yet.
+    expect(root.querySelector(".match-fx-super")).toBeNull();
+    expect(delays).toHaveLength(1);
+    // Advance to step 2 (the attack): the OPPONENT's cinematic appears…
+    queued[0]!();
+    const overlay = root.querySelector<HTMLElement>(".match-fx-super");
+    expect(overlay).not.toBeNull();
+    expect(overlay!.classList.contains("match-fx-super--opponent")).toBe(true);
+    // …and THAT step's dwell is extended so the next repaint (which replaces
+    // the board's children) can't cut the cinematic short.
+    expect(delays).toHaveLength(2);
+    expect(delays[1]! - delays[0]!).toBeGreaterThanOrEqual(SUPER_PLAYBACK_HOLD_MS - 200);
+    expect(delays[1]!).toBeGreaterThanOrEqual(750 + SUPER_PLAYBACK_HOLD_MS);
     root.dispose();
   });
 });
