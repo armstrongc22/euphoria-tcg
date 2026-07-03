@@ -11,9 +11,15 @@ import {
   WORLD_WIDTH,
   clampTarget,
   distanceLimits,
+  easeOutCubic,
+  entryPose,
+  heightAt,
   initialPose,
+  lerpPose,
   pinPlacements,
+  routeTrails,
   shouldFly,
+  territoryPools,
   worldDepthFor,
 } from "../src/map/flight-math";
 
@@ -130,5 +136,68 @@ describe("shouldFly", () => {
     expect(shouldFly(false, false)).toBe(false);
     expect(shouldFly(true, true)).toBe(false);
     expect(shouldFly(false, true)).toBe(false);
+  });
+});
+
+describe("Phase E polish helpers", () => {
+  const depth = worldDepthFor(IMG_W, IMG_H);
+
+  it("entry dive: eases from high orbit down to the take-off pose", () => {
+    const from = entryPose(depth);
+    const to = initialPose(depth).position;
+    expect(from.y).toBeGreaterThan(to.y);
+    expect(from.z).toBeGreaterThan(to.z);
+    expect(lerpPose(from, to, 0)).toEqual(from);
+    const arrived = lerpPose(from, to, 1);
+    expect(arrived.x).toBeCloseTo(to.x, 10);
+    expect(arrived.y).toBeCloseTo(to.y, 10);
+    expect(arrived.z).toBeCloseTo(to.z, 10);
+    const mid = lerpPose(from, to, easeOutCubic(0.5));
+    expect(mid.y).toBeLessThan(from.y);
+    expect(mid.y).toBeGreaterThan(to.y);
+    expect(easeOutCubic(-1)).toBe(0);
+    expect(easeOutCubic(2)).toBe(1);
+  });
+
+  it("territory pools: only territory-holding markers with a lead faction", () => {
+    const pools = territoryPools(
+      [
+        marker({ id: "a", territory: "Dwarf Nation" }),
+        marker({ id: "b", territory: "" }),
+        marker({ id: "c", territory: "Somewhere", factionAffinity: [] }),
+        marker({ id: "d", territory: "Hidden", view3d: { enabled: false } }),
+      ],
+      IMG_W,
+      IMG_H,
+    );
+    expect(pools).toHaveLength(1);
+    expect(pools[0]!.radius).toBeGreaterThan(0);
+  });
+
+  it("route trails: groups route points by route:* tag in marker order", () => {
+    const trails = routeTrails(
+      [
+        marker({ id: "r1", type: "route point", tags: ["route:silk"], x: 100, y: 100 }),
+        marker({ id: "x", type: "city" }), // not a route point
+        marker({ id: "r2", type: "route point", tags: ["Route:Silk"], x: 300, y: 300 }),
+        marker({ id: "r3", type: "route point", tags: ["route:lonely"] }), // 1 point → dropped
+        marker({ id: "r4", type: "route point", tags: [] }), // untagged → ignored
+      ],
+      IMG_W,
+      IMG_H,
+    );
+    expect(trails).toHaveLength(1);
+    expect(trails[0]!.name).toBe("route:silk"); // tag matching is case-insensitive
+    expect(trails[0]!.points).toHaveLength(2);
+    expect(trails[0]!.points[0]!.x).toBeLessThan(trails[0]!.points[1]!.x); // order kept
+  });
+
+  it("heightAt: samples the red channel, scaled and clamped to the field", () => {
+    // 2×1 grayscale strip: black then white.
+    const pixels = new Uint8ClampedArray([0, 0, 0, 255, 255, 255, 255, 255]);
+    expect(heightAt(pixels, 2, 1, 0, 0.5, 0.4)).toBe(0);
+    expect(heightAt(pixels, 2, 1, 1, 0.5, 0.4)).toBeCloseTo(0.4, 5);
+    expect(heightAt(pixels, 2, 1, 9, 9, 0.4)).toBeCloseTo(0.4, 5); // clamped
+    expect(heightAt(new Uint8ClampedArray(0), 2, 1, 0, 0, 0.4)).toBe(0); // bad field
   });
 });

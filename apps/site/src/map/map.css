@@ -1262,3 +1262,9 @@
     aspect-ratio: 3 / 4; /* portrait phones: taller stage, whole map in view */
   }
 }
+
+/* HUD toggle in its pressed state (e.g. Territories on). */
+.eu-map-btn--on {
+  border-color: var(--c-purple);
+  box-shadow: 0 0 0 1px var(--c-purple), 0 0 12px -4px var(--c-purple);
+}
