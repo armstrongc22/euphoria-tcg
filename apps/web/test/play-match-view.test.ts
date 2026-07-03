@@ -2319,10 +2319,9 @@ describe("renderPlayableMatch — viewport-constrained layout", () => {
     expect(buttons).toHaveLength(2);
     expect(buttons[0]!.classList.contains("play-match__enter")).toBe(true);
     expect(buttons[1]!.classList.contains("play-match__end")).toBe(true);
-    // And the collapsed log (a floating chip on phones) still exposes its opener.
-    expect(
-      root.querySelector(".play-match__log--collapsed .play-match__log-toggle"),
-    ).not.toBeNull();
+    // The log element stays in the DOM (collapsed by default on narrow
+    // screens) but is display:none'd by the phone CSS — desktop keeps it.
+    expect(root.querySelector(".arena__log")).not.toBeNull();
     root.dispose();
   });
 
