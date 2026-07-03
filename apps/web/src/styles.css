@@ -3206,3 +3206,105 @@ body {
     width: 100%;
   }
 }
+
+/* ---- Reward reveal re-skin (ux-reboot Phase B leftover) --------------------
+   Pure CSS over the existing reward-modal/reward-choice markup — no logic
+   changes. The reveal is a two-beat moment on the shared tokens
+   (fx-tokens.css): the stage dims, the milestone banner cuts in on the global
+   diagonal, and each reward card arrives as a dark SILHOUETTE that flashes to
+   full art with a silver energy slam, staggered left to right. Chosen keeps a
+   steady energy ring. Reduced motion: everything appears instantly. */
+.reward-modal__backdrop {
+  background:
+    radial-gradient(2px 2px at 22% 30%, rgba(195, 200, 210, 0.08) 1px, transparent 1px),
+    rgba(6, 7, 11, 0.85);
+  background-size: 22px 22px, auto;
+  animation: reward-stage-in var(--eu-fx-base, 320ms) ease-out;
+}
+@keyframes reward-stage-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.reward-modal__dialog .reward-choice {
+  background: var(--eu-stage-raised, #12151c);
+  border: 1px solid var(--eu-hairline, rgba(195, 200, 210, 0.18));
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 1rem), calc(100% - 1rem) 100%, 0 100%);
+}
+
+.reward-modal__dialog .account__panel-heading {
+  display: inline-block;
+  padding: 0.2rem 1rem 0.2rem 0.6rem;
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--eu-ink, #f2f4f8);
+  background: linear-gradient(
+    calc(90deg + var(--eu-diagonal, 7deg)),
+    rgba(195, 200, 210, 0.22),
+    transparent 85%
+  );
+  border-left: 3px solid var(--eu-energy-neutral, #c3c8d2);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 0.6rem) 100%, 0 100%);
+}
+
+/* Two-beat arrival: silhouette hold, then the slam to full art. */
+.reward-modal .reward-choice__option {
+  opacity: 0;
+  animation: reward-card-slam 640ms var(--eu-ease-impact, cubic-bezier(0.7, 0, 0.3, 1)) forwards;
+}
+.reward-modal .reward-choice__card:nth-child(1) .reward-choice__option {
+  animation-delay: 120ms;
+}
+.reward-modal .reward-choice__card:nth-child(2) .reward-choice__option {
+  animation-delay: 260ms;
+}
+.reward-modal .reward-choice__card:nth-child(3) .reward-choice__option {
+  animation-delay: 400ms;
+}
+@keyframes reward-card-slam {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(10px);
+    filter: brightness(0) saturate(0.4);
+  }
+  45% {
+    /* The silhouette beat: present but unrevealed. */
+    opacity: 1;
+    transform: scale(0.96) translateY(2px);
+    filter: brightness(0) saturate(0.4);
+  }
+  62% {
+    /* The flash: over-bright for two frames… */
+    transform: scale(1.03);
+    filter: brightness(1.65) saturate(1.1);
+    box-shadow: 0 0 26px -2px var(--eu-energy-neutral, #c3c8d2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: brightness(1);
+  }
+}
+
+.reward-modal .reward-choice__option:hover:not(:disabled) {
+  border-color: var(--eu-energy-neutral, #c3c8d2);
+  box-shadow: 0 0 18px -6px var(--eu-energy-neutral, #c3c8d2);
+}
+.reward-modal .reward-choice__option--chosen {
+  border-color: var(--eu-energy-neutral, #c3c8d2);
+  box-shadow:
+    0 0 0 1px var(--eu-energy-neutral, #c3c8d2),
+    0 0 22px -4px var(--eu-energy-neutral, #c3c8d2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reward-modal__backdrop {
+    animation: none;
+  }
+  .reward-modal .reward-choice__option {
+    animation: none;
+    opacity: 1;
+  }
+}
