@@ -15,6 +15,7 @@
   --c-white: #eef2f8;
   --c-green: #29d17a;
   --c-purple: #9b5cff;
+  --c-gold: #d9a441;
 
   --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --shell-max: 1180px;
@@ -1035,4 +1036,400 @@ code {
   color: var(--c-ink);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* ---- Blog: index feed --------------------------------------------------- */
+.eu-blog-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 2rem;
+  max-width: 52rem;
+}
+
+.eu-blog-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.4rem 1.5rem;
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-left: 4px solid var(--c-line);
+  border-radius: 13px;
+  transition: transform 0.14s, border-color 0.16s, background 0.16s;
+}
+
+.eu-blog-item:hover {
+  transform: translateY(-2px);
+  background: var(--c-bg-2);
+}
+
+.eu-blog-item--red { border-left-color: var(--c-red); }
+.eu-blog-item--blue { border-left-color: var(--c-blue); }
+.eu-blog-item--white { border-left-color: var(--c-white); }
+.eu-blog-item--green { border-left-color: var(--c-green); }
+.eu-blog-item--purple { border-left-color: var(--c-purple); }
+.eu-blog-item--gold { border-left-color: var(--c-gold); }
+
+.eu-blog-item__eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.68rem;
+  color: var(--c-ink-dim);
+}
+
+.eu-blog-item__title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.eu-blog-item__summary {
+  margin: 0;
+  color: var(--c-ink-dim);
+  font-size: 0.95rem;
+}
+
+.eu-blog-item__cta {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* Restricted (Shaman) entry: classified-file card. */
+.eu-blog-item--restricted {
+  border-left-color: var(--c-purple);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.025) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(120deg, rgba(155, 92, 255, 0.1), rgba(7, 8, 13, 0.6));
+}
+
+.eu-blog-item--restricted:hover {
+  border-color: var(--c-purple);
+}
+
+.eu-blog-item__lock {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.3em;
+  padding: 0.25rem 0.55rem 0.25rem 0.75rem;
+  border: 1px solid var(--c-purple);
+  color: var(--c-purple);
+  border-radius: 3px;
+}
+
+.eu-blog-item__summary--mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  color: var(--c-purple);
+  opacity: 0.85;
+}
+
+/* ---- Blog: article page ------------------------------------------------- */
+.eu-post__back {
+  color: var(--c-ink-dim);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.eu-post__back:hover {
+  color: var(--c-ink);
+}
+
+.eu-post__body {
+  max-width: 44rem;
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+
+.eu-post__body > p {
+  margin: 0 0 1.15rem;
+  color: var(--c-ink-dim);
+}
+
+.eu-post__heading {
+  margin: 2.2rem 0 0.9rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--c-ink);
+}
+
+.eu-post__pull {
+  margin: 1.8rem 0;
+  padding: 0.35rem 0 0.35rem 1.15rem;
+  border-left: 3px solid var(--c-line);
+  font-size: 1.18rem;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--c-ink);
+}
+
+.eu-post__pull--red { border-left-color: var(--c-red); }
+.eu-post__pull--blue { border-left-color: var(--c-blue); }
+.eu-post__pull--white { border-left-color: var(--c-white); }
+.eu-post__pull--green { border-left-color: var(--c-green); }
+.eu-post__pull--purple { border-left-color: var(--c-purple); }
+.eu-post__pull--gold { border-left-color: var(--c-gold); }
+
+.eu-page--gold {
+  border-top-color: var(--c-gold);
+}
+
+.eu-post__footer {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--c-line);
+}
+
+/* ---- Blog: restricted archive (Shaman) ---------------------------------- */
+/* Full-bleed corrupted-signal stage. Escapes .eu-main's column so the static
+   covers the whole viewport width; min-height keeps it a full "screen". */
+.eu-restricted {
+  position: relative;
+  width: 100vw;
+  margin: -2.5rem calc(50% - 50vw) -4rem;
+  min-height: calc(100vh - 64px);
+  display: grid;
+  place-items: center;
+  padding: 4.5rem 1.25rem;
+  overflow: hidden;
+  background:
+    radial-gradient(80% 60% at 50% 45%, rgba(155, 92, 255, 0.14), transparent 70%),
+    radial-gradient(120% 100% at 50% 110%, rgba(90, 40, 160, 0.18), transparent 60%),
+    #030307;
+  isolation: isolate;
+}
+
+/* TV static: tiled SVG turbulence noise, jittered in coarse steps. */
+.eu-restricted__static {
+  position: absolute;
+  inset: -60px;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.16;
+  animation: eu-static-jitter 0.45s steps(4) infinite;
+}
+
+@keyframes eu-static-jitter {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-18px, 12px); }
+  50% { transform: translate(14px, -20px); }
+  75% { transform: translate(-10px, -8px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* Scanlines + a slow violet interference sweep. */
+.eu-restricted__scanlines {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.32) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(155, 92, 255, 0.06) 48%,
+      rgba(155, 92, 255, 0.12) 50%,
+      rgba(155, 92, 255, 0.06) 52%,
+      transparent 100%
+    );
+  background-size: 100% 100%, 100% 340%;
+  animation: eu-signal-sweep 7s linear infinite;
+}
+
+@keyframes eu-signal-sweep {
+  from { background-position: 0 0, 0 -120%; }
+  to { background-position: 0 0, 0 220%; }
+}
+
+/* Corner interface readouts. */
+.eu-restricted__readout {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.28em;
+  color: rgba(238, 242, 248, 0.5);
+  text-shadow: 0 0 6px rgba(155, 92, 255, 0.5);
+}
+
+.eu-restricted__readout--tl {
+  top: 1.1rem;
+  left: 1.25rem;
+}
+
+.eu-restricted__readout--br {
+  bottom: 1.1rem;
+  right: 1.25rem;
+  text-align: right;
+}
+
+/* Centered archive content. */
+.eu-restricted__center {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4rem;
+  max-width: 38rem;
+  text-align: center;
+}
+
+.eu-restricted__file {
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  color: var(--c-ink-dim);
+}
+
+/* Distressed stamp. The noise overlay (::after) eats into the ink so the
+   stamp reads as worn rather than freshly printed. */
+.eu-restricted__stamp {
+  position: relative;
+  padding: 1.1rem 2.2rem;
+  border: 4px double rgba(238, 242, 248, 0.85);
+  border-radius: 6px;
+  transform: rotate(-4deg);
+  font-size: clamp(1.9rem, 7vw, 3.2rem);
+  font-weight: 900;
+  line-height: 1.08;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(238, 242, 248, 0.92);
+  text-shadow:
+    0 0 18px rgba(155, 92, 255, 0.55),
+    2px 0 0 rgba(155, 92, 255, 0.35),
+    -2px 0 0 rgba(46, 139, 255, 0.2);
+  box-shadow:
+    0 0 34px rgba(155, 92, 255, 0.28),
+    inset 0 0 22px rgba(155, 92, 255, 0.14);
+}
+
+.eu-restricted__stamp::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.eu-restricted__denied {
+  margin: -0.4rem 0 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.5em;
+  padding-left: 0.5em; /* optically recenters the letterspaced line */
+  color: var(--c-purple);
+  animation: eu-denied-blink 2.4s steps(2) infinite;
+}
+
+@keyframes eu-denied-blink {
+  0%, 74% { opacity: 1; }
+  75%, 100% { opacity: 0.25; }
+}
+
+/* Intelligence-notice block. */
+.eu-restricted__notice {
+  padding: 1.2rem 1.4rem;
+  border: 1px solid rgba(155, 92, 255, 0.35);
+  border-radius: 4px;
+  background: rgba(5, 4, 10, 0.72);
+  backdrop-filter: blur(2px);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.86rem;
+  line-height: 1.8;
+  color: rgba(238, 242, 248, 0.78);
+}
+
+.eu-restricted__notice p {
+  margin: 0 0 0.85rem;
+}
+
+.eu-restricted__notice p:last-child {
+  margin-bottom: 0;
+}
+
+/* The one truth — warning treatment with a glitch skew. */
+.eu-restricted__warning {
+  margin: 0;
+  font-size: clamp(1.05rem, 3.4vw, 1.5rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow:
+    0 0 14px rgba(155, 92, 255, 0.9),
+    1px 0 0 rgba(255, 46, 77, 0.55),
+    -1px 0 0 rgba(46, 139, 255, 0.55);
+  animation: eu-warning-glitch 3.2s infinite;
+}
+
+@keyframes eu-warning-glitch {
+  0%, 92%, 100% { transform: none; opacity: 1; }
+  93% { transform: translateX(-2px) skewX(-6deg); opacity: 0.85; }
+  94% { transform: translateX(2px) skewX(4deg); }
+  95% { transform: none; }
+  97% { transform: translateX(1px); opacity: 0.9; }
+}
+
+.eu-restricted__exit {
+  margin-top: 0.8rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  color: var(--c-ink-dim);
+  border-bottom: 1px dotted var(--c-ink-dim);
+  padding-bottom: 2px;
+}
+
+.eu-restricted__exit:hover {
+  color: var(--c-ink);
+  border-bottom-color: var(--c-ink);
+}
+
+@media (max-width: 560px) {
+  .eu-restricted {
+    padding: 3.5rem 1rem;
+  }
+
+  .eu-restricted__readout--br {
+    display: none;
+  }
+
+  .eu-restricted__notice {
+    font-size: 0.8rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eu-restricted__static,
+  .eu-restricted__scanlines,
+  .eu-restricted__denied,
+  .eu-restricted__warning {
+    animation: none;
+  }
 }

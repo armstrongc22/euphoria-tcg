@@ -6,6 +6,7 @@ import { Cards } from "./pages/Cards";
 import { Manga } from "./pages/Manga";
 import { Shop } from "./pages/Shop";
 import { Blog } from "./pages/Blog";
+import { BlogPost } from "./pages/BlogPost";
 import { MapPage } from "./pages/MapPage";
 import { NotFound } from "./pages/NotFound";
 
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
       { path: "manga", element: <Manga /> },
       { path: "shop", element: <Shop /> },
       { path: "blog", element: <Blog /> },
+      { path: "blog/:slug", element: <BlogPost /> },
       { path: "map", element: <MapPage /> },
       { path: "*", element: <NotFound /> },
     ],
