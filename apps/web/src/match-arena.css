@@ -60,23 +60,32 @@
   --arena-hand-min: clamp(168px, 24vh, 290px);
   --arena-strip-h: clamp(46px, 6vh, 58px);
   --arena-actions-h: clamp(46px, 6vh, 56px);
+  /* Per-field row sizing, overridable independently (mobile compresses an
+     EMPTY field without touching the occupied one). */
+  --arena-row-opp: minmax(var(--arena-field-min), 1fr);
+  --arena-row-mine: minmax(var(--arena-field-min), 1fr);
   flex: 1;
   min-height: 0;
   display: grid;
   gap: var(--arena-gap);
-  grid-template-columns: 1fr;
+  /* minmax(0, …), NOT bare 1fr: a bare fr track can never shrink below its
+     rows' min-content, so one wide row silently widened the whole column past
+     a phone viewport and pushed End Turn off the right edge. */
+  grid-template-columns: minmax(0, 1fr);
   /* Fields AND hand flex to fill ALL available height (fr units) with readable
      minimums. The HAND carries the most weight (cards are height-driven, so a
      taller row = bigger cards); the center status row is gone (info is in the
      HUD), reclaiming that height for the cards. */
   grid-template-rows:
     auto                                       /* top: compact HUD */
-    minmax(var(--arena-field-min), 1fr)        /* opponent field */
+    var(--arena-row-opp)                       /* opponent field */
     auto                                       /* lane: transient status only */
-    minmax(var(--arena-field-min), 1fr)        /* player field */
+    var(--arena-row-mine)                      /* player field */
     auto                                       /* command strip (0 when empty) */
     minmax(var(--arena-hand-min), 1.7fr)       /* hand dock — biggest cards */
-    var(--arena-actions-h)                     /* primary actions */
+    /* Primary actions grow by the device's bottom safe area, so End Turn is
+       never under an iPhone home indicator (the row pads, buttons keep size). */
+    calc(var(--arena-actions-h) + env(safe-area-inset-bottom, 0px))
     auto;                                      /* combat log (secondary) */
   grid-template-areas:
     "top"
@@ -96,6 +105,11 @@
 .gc .arena__hand { grid-area: hand; min-height: 0; }
 .gc .arena__actions { grid-area: actions; min-height: 0; }
 .gc .arena__log { grid-area: log; }
+/* Grid items must be allowed to shrink to the track (belt to the minmax(0,…)
+   braces above) — otherwise wide content re-widens the column. */
+.gc .arena > * {
+  min-width: 0;
+}
 
 /* Opponent/player areas: field scrolls internally, never collapses. */
 .gc .arena__opp,
@@ -1318,5 +1332,204 @@
   .gc .play-match__warrior:hover,
   .gc .play-match__actionbar button:hover {
     transform: none;
+  }
+}
+
+/* ---- Mobile rehab ----------------------------------------------------------
+   1) Safe-area padding so End Turn / the hand dock never sit under a phone's
+      home indicator.
+   2) Short/narrow viewport safety: compact row minimums at phone widths, and
+      when the viewport is shorter than the board's minimum stack (landscape
+      phones), the game area scrolls INTERNALLY instead of clipping actions.
+   (The HUD "Home" exit button + confirm dialog were removed — the way out of
+   the beta is the main menu's "← Exit to Site"; in-match, Concede owns the
+   corner.) */
+
+/* Thumb zone: keep the primary action row + hand clear of browser chrome. */
+.gc .arena__actions {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ---- Phone layout: the WHOLE core arena fits one screen -------------------
+   Target model (mobile rehab v2): opponent field, player field, hand, and the
+   Enter Battle / End Turn bar ALL visible with no page scrolling; only the
+   hand (and an overflowing field) scrolls horizontally. The grid's minimum
+   stack is budgeted for the smallest real phone (iPhone SE portrait, ~548px
+   of visible dvh): HUD ~30 + field 78 + lane ~36 + field 78 + selected pill
+   ≤60 + hand 132 + actions 52+inset + log bar ~30 + gaps ≈ 525px.
+
+   NOTE: the row variables are DEFINED on .gc .arena (own definitions beat
+   values inherited from .play-match), so the overrides live there too — the
+   earlier .play-match override silently never applied, which is exactly why
+   phones still clipped. */
+@media (max-width: 700px) {
+  .gc .gc-screen-root:has(.arena) > .play-match {
+    padding: 0.2rem 0.3rem 0;
+  }
+  .gc .arena {
+    --arena-gap: 0.2rem;
+    --arena-field-min: clamp(78px, 12dvh, 130px);
+    --arena-hand-min: clamp(132px, 21dvh, 210px);
+    --arena-actions-h: 52px;
+  }
+
+  /* 1) Compact HUD: drop the brand AND the turn/phase text (the phase banner
+     directly below already says "Turn N — X phase") — one thin row of
+     title … Concede | Report, side by side. The title is the only child
+     allowed to shrink, so the buttons can never be pushed past the edge. */
+  .gc .play-match__hud-brand,
+  .gc .play-match__hud-turn {
+    display: none;
+  }
+  .gc .play-match__header {
+    padding: 0.25rem 0.4rem;
+    gap: 0.3rem 0.4rem;
+  }
+  .gc .play-match__hud-title {
+    font-size: 0.78rem;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .gc .play-match__hud .play-match__quit {
+    margin-left: auto;
+  }
+  .gc .play-match__hud .play-match__quit,
+  .gc .play-match__hud .play-match__report {
+    white-space: nowrap;
+  }
+
+  /* 2) Compact center lane (phase banner + notices). */
+  .gc .play-match__phase {
+    padding: 0.22rem 0.5rem;
+  }
+  .gc .play-match__phase-state {
+    font-size: 0.82rem;
+  }
+  .gc .play-match__phase-sub,
+  .gc .play-match__callout,
+  .gc .play-match__hint {
+    font-size: 0.68rem;
+  }
+
+  /* 3) Selected-card action pill: one compact horizontal strip, capped so
+     selecting a card can never push the action bar off-screen. Extra buttons
+     scroll sideways inside the pill rather than wrapping taller. */
+  .gc .arena__command {
+    max-height: 60px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.3rem 0.45rem;
+    gap: 0.4rem;
+  }
+  .gc .arena__command .play-match__selected-title {
+    max-width: 34vw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.78rem;
+  }
+  .gc .arena__command .play-match__selected-sub {
+    display: none; /* the pill keeps name + actions; stats live on Inspect */
+  }
+  .gc .arena__command .play-match__selected-actions {
+    flex-wrap: nowrap;
+  }
+  .gc .arena__command .play-match__selected-actions button {
+    white-space: nowrap;
+    font-size: 0.78rem;
+    padding: 0.4rem 0.6rem;
+  }
+
+  /* 4) Hand: sideways-only scroll with snap; cards sized for thumbs (big
+     enough to read/tap, never vertically cropped — contain is inherited). */
+  .gc .arena__hand .play-match__card {
+    width: clamp(118px, 34vw, 160px);
+    scroll-snap-align: start;
+  }
+  .gc .arena__hand .play-match__zone-label {
+    display: none; /* the dock is self-evident; give the pixels to cards */
+  }
+
+  /* 5) Fields: readable but compact; empty-state stays low-profile. */
+  .gc .play-match__empty {
+    font-size: 0.7rem;
+  }
+  .gc .arena__opp .play-match__zone,
+  .gc .arena__mine .play-match__zone {
+    padding: 0.15rem 0.3rem;
+    gap: 0.15rem;
+  }
+
+  /* 6) Primary actions: a TRUE two-column grid (minmax(0,1fr) columns), so
+     Enter Battle and End Turn always share the viewport width — neither can
+     push the other off the right edge. The decorative skew clip is dropped on
+     phones: every pixel is tap target. */
+  .gc .arena__actions .play-match__actionbar {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 0.35rem;
+    margin-top: 0.2rem;
+  }
+  .gc .arena__actions .play-match__actionbar button {
+    min-width: 0;
+    font-size: 0.84rem;
+    letter-spacing: 0.02em;
+    padding: 0.3rem 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    clip-path: none;
+  }
+
+  /* 7) Combat log: REMOVED on phones. The full history stays computed (and
+     the desktop side column is untouched) — on a phone every pixel goes to
+     the board, and the floating chip proved to be clutter. The element stays
+     in the DOM (no view-logic change); it's simply never displayed. */
+  .gc .arena__log {
+    display: none;
+  }
+
+  /* 8) Empty fields compress (min 46px, small flex share) so their height
+     flows to the hand and to whichever field actually has Warriors; summoning
+     lets the row grow back to card size. */
+  .gc .arena:has(.arena__opp .play-match__empty) {
+    --arena-row-opp: minmax(46px, 0.4fr);
+  }
+  .gc .arena:has(.arena__mine .play-match__empty) {
+    --arena-row-mine: minmax(46px, 0.4fr);
+  }
+
+  /* 9) In-match shell diet: the deck-status note ("Using your custom deck."),
+     the app footer, and HUD bulk make way for the board. The note still shows
+     on the account screen; Menu/Account stay, just tighter. */
+  .gc .account__deck-note:has(+ .play-match) {
+    display: none;
+  }
+  .gc:has(.arena) .gc-foot {
+    display: none;
+  }
+  .gc:has(.arena) .gc-hud {
+    padding: 0.3rem 0.55rem;
+  }
+  .gc:has(.arena) .gc-hud__btn {
+    font-size: 0.72rem;
+    padding: 0.25rem 0.5rem;
+  }
+  .gc:has(.arena) .gc-hud__title {
+    font-size: 0.8rem;
+  }
+}
+
+/* Landscape phones / very short screens (FALLBACK ONLY — the portrait budget
+   above fits real phones): the minimum stack can't fit, so the game area
+   scrolls internally (controlled, inside the app shell) rather than clipping
+   End Turn off-screen. An arena pager/carousel stays deliberately deferred. */
+@media (max-height: 560px) {
+  .gc .gc-screen-root:has(.arena) {
+    overflow-y: auto;
+  }
+  .gc .gc-screen-root:has(.arena) > .play-match {
+    min-height: 560px;
   }
 }

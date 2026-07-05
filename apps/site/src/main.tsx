@@ -4,6 +4,7 @@ import { RouterProvider } from "react-router-dom";
 import { router } from "./router";
 import "./fx-tokens.css";
 import "./styles.css";
+import "./hub.css";
 
 const rootEl = document.getElementById("root");
 if (rootEl === null) {

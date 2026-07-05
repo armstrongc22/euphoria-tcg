@@ -103,7 +103,15 @@
   filter: saturate(1.05) contrast(1.03);
 }
 
-/* ---- Markers ------------------------------------------------------------ */
+/* ---- Markers --------------------------------------------------------------
+   Compact glowing nodes (ux-reboot pass): a small dark glass core carrying the
+   type glyph, a thin faction-colored energy ring, and a light hairline that
+   keeps every marker separated from any terrain (parchment, ocean, forest —
+   and it's what keeps the black Criminal ring readable). Idle is calm; hover
+   RADIATES (brightened core, grown glow, two soft ripple rings); selected
+   (open lore card) adds a steady locked-on halo one step above hover. The
+   visual node is 18px but the pointer target stays ≥34px via an invisible
+   hit extender, so touch usability is unchanged. */
 .eu-map-marker {
   /* Default ring tint; markers with a faction override --faction inline. */
   --faction: rgba(238, 242, 248, 0.45);
@@ -112,66 +120,154 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.3rem;
   cursor: pointer;
   z-index: 2;
-  /* The hit area is the glyph disc; the label floats above it. */
+}
+/* Invisible hit extender: small marker, honest touch target. */
+.eu-map-marker::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 34px;
+  height: 34px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
 }
 
-/* The glyph disc carries the symbol (ink) with a faction-colored ring + glow.
-   --faction is set inline per marker (default = subtle ivory for no faction). */
 .eu-map-marker__glyph {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  color: #f3ead0;
+  width: 18px;
+  height: 18px;
+  color: #eef2f8;
   border-radius: 50%;
-  background: radial-gradient(
-    circle at 50% 42%,
-    rgba(10, 13, 22, 0.92),
-    rgba(7, 8, 13, 0.78)
-  );
-  /* Light hairline first so even a black (Criminal) ring stays readable. */
+  /* Dark glass core: deep base + a faint top sheen. */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 42%),
+    radial-gradient(circle at 50% 44%, rgba(12, 15, 24, 0.95), rgba(7, 8, 13, 0.85));
+  /* Light hairline → thin energy ring → tight ambient glow → ground shadow. */
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.28),
-    0 0 0 3px var(--faction),
-    0 0 12px 1px var(--faction),
-    0 2px 6px rgba(0, 0, 0, 0.7);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+    0 0 0 1px rgba(255, 255, 255, 0.34),
+    0 0 0 2.5px var(--faction),
+    0 0 7px 0 var(--faction),
+    0 1px 4px rgba(0, 0, 0, 0.65);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, color 0.16s ease;
 }
 .eu-map-marker__glyph svg {
-  width: 15px;
-  height: 15px;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+  width: 11px;
+  height: 11px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.55));
 }
+
+/* Ripple rings (hover/selected only — idle stays calm). Two staggered
+   faction-colored rings expanding and fading: energy radiating outward. */
+.eu-map-marker__glyph::before,
+.eu-map-marker__glyph::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1px solid var(--faction);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---- Hover / keyboard focus: radiate ------------------------------------ */
 .eu-map-marker:hover .eu-map-marker__glyph,
 .eu-map-marker:focus-visible .eu-map-marker__glyph {
-  transform: scale(1.18);
+  color: #ffffff;
+  transform: scale(1.12);
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.28),
-    0 0 0 3px var(--faction),
-    0 0 20px 5px var(--faction),
-    0 2px 8px rgba(0, 0, 0, 0.8);
+    0 0 0 1px rgba(255, 255, 255, 0.5),
+    0 0 0 2.5px var(--faction),
+    0 0 14px 3px var(--faction),
+    0 1px 5px rgba(0, 0, 0, 0.7);
+}
+.eu-map-marker:hover .eu-map-marker__glyph::before,
+.eu-map-marker:focus-visible .eu-map-marker__glyph::before {
+  animation: eu-map-ripple 1.5s ease-out infinite;
+}
+.eu-map-marker:hover .eu-map-marker__glyph::after,
+.eu-map-marker:focus-visible .eu-map-marker__glyph::after {
+  animation: eu-map-ripple 1.5s ease-out 0.4s infinite;
+}
+@keyframes eu-map-ripple {
+  0% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.1);
+  }
+}
+
+/* ---- Selected (open lore card): locked on ------------------------------- */
+.eu-map-marker--selected {
+  z-index: 5;
+}
+.eu-map-marker--selected .eu-map-marker__glyph {
+  color: #ffffff;
+  transform: scale(1.18);
+  /* The steady halo: an extra offset ring hover doesn't have. */
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 0 0 2.5px var(--faction),
+    0 0 0 5.5px rgba(7, 8, 13, 0.65),
+    0 0 0 6.5px var(--faction),
+    0 0 18px 5px var(--faction),
+    0 1px 6px rgba(0, 0, 0, 0.75);
+}
+.eu-map-marker--selected .eu-map-marker__glyph::before {
+  animation: eu-map-ripple 2.2s ease-out infinite;
+}
+.eu-map-marker--selected .eu-map-marker__label {
+  opacity: 1;
 }
 
 .eu-map-marker__label {
   transform: translateY(-2px);
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
   white-space: nowrap;
   padding: 0.1rem 0.4rem;
-  border-radius: 6px;
+  border-radius: 5px;
   color: var(--c-ink);
-  background: rgba(7, 8, 13, 0.82);
+  background: rgba(7, 8, 13, 0.85);
   border: 1px solid var(--c-line);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.12s ease;
+  transition: opacity 0.16s ease;
 }
 .eu-map-marker:hover .eu-map-marker__label {
   opacity: 1;
+}
+
+/* Touch devices: no hover — rely on the bigger hit target + selected state. */
+@media (pointer: coarse) {
+  .eu-map-marker::after {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Reduced motion: ripples/pulse off; the static glow states remain. */
+@media (prefers-reduced-motion: reduce) {
+  .eu-map-marker__glyph,
+  .eu-map-marker__label {
+    transition: none;
+  }
+  .eu-map-marker:hover .eu-map-marker__glyph::before,
+  .eu-map-marker:hover .eu-map-marker__glyph::after,
+  .eu-map-marker:focus-visible .eu-map-marker__glyph::before,
+  .eu-map-marker:focus-visible .eu-map-marker__glyph::after,
+  .eu-map-marker--selected .eu-map-marker__glyph::before {
+    animation: none;
+  }
 }
 
 /* ---- Overlays (zoom + badge) ------------------------------------------- */
@@ -1011,7 +1107,8 @@
   color: var(--c-ink-dim);
 }
 
-/* Highlighted (searched-to) marker pulses briefly. */
+/* Highlighted (searched-to) marker pulses briefly — retuned to the compact
+   node scale so the flash still beckons without ballooning. */
 .eu-map-marker--active {
   z-index: 4;
 }
@@ -1023,12 +1120,17 @@
 }
 @keyframes eu-map-pulse {
   0%, 100% {
-    transform: scale(1.1);
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28), 0 0 0 3px var(--faction), 0 0 14px 3px var(--faction);
+    transform: scale(1.08);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.34), 0 0 0 2.5px var(--faction), 0 0 10px 2px var(--faction);
   }
   50% {
-    transform: scale(1.28);
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4), 0 0 0 3px var(--faction), 0 0 26px 8px var(--faction);
+    transform: scale(1.22);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5), 0 0 0 2.5px var(--faction), 0 0 18px 5px var(--faction);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .eu-map-marker--active .eu-map-marker__glyph {
+    animation: none;
   }
 }
 
@@ -1110,4 +1212,59 @@
       opacity: 1;
     }
   }
+}
+
+/* ---- 3D Flight Mode (Phase D) --------------------------------------------
+   The real Three.js scene behind the gate. The canvas fills the stage; HUD
+   buttons reuse .eu-map-btn; the hint line doubles as the hover readout. */
+.eu-map-flight__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.eu-map-flight__stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 72vh;
+  border: 1px solid var(--c-line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0a0c10;
+}
+.eu-map-flight__stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none; /* one finger orbits; the page must not scroll-fight */
+}
+.eu-map-flight__status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  color: var(--c-ink);
+  background: rgba(7, 8, 13, 0.85);
+  border: 1px solid var(--c-line);
+  border-radius: 8px;
+}
+.eu-map-flight__hint {
+  margin: 0.5rem 0 0;
+  min-height: 1.2em;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--c-ink-dim);
+}
+@media (max-width: 640px) {
+  .eu-map-flight__stage {
+    aspect-ratio: 3 / 4; /* portrait phones: taller stage, whole map in view */
+  }
+}
+
+/* HUD toggle in its pressed state (e.g. Territories on). */
+.eu-map-btn--on {
+  border-color: var(--c-purple);
+  box-shadow: 0 0 0 1px var(--c-purple), 0 0 12px -4px var(--c-purple);
 }

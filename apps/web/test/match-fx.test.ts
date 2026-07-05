@@ -13,7 +13,11 @@ import {
   type MatchAnimDetail,
 } from "@euphoria/core/match-playback";
 import { FLAG_NO_ANIM, setFlag } from "../src/debug-flags";
-import { attachMatchFx } from "../src/match-fx";
+import {
+  attachMatchFx,
+  ATTACK_CARD_FX_EVENT,
+  type AttackCardFxDetail,
+} from "../src/match-fx";
 
 function makeBoard(): HTMLElement {
   const board = document.createElement("section");
@@ -173,5 +177,262 @@ describe("attachMatchFx — kill switches", () => {
     expect(board.querySelector(".match-fx")).toBeNull();
     fire(board, { kind: "summon", targetInstanceId: "warrior-1" });
     expect(board.querySelector(".match-fx")).toBeNull();
+  });
+});
+
+describe("attachMatchFx — faction signatures", () => {
+  const FACTIONS: ReadonlyArray<[string, string]> = [
+    ["Dwarf", "dwarf"],
+    ["Monk", "monk"],
+    ["Surfer", "surfer"],
+    ["Sonic", "sonic"],
+    ["Shaman", "shaman"],
+    ["Human", "human"],
+    ["Neutral", "neutral"],
+    ["Criminal", "criminal"],
+  ];
+
+  it("stamps every recognized faction's modifier and energy token", () => {
+    for (const [faction, slug] of FACTIONS) {
+      const board = makeBoard();
+      const detach = attachMatchFx(board, {
+        playerFaction: faction,
+        opponentFaction: "Neutral",
+      });
+      fire(board, { kind: "summon", actor: "player", targetInstanceId: "warrior-1" });
+      const node = board.querySelector<HTMLElement>(".match-fx--burst")!;
+      expect(node.classList.contains(`match-fx--${slug}`)).toBe(true);
+      expect(node.style.getPropertyValue("--fx-energy")).toBe(
+        `var(--eu-energy-${slug})`,
+      );
+      detach();
+      board.remove();
+    }
+  });
+
+  it("falls back to the base template + Neutral energy for unknown factions", () => {
+    const board = makeBoard();
+    const detach = attachMatchFx(board, {
+      playerFaction: "Mystery",
+      opponentFaction: "Neutral",
+    });
+    fire(board, { kind: "summon", actor: "player", targetInstanceId: "warrior-1" });
+    const node = board.querySelector<HTMLElement>(".match-fx--burst")!;
+    expect(node.className).toBe("match-fx match-fx--burst"); // no modifier
+    expect(node.style.getPropertyValue("--fx-energy")).toBe("var(--eu-energy-neutral)");
+    detach();
+  });
+
+  it("Dwarf hits request the micro-shake without crashing where WAAPI is absent", () => {
+    const board = makeBoard();
+    const animate = vi.fn();
+    (board as HTMLElement & { animate?: unknown }).animate = animate;
+    const detach = attachMatchFx(board, {
+      playerFaction: "Dwarf",
+      opponentFaction: "Monk",
+    });
+    fire(board, { kind: "damage", actor: "player", targetInstanceId: "warrior-1" });
+    expect(animate).toHaveBeenCalledTimes(1);
+    // Throttled: an immediate second hit shakes once, not twice.
+    fire(board, { kind: "damage", actor: "player", targetInstanceId: "warrior-1" });
+    expect(animate).toHaveBeenCalledTimes(1);
+    // Non-Dwarf actors never shake.
+    fire(board, { kind: "damage", actor: "opponent", targetInstanceId: "warrior-1" });
+    expect(animate).toHaveBeenCalledTimes(1);
+    // And a board without Element.animate (jsdom default) is a silent no-op.
+    delete (board as unknown as { animate?: unknown }).animate;
+    fire(board, { kind: "directAttack", actor: "player", targetPlayer: "player2" });
+    expect(board.querySelectorAll(".match-fx--impact").length).toBeGreaterThan(0);
+    detach();
+  });
+});
+
+describe("attachMatchFx — attack-card super move", () => {
+  const superDetail = (over: Partial<AttackCardFxDetail> = {}): AttackCardFxDetail => ({
+    cardName: "Serf's Bondage",
+    artUrl: "/beta/cards/x.png",
+    actor: "player",
+    targetInstanceId: "warrior-1",
+    ...over,
+  });
+  const fireSuper = (board: HTMLElement, detail: AttackCardFxDetail): void => {
+    board.dispatchEvent(new CustomEvent(ATTACK_CARD_FX_EVENT, { detail }));
+  };
+
+  it("renders veil, speed lines, card art, and the name in the actor's energy", () => {
+    const board = makeBoard();
+    const detach = attachMatchFx(board, OPTS);
+    fireSuper(board, superDetail());
+    const overlay = board.querySelector<HTMLElement>(".match-fx-super")!;
+    expect(overlay).not.toBeNull();
+    expect(overlay.classList.contains("match-fx-super--player")).toBe(true);
+    expect(overlay.classList.contains("match-fx--monk")).toBe(true);
+    expect(overlay.style.getPropertyValue("--fx-energy")).toBe("var(--eu-energy-monk)");
+    expect(overlay.querySelectorAll(".match-fx-super__line")).toHaveLength(3);
+    expect(overlay.querySelector<HTMLImageElement>(".match-fx-super__art")!.src).toContain("x.png");
+    expect(overlay.querySelector(".match-fx-super__name")!.textContent).toBe("Serf's Bondage");
+    expect(overlay.getAttribute("aria-hidden")).toBe("true");
+    detach();
+  });
+
+  it("uses the opponent entry side + their faction for opponent supers", () => {
+    const board = makeBoard();
+    const detach = attachMatchFx(board, OPTS);
+    fireSuper(board, superDetail({ actor: "opponent" }));
+    const overlay = board.querySelector<HTMLElement>(".match-fx-super")!;
+    expect(overlay.classList.contains("match-fx-super--opponent")).toBe(true);
+    expect(overlay.style.getPropertyValue("--fx-energy")).toBe("var(--eu-energy-dwarf)");
+    detach();
+  });
+
+  it("falls back to a text card face without art", () => {
+    const board = makeBoard();
+    const detach = attachMatchFx(board, OPTS);
+    fireSuper(board, superDetail({ artUrl: undefined }));
+    const face = board.querySelector(".match-fx-super__card--text")!;
+    expect(face.textContent).toBe("Serf's Bondage");
+    expect(board.querySelector(".match-fx-super__art")).toBeNull();
+    detach();
+  });
+
+  it("reveals, then GOes, lands the impact in the final third, and cleans up", async () => {
+    vi.useFakeTimers();
+    try {
+      const board = makeBoard();
+      const animate = vi.fn();
+      (board as HTMLElement & { animate?: unknown }).animate = animate;
+      const detach = attachMatchFx(board, OPTS);
+      fireSuper(board, superDetail());
+      const overlay = board.querySelector<HTMLElement>(".match-fx-super")!;
+      // Reveal beat: on screen but not sweeping yet; desktop GO pacing set.
+      expect(overlay.classList.contains("match-fx-super--go")).toBe(false);
+      expect(overlay.style.getPropertyValue("--super-go")).toBe("900ms");
+      // After the minimum beat (+ decode timeout at worst) the sweep starts.
+      await vi.advanceTimersByTimeAsync(300);
+      expect(overlay.classList.contains("match-fx-super--go")).toBe(true);
+      expect(board.querySelector(".match-fx--impact")).toBeNull(); // not yet
+      // The impact lands in the GO phase's final third (900 × 0.66 = 594).
+      await vi.advanceTimersByTimeAsync(600);
+      expect(board.querySelector(".match-fx--impact")).not.toBeNull();
+      expect(animate).toHaveBeenCalledTimes(1); // the slam shake
+      // Cleanup just after the GO fade (900ms + slack).
+      await vi.advanceTimersByTimeAsync(400);
+      expect(board.querySelector(".match-fx-super")).toBeNull();
+      detach();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("holds the reveal until the art decodes, then flips to GO", async () => {
+    vi.useFakeTimers();
+    const proto = HTMLImageElement.prototype as { decode?: () => Promise<void> };
+    const original = proto.decode;
+    let resolveDecode: (() => void) | undefined;
+    proto.decode = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveDecode = resolve;
+        }),
+    );
+    try {
+      const board = makeBoard();
+      const detach = attachMatchFx(board, OPTS);
+      fireSuper(board, superDetail());
+      const overlay = board.querySelector<HTMLElement>(".match-fx-super")!;
+      // Past the minimum beat but the art is still decoding: keep holding.
+      await vi.advanceTimersByTimeAsync(200);
+      expect(overlay.classList.contains("match-fx-super--go")).toBe(false);
+      resolveDecode!();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(overlay.classList.contains("match-fx-super--go")).toBe(true);
+      detach();
+    } finally {
+      proto.decode = original;
+      vi.useRealTimers();
+    }
+  });
+
+  it("never stalls on a hung decode: the timeout starts the sweep", async () => {
+    vi.useFakeTimers();
+    const proto = HTMLImageElement.prototype as { decode?: () => Promise<void> };
+    const original = proto.decode;
+    proto.decode = vi.fn(() => new Promise<void>(() => {})); // never settles
+    try {
+      const board = makeBoard();
+      const detach = attachMatchFx(board, OPTS);
+      fireSuper(board, superDetail());
+      const overlay = board.querySelector<HTMLElement>(".match-fx-super")!;
+      await vi.advanceTimersByTimeAsync(200);
+      expect(overlay.classList.contains("match-fx-super--go")).toBe(false);
+      await vi.advanceTimersByTimeAsync(80); // the 250ms decode timeout passed
+      expect(overlay.classList.contains("match-fx-super--go")).toBe(true);
+      detach();
+    } finally {
+      proto.decode = original;
+      vi.useRealTimers();
+    }
+  });
+
+  it("a replaced super never GOes or fires its impact", async () => {
+    vi.useFakeTimers();
+    try {
+      const board = makeBoard();
+      const detach = attachMatchFx(board, OPTS);
+      fireSuper(board, superDetail());
+      const first = board.querySelector<HTMLElement>(".match-fx-super")!;
+      fireSuper(board, superDetail({ cardName: "Pisubaipa" })); // replaces it
+      await vi.advanceTimersByTimeAsync(300);
+      expect(first.classList.contains("match-fx-super--go")).toBe(false);
+      const live = board.querySelectorAll(".match-fx-super");
+      expect(live).toHaveLength(1);
+      expect(live[0]!.classList.contains("match-fx-super--go")).toBe(true);
+      detach();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("replaces a live super instead of stacking", () => {
+    const board = makeBoard();
+    const detach = attachMatchFx(board, OPTS);
+    fireSuper(board, superDetail());
+    fireSuper(board, superDetail({ cardName: "Pisubaipa" }));
+    const overlays = board.querySelectorAll(".match-fx-super");
+    expect(overlays).toHaveLength(1);
+    expect(overlays[0]!.querySelector(".match-fx-super__name")!.textContent).toBe("Pisubaipa");
+    detach();
+  });
+
+  it("reduced motion gets the calm lite variant: no lines, no shake", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: true }));
+    try {
+      const board = makeBoard();
+      const animate = vi.fn();
+      (board as HTMLElement & { animate?: unknown }).animate = animate;
+      const detach = attachMatchFx(board, OPTS);
+      fireSuper(board, superDetail());
+      const overlay = board.querySelector<HTMLElement>(".match-fx-super")!;
+      expect(overlay.classList.contains("match-fx-super--lite")).toBe(true);
+      expect(overlay.querySelectorAll(".match-fx-super__line")).toHaveLength(0);
+      vi.advanceTimersByTime(500);
+      expect(animate).not.toHaveBeenCalled(); // no impact shake in lite
+      expect(board.querySelector(".match-fx-super")).toBeNull(); // shorter life
+      detach();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("detach removes a live super overlay and its listener", () => {
+    const board = makeBoard();
+    const detach = attachMatchFx(board, OPTS);
+    fireSuper(board, superDetail());
+    expect(board.querySelector(".match-fx-super")).not.toBeNull();
+    detach();
+    expect(board.querySelector(".match-fx-super")).toBeNull();
+    fireSuper(board, superDetail());
+    expect(board.querySelector(".match-fx-super")).toBeNull();
   });
 });

@@ -68,7 +68,12 @@ import {
   noPlayback,
   renderedLogCap,
 } from "./debug-flags";
-import { attachMatchFx } from "./match-fx";
+import {
+  attachMatchFx,
+  ATTACK_CARD_FX_EVENT,
+  SUPER_PLAYBACK_HOLD_MS,
+  type AttackCardFxDetail,
+} from "./match-fx";
 
 /** Base path Vite serves card art from (see cardImageUrl). */
 const LIVE_ART_BASE = import.meta.env.BASE_URL;
@@ -472,6 +477,75 @@ export function renderPlayableMatch(
     root.dispatchEvent(new CustomEvent<MatchAnimDetail>(MATCH_ANIM_EVENT, { detail }));
   };
 
+  // --- Attack-card "super move" cinematic (ux-reboot) ------------------------
+  // The anim events don't say WHICH Attack card powered an attack, but the raw
+  // engine events in each resolved frame do (attackCardUsed carries the card +
+  // attacker). Collect those when an action resolves, then fire a view-level
+  // CustomEvent at the matching attack step's visual moment — the FX layer
+  // renders the cinematic. Matching is positional: attackCardUsed always
+  // precedes ITS warriorAttacked event, so each pending entry stores the index
+  // of the attack it belongs to and fires only on that attack step (a basic
+  // attack in between never steals it). Presentation-only: nothing here feeds
+  // back into the match.
+  interface PendingCardFx {
+    readonly attackIndex: number;
+    readonly card: Card;
+    readonly actor: "player" | "opponent";
+  }
+  let pendingCardFx: PendingCardFx[] = [];
+  let attackEventsSeen = 0; // collect-side counter (frames walked)
+  let attackStepsSeen = 0; // fire-side counter (steps animated)
+
+  const collectAttackCardFx = (frames: readonly MatchFrame[]): void => {
+    pendingCardFx = [];
+    attackEventsSeen = 0;
+    attackStepsSeen = 0;
+    for (const frame of frames) {
+      for (const ev of frame.events) {
+        if (ev.type === "attackCardUsed") {
+          // The spent card just moved to its owner's Out Deck.
+          const owner = frame.state.players[ev.player];
+          const card =
+            owner.outDeck.find((c) => c.id === ev.cardId) ??
+            owner.hand.find((c) => c.id === ev.cardId);
+          if (card !== undefined) {
+            pendingCardFx.push({
+              attackIndex: attackEventsSeen,
+              card,
+              actor: frame.actor,
+            });
+          }
+        } else if (ev.type === "warriorAttacked") {
+          attackEventsSeen += 1;
+        }
+      }
+    }
+  };
+
+  // Set when the step that just animated fired the super-move cinematic:
+  // scheduleNext extends THAT step's dwell so the next repaint (which replaces
+  // the board's children, super overlay included) can't cut the cinematic
+  // short. This is what keeps opponent supers playing at full length — the
+  // player's own attacks have no follow-up repaint and always ran in full.
+  let stepFiredSuper = false;
+
+  const fireAttackCardFx = (step: PlaybackStep): void => {
+    if (step.anim !== "attack") return;
+    const index = attackStepsSeen;
+    attackStepsSeen += 1;
+    const head = pendingCardFx[0];
+    if (head === undefined || head.attackIndex !== index) return;
+    pendingCardFx.shift();
+    const detail: AttackCardFxDetail = {
+      cardName: head.card.name,
+      artUrl: flags.noArt ? undefined : cardThumbUrl(head.card, LIVE_ART_BASE),
+      actor: head.actor,
+      targetInstanceId: step.targetInstanceId,
+    };
+    stepFiredSuper = true;
+    root.dispatchEvent(new CustomEvent<AttackCardFxDetail>(ATTACK_CARD_FX_EVENT, { detail }));
+  };
+
   // Find a Warrior tile / a player's life area in the freshly-painted board.
   const tileOf = (instanceId: string | undefined): HTMLElement | null =>
     instanceId === undefined
@@ -530,6 +604,10 @@ export function renderPlayableMatch(
       targetInstanceId: step.targetInstanceId,
       targetPlayer: step.targetPlayer,
     });
+    // Attack-card cinematic: fires only when this attack step's attack was
+    // powered by an Attack card (see collectAttackCardFx). Event-only here;
+    // the FX layer decides how (or whether) to render it.
+    fireAttackCardFx(step);
     // The sound-ready event always fires; the visual motion is suppressed under
     // no-anim / reduced-motion so we can isolate animation as a reload cause.
     if (flags.noAnim || prefersReducedMotion()) return;
@@ -614,6 +692,12 @@ export function renderPlayableMatch(
   const scheduleNext = (): void => {
     if (playback === null || disposed) return;
     const step = playback.steps[playback.index]!;
+    // If this step's attack fired the super-move cinematic, dwell long enough
+    // for it to finish before the next repaint replaces the board's children —
+    // otherwise opponent supers get wiped mid-sweep (the player's own attacks
+    // have no follow-up repaint, so both sides now run at the same full speed).
+    const superHold = stepFiredSuper ? SUPER_PLAYBACK_HOLD_MS : 0;
+    stepFiredSuper = false;
     schedule(() => {
       // The board may have been disposed (unmounted) while this was queued.
       if (disposed || playback === null) return;
@@ -628,7 +712,7 @@ export function renderPlayableMatch(
         applyStepEffects(playback.steps[playback.index]!);
         scheduleNext();
       }
-    }, options.stepDelayMs ?? step.durationMs);
+    }, (options.stepDelayMs ?? step.durationMs) + superHold);
   };
 
   // Cleanup hook: cancel the pending playback timer and stop further re-renders.
@@ -679,6 +763,8 @@ export function renderPlayableMatch(
     error = null;
     // Persist the move for crash/refresh recovery before any playback animates.
     actions.onAction?.();
+    collectAttackCardFx(res.frames);
+    stepFiredSuper = false; // fresh cycle — no stale hold from a prior action
     const steps = toPlaybackSteps(res.frames);
     const passedTurn = res.frames.some((f) => f.actor === "opponent");
     if (passedTurn && steps.length > 0 && flags.noPlayback) {

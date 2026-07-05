@@ -22,6 +22,11 @@ import {
   type MatchAnimDetail,
 } from "../src/play-match-view";
 import { createCardDetail } from "../src/detail";
+import {
+  ATTACK_CARD_FX_EVENT,
+  SUPER_PLAYBACK_HOLD_MS,
+  type AttackCardFxDetail,
+} from "../src/match-fx";
 
 /** Minimal in-play Warrior for white-box board scenarios. */
 function wip(card: Card, instanceId: string): WarriorInPlay {
@@ -493,6 +498,43 @@ describe("renderPlayableMatch — Attack-card prompt (Bug B)", () => {
     // The Attack card was spent to the Out Deck.
     expect(match.state().players.player1.hand.some((c) => c.id === atk.id)).toBe(false);
     expect(match.state().players.player1.outDeck.some((c) => c.id === atk.id)).toBe(true);
+  });
+
+  it("plays the super-move cinematic for the Attack-card path only", () => {
+    const atk = anAttackCard();
+    const friendly = warriorOfFaction(atk.faction);
+
+    // Regular attack: no cinematic, no event.
+    {
+      const match = craftBattle(friendly, [atk], atk.cost + 1);
+      const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+      declareAttack(root);
+      buttonByText(root, ".play-match__choice-btn", "Regular Attack")!.click();
+      expect(root.querySelector(".match-fx-super")).toBeNull();
+      root.dispose();
+    }
+
+    // Attack-card path: the view announces the card and the FX layer renders
+    // the super overlay with its name, before/while damage resolves visually.
+    const match = craftBattle(friendly, [atk], atk.cost + 1);
+    const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
+    const seen: AttackCardFxDetail[] = [];
+    root.addEventListener(ATTACK_CARD_FX_EVENT, (e) =>
+      seen.push((e as CustomEvent<AttackCardFxDetail>).detail),
+    );
+    declareAttack(root);
+    buttonByText(root, ".play-match__choice-btn", "Use This Attack")!.click();
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.cardName).toBe(atk.name);
+    expect(seen[0]!.actor).toBe("player");
+    const overlay = root.querySelector(".match-fx-super");
+    expect(overlay).not.toBeNull();
+    expect(overlay!.querySelector(".match-fx-super__name")!.textContent).toBe(atk.name);
+    // The match itself resolved exactly as before (presentation-only).
+    expect(match.state().events.map((e) => e.type)).toContain("attackCardUsed");
+    root.dispose();
+    expect(root.querySelector(".match-fx-super")).toBeNull();
   });
 
   it("does not prompt for an off-faction Attack card", () => {
@@ -2269,6 +2311,24 @@ describe("renderPlayableMatch — viewport-constrained layout", () => {
     expect(root.querySelector(".play-match__log-toggle")!.textContent).toBe("Show");
   });
 
+  it("keeps BOTH primary actions in the guaranteed action region on phones", () => {
+    setWidth(390);
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    // One action bar in the dedicated grid region, holding exactly the two
+    // primary buttons (the mobile CSS lays them out as equal minmax(0,1fr)
+    // grid columns, so neither can push the other past the viewport).
+    const bars = root.querySelectorAll(".arena__actions .play-match__actionbar");
+    expect(bars).toHaveLength(1);
+    const buttons = bars[0]!.querySelectorAll("button");
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]!.classList.contains("play-match__enter")).toBe(true);
+    expect(buttons[1]!.classList.contains("play-match__end")).toBe(true);
+    // The log element stays in the DOM (collapsed by default on narrow
+    // screens) but is display:none'd by the phone CSS — desktop keeps it.
+    expect(root.querySelector(".arena__log")).not.toBeNull();
+    root.dispose();
+  });
+
   it("keeps the combat log open on wide screens (side panel)", () => {
     setWidth(1400);
     const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
@@ -2721,5 +2781,93 @@ describe("renderPlayableMatch — PvP viewerSeat (joiner POV)", () => {
     creator.apply(end);
     await settle();
     expect(onComplete).not.toHaveBeenCalled();
+  });
+});
+
+describe("renderPlayableMatch — HUD stays lean (no Home/exit button)", () => {
+  it("renders no Home button in the arena HUD (exit lives on the main menu)", () => {
+    const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
+    expect(root.querySelector(".play-match__home")).toBeNull();
+    expect(root.querySelector(".play-match__confirm")).toBeNull();
+    // Concede owns the corner.
+    expect(root.querySelector(".play-match__quit")).not.toBeNull();
+    root.dispose();
+  });
+});
+
+describe("renderPlayableMatch — opponent attack-card super plays in full", () => {
+  it("holds the playback step so the cinematic isn't wiped by the next repaint", () => {
+    // A stub match whose one action returns an OPPONENT reply that used an
+    // Attack card: attackCardUsed (the collector's source) followed by its
+    // warriorAttacked (the step the cinematic fires on). Built over a real
+    // game state so painting/resolvers work.
+    const inner = newMatch();
+    const state = inner.state();
+    const atk = cards.find((c) => c.type === "Attack")!;
+    state.players.player2.outDeck = [...state.players.player2.outDeck, atk];
+    state.players.player1.field = [wip(state.players.player1.hand[0]!, "f1")];
+    state.players.player2.field = [wip(state.players.player2.deck[0]!, "e1")];
+
+    const frames = [
+      {
+        state,
+        events: [
+          {
+            type: "attackCardUsed",
+            player: "player2",
+            cardId: atk.id,
+            attackerInstanceId: "e1",
+            cost: atk.cost,
+          },
+          {
+            type: "warriorAttacked",
+            attackerInstanceId: "e1",
+            defenderInstanceId: "f1",
+            damage: 500,
+          },
+        ],
+        actor: "opponent" as const,
+      },
+    ];
+    const stub = {
+      playerFaction: inner.playerFaction,
+      opponentFaction: inner.opponentFaction,
+      seed: inner.seed,
+      state: () => state,
+      isOver: () => false,
+      legalActions: () => [{ kind: "endTurn" }],
+      apply: () => ({ ok: true as const, frames }),
+      history: () => [],
+      summary: inner.summary,
+    } as unknown as ReturnType<typeof createPlayableMatch>;
+
+    const delays: number[] = [];
+    const queued: Array<() => void> = [];
+    const root = renderPlayableMatch(
+      stub,
+      { onComplete: noop, onQuit: noop },
+      {
+        scheduler: (cb, ms) => {
+          delays.push(ms);
+          queued.push(cb);
+        },
+      },
+    );
+    root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+
+    // Step 1 ("used <card>", anim: play) — no cinematic yet.
+    expect(root.querySelector(".match-fx-super")).toBeNull();
+    expect(delays).toHaveLength(1);
+    // Advance to step 2 (the attack): the OPPONENT's cinematic appears…
+    queued[0]!();
+    const overlay = root.querySelector<HTMLElement>(".match-fx-super");
+    expect(overlay).not.toBeNull();
+    expect(overlay!.classList.contains("match-fx-super--opponent")).toBe(true);
+    // …and THAT step's dwell is extended so the next repaint (which replaces
+    // the board's children) can't cut the cinematic short.
+    expect(delays).toHaveLength(2);
+    expect(delays[1]! - delays[0]!).toBeGreaterThanOrEqual(SUPER_PLAYBACK_HOLD_MS - 200);
+    expect(delays[1]!).toBeGreaterThanOrEqual(750 + SUPER_PLAYBACK_HOLD_MS);
+    root.dispose();
   });
 });
