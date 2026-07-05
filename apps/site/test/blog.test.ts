@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { BLOG_POSTS, findPost } from "../src/blog/posts";
+import { adjacentPosts, BLOG_POSTS, findPost } from "../src/blog/posts";
 
 const SOURCE_DIR = fileURLToPath(
   new URL("../../../content/blog-source-documents/", import.meta.url),
@@ -52,5 +52,16 @@ describe("blog posts", () => {
 
   it("findPost returns undefined for unknown slugs", () => {
     expect(findPost("sonic")).toBeUndefined();
+  });
+
+  it("adjacentPosts walks the docket in order", () => {
+    const first = BLOG_POSTS[0]!;
+    const last = BLOG_POSTS[BLOG_POSTS.length - 1]!;
+    expect(adjacentPosts(first.slug).prev).toBeUndefined();
+    expect(adjacentPosts(first.slug).next?.slug).toBe(BLOG_POSTS[1]!.slug);
+    expect(adjacentPosts(last.slug).next).toBeUndefined();
+    expect(adjacentPosts("shamans").prev?.slug).toBe("surfers");
+    expect(adjacentPosts("shamans").next?.slug).toBe("port-troy");
+    expect(adjacentPosts("nope")).toEqual({ prev: undefined, next: undefined });
   });
 });

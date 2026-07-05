@@ -1,5 +1,7 @@
 import { Link, useParams } from "react-router-dom";
-import { findPost, type BlogPost as Post } from "../blog/posts";
+import { adjacentPosts, findPost, type BlogPost as Post } from "../blog/posts";
+
+const entryNo = (post: Post) => String(post.number).padStart(2, "0");
 
 /**
  * Single blog post page (/blog/:slug). Articles render as a polished
@@ -58,11 +60,41 @@ export function BlogPost() {
         })}
       </div>
       <footer className="eu-post__footer">
+        <DocketNav slug={post.slug} />
         <Link className="eu-btn eu-btn--blue eu-btn--ghost eu-btn--sm" to="/blog">
           ← All entries
         </Link>
       </footer>
     </article>
+  );
+}
+
+/** Prev/next pagination between docket entries, shown on every post page. */
+function DocketNav({ slug }: { readonly slug: string }) {
+  const { prev, next } = adjacentPosts(slug);
+  if (prev === undefined && next === undefined) return null;
+  return (
+    <nav className="eu-post__nav" aria-label="Blog entries">
+      {prev !== undefined ? (
+        <Link to={`/blog/${prev.slug}`} className="eu-post__nav-link">
+          <span className="eu-post__nav-dir">← Entry {entryNo(prev)}</span>
+          <span className="eu-post__nav-title">{prev.title}</span>
+        </Link>
+      ) : (
+        <span />
+      )}
+      {next !== undefined ? (
+        <Link
+          to={`/blog/${next.slug}`}
+          className="eu-post__nav-link eu-post__nav-link--next"
+        >
+          <span className="eu-post__nav-dir">Entry {entryNo(next)} →</span>
+          <span className="eu-post__nav-title">{next.title}</span>
+        </Link>
+      ) : (
+        <span />
+      )}
+    </nav>
   );
 }
 
@@ -73,6 +105,7 @@ export function BlogPost() {
  * intentional — never a normal faction primer.
  */
 function RestrictedArchive({ post }: { readonly post: Post }) {
+  const { prev, next } = adjacentPosts(post.slug);
   return (
     <div className="eu-restricted" data-slug={post.slug}>
       <div className="eu-restricted__static" aria-hidden="true" />
@@ -119,9 +152,21 @@ function RestrictedArchive({ post }: { readonly post: Post }) {
           IF YOU ARE FACE TO FACE WITH A SHAMAN, RUN.
         </p>
 
-        <Link to="/blog" className="eu-restricted__exit">
-          ← Return to unrestricted archive
-        </Link>
+        <nav className="eu-restricted__nav" aria-label="Blog entries">
+          {prev !== undefined && (
+            <Link to={`/blog/${prev.slug}`} className="eu-restricted__exit">
+              ← ENTRY {String(prev.number).padStart(2, "0")}
+            </Link>
+          )}
+          <Link to="/blog" className="eu-restricted__exit">
+            UNRESTRICTED ARCHIVE
+          </Link>
+          {next !== undefined && (
+            <Link to={`/blog/${next.slug}`} className="eu-restricted__exit">
+              ENTRY {String(next.number).padStart(2, "0")} →
+            </Link>
+          )}
+        </nav>
       </div>
     </div>
   );

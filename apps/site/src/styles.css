@@ -1433,3 +1433,71 @@ code {
     animation: none;
   }
 }
+
+/* ---- Blog: docket prev/next pagination ---------------------------------- */
+.eu-post__nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.eu-post__nav-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-width: 46%;
+  padding: 0.75rem 1rem;
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-radius: 11px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.eu-post__nav-link:hover {
+  background: var(--c-bg-2);
+  border-color: var(--c-ink-dim);
+}
+
+.eu-post__nav-link--next {
+  text-align: right;
+  margin-left: auto;
+}
+
+.eu-post__nav-dir {
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--c-ink-dim);
+}
+
+.eu-post__nav-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 560px) {
+  .eu-post__nav {
+    flex-direction: column;
+  }
+
+  .eu-post__nav-link,
+  .eu-post__nav-link--next {
+    max-width: 100%;
+    margin-left: 0;
+  }
+}
+
+/* Restricted page: mono nav row above the fold's exit link. */
+.eu-restricted__nav {
+  display: flex;
+  align-items: center;
+  gap: 1.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 0.8rem;
+}
+
+.eu-restricted__nav .eu-restricted__exit {
+  margin-top: 0;
+}

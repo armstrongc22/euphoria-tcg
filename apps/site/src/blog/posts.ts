@@ -340,3 +340,13 @@ export const BLOG_POSTS: readonly BlogPost[] = [
 export function findPost(slug: string): BlogPost | undefined {
   return BLOG_POSTS.find((post) => post.slug === slug);
 }
+
+/** Docket neighbors of a post: the previous and next entries by number. */
+export function adjacentPosts(slug: string): {
+  prev: BlogPost | undefined;
+  next: BlogPost | undefined;
+} {
+  const i = BLOG_POSTS.findIndex((post) => post.slug === slug);
+  if (i === -1) return { prev: undefined, next: undefined };
+  return { prev: BLOG_POSTS[i - 1], next: BLOG_POSTS[i + 1] };
+}
