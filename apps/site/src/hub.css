@@ -501,17 +501,36 @@
   border-bottom: 2px solid var(--eu-energy-neutral);
 }
 
-/* ---- Hero graffiti logo -------------------------------------------------- */
+/* ---- Hero graffiti logo --------------------------------------------------
+   The mark floats DIRECTLY on the dark stage — no container, no bounding
+   box. Ambient faction energy (green/purple/red) blooms behind it via
+   blurred CSS radials; the art itself is a true-alpha webp. */
 .hub-hero__logo {
-  margin: 0 0 0.75rem;
+  position: relative;
+  margin: 0 0 1rem;
   line-height: 0;
+  z-index: 0;
+}
+
+.hub-hero__logo::before {
+  content: "";
+  position: absolute;
+  inset: -34%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(41, 209, 122, 0.2), transparent 55%),
+    radial-gradient(circle at 82% 28%, rgba(155, 92, 255, 0.14), transparent 45%),
+    radial-gradient(circle at 16% 72%, rgba(255, 46, 77, 0.12), transparent 40%);
+  filter: blur(22px);
 }
 
 .hub-hero__logo img {
-  width: min(620px, 92%);
+  width: min(720px, 92vw);
   height: auto;
-  filter: drop-shadow(0 0 28px rgba(155, 92, 255, 0.28))
-    drop-shadow(0 6px 18px rgba(0, 0, 0, 0.6));
+  background: transparent;
+  filter: drop-shadow(0 24px 40px rgba(0, 0, 0, 0.75))
+    drop-shadow(0 0 28px rgba(44, 255, 136, 0.18));
 }
 
 /* The old title becomes the tagline under the logo mark. */
@@ -520,16 +539,21 @@
   margin: 0 0 0.9rem;
 }
 
-/* ---- Factions strip ------------------------------------------------------ */
+/* ---- Factions: 2x2 dossier grid ------------------------------------------
+   Four premium faction identity cards. True-alpha emblems float at the top
+   of each tile over an ambient energy bloom — no frames, no banners, no
+   image boxes. Each card carries its nation's weather (restrained gradients
+   + a faint blueprint grid); title and copy sit beneath the crest. */
 .hub-panel--factions {
   display: block;
 }
 
 .hub-factions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1rem;
-  margin-top: 1.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  max-width: 980px;
+  margin: 2.4rem auto 0;
 }
 
 .hub-faction {
@@ -537,53 +561,168 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: 0.55rem;
-  padding: 1.1rem 1.1rem 1.2rem;
-  background:
-    radial-gradient(120% 90% at 50% -20%, color-mix(in srgb, var(--energy) 14%, transparent), transparent 65%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.25)),
-    var(--c-panel, #12151f);
+  padding: 1.9rem 1.6rem 1.7rem;
+  background: linear-gradient(180deg, #111820, #090c12);
   border: 1px solid var(--c-line, #232838);
-  border-top: 3px solid var(--energy);
-  border-radius: 14px;
+  border-radius: 16px;
   overflow: hidden;
-  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.2s ease;
+  isolation: isolate;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.24s ease;
+}
+
+/* Faint blueprint grid so the card reads as a surface, not a void. */
+.hub-faction::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.35;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* A whisper of energy along the top edge instead of a solid banner bar. */
+.hub-faction::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--energy), transparent);
+  opacity: 0.7;
 }
 
 .hub-faction:hover {
-  transform: translateY(-4px);
-  border-color: var(--energy);
-  box-shadow: 0 14px 34px -18px var(--energy);
+  transform: translateY(-5px);
+  border-color: color-mix(in srgb, var(--energy) 55%, var(--c-line, #232838));
+  box-shadow:
+    0 18px 44px -20px var(--energy),
+    0 10px 30px -18px rgba(0, 0, 0, 0.9);
 }
 
-.hub-faction--green { --energy: var(--eu-energy-dwarf); }
-.hub-faction--red { --energy: var(--eu-energy-monk); }
-.hub-faction--blue { --energy: var(--eu-energy-surfer); }
-.hub-faction--yellow { --energy: var(--eu-energy-sonic); }
+/* Per-faction atmosphere (kept beneath the emblem and copy). */
+.hub-faction--green {
+  --energy: var(--eu-energy-dwarf);
+  background:
+    radial-gradient(circle at 50% -8%, rgba(46, 255, 140, 0.15), transparent 48%),
+    radial-gradient(circle at 10% 100%, rgba(46, 255, 140, 0.06), transparent 36%),
+    linear-gradient(180deg, #101a15, #090c12);
+}
+.hub-faction--red {
+  --energy: var(--eu-energy-monk);
+  background:
+    radial-gradient(circle at 50% -8%, rgba(255, 92, 40, 0.16), transparent 48%),
+    radial-gradient(circle at 50% 108%, rgba(255, 46, 77, 0.1), transparent 42%),
+    linear-gradient(180deg, #15100f, #0b0708);
+}
+.hub-faction--yellow {
+  --energy: var(--eu-energy-sonic);
+  background:
+    radial-gradient(circle at 76% -8%, rgba(242, 193, 29, 0.13), transparent 44%),
+    radial-gradient(circle at 20% 104%, rgba(242, 193, 29, 0.05), transparent 32%),
+    linear-gradient(180deg, #14161a, #0a0b0e);
+}
+.hub-faction--blue {
+  --energy: var(--eu-energy-surfer);
+  background:
+    radial-gradient(circle at 50% -8%, rgba(46, 139, 255, 0.19), transparent 50%),
+    radial-gradient(circle at 50% 112%, rgba(160, 220, 255, 0.11), transparent 44%),
+    linear-gradient(180deg, #0e1520, #080b12);
+}
+
+/* The crest: emblem floating over its own ambient bloom. */
+.hub-faction__emblem {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.hub-faction__emblem::before {
+  content: "";
+  position: absolute;
+  inset: -26% 4%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 52%,
+    color-mix(in srgb, var(--energy) 20%, transparent),
+    transparent 60%
+  );
+  filter: blur(20px);
+  opacity: 0.85;
+  transition: opacity 0.24s ease;
+}
+
+.hub-faction:hover .hub-faction__emblem::before {
+  opacity: 1.35;
+}
 
 .hub-faction__logo {
+  position: relative;
+  z-index: 1;
   width: 100%;
+  max-width: 330px;
   height: auto;
-  border-radius: 8px;
-  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.55));
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  object-fit: contain;
+  filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.65))
+    drop-shadow(0 0 18px color-mix(in srgb, var(--energy) 30%, transparent));
+}
+
+.hub-faction__title {
+  margin-top: 0.4rem;
+  font-size: 1.06rem;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.3em;
+  padding-left: 0.3em; /* optically recenters the letterspaced word */
+  text-transform: uppercase;
+  color: var(--eu-ink, #f5f7fa);
 }
 
 .hub-faction__line {
+  max-width: 34ch;
   color: var(--c-ink-dim, #9aa3b2);
-  font-size: 0.92rem;
-  line-height: 1.45;
+  font-size: 0.94rem;
+  line-height: 1.5;
 }
 
 .hub-faction__cta {
+  margin-top: 0.55rem;
   font-weight: 800;
-  font-size: 0.85rem;
-  letter-spacing: 0.04em;
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--energy);
+  opacity: 0.85;
+  transition: opacity 0.18s ease, letter-spacing 0.18s ease;
 }
 
-@media (max-width: 560px) {
+.hub-faction:hover .hub-faction__cta {
+  opacity: 1;
+  letter-spacing: 0.18em;
+}
+
+@media (max-width: 720px) {
   .hub-factions {
     grid-template-columns: 1fr;
+    gap: 1.1rem;
+    margin-top: 2rem;
+  }
+  .hub-faction {
+    padding: 1.5rem 1.2rem 1.4rem;
+  }
+  .hub-faction__logo {
+    max-width: 280px;
   }
 }

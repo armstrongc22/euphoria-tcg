@@ -1609,31 +1609,47 @@ code {
   }
 }
 
-/* ---- Blog: faction banner hero ------------------------------------------ */
+/* ---- Blog: faction emblem hero -------------------------------------------
+   The emblem floats directly on the page — no panel, no border, no image
+   box. A soft tone-colored bloom behind it (edge-free radial) ties it into
+   the dark stage; the webp itself carries true alpha. */
 .eu-post__banner {
+  --emblem-glow: rgba(195, 200, 210, 0.14);
+  position: relative;
   max-width: 44rem;
-  margin: 0.25rem 0 1.4rem;
-  padding: 1.1rem 1.25rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.3)),
-    var(--c-bg-2);
-  border: 1px solid var(--c-line);
-  border-left: 4px solid var(--c-line);
-  border-radius: 15px;
-  overflow: hidden;
+  margin: 0.5rem 0 1.6rem;
+  background: transparent;
+  border: none;
+  padding: 0;
+  overflow: visible;
+  display: flex;
+  justify-content: center;
+}
+
+.eu-post__banner::before {
+  content: "";
+  position: absolute;
+  inset: -18% -6%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 55%, var(--emblem-glow), transparent 62%);
+  filter: blur(18px);
 }
 
 .eu-post__banner img {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
-  max-width: 30rem;
+  max-width: 28rem;
   height: auto;
-  margin: 0 auto;
-  filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.6));
+  background: transparent;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.65));
 }
 
-.eu-post__banner--red { border-left-color: var(--c-red); }
-.eu-post__banner--blue { border-left-color: var(--c-blue); }
-.eu-post__banner--white { border-left-color: var(--c-white); }
-.eu-post__banner--green { border-left-color: var(--c-green); }
-.eu-post__banner--gold { border-left-color: var(--c-gold); }
+.eu-post__banner--red { --emblem-glow: rgba(255, 46, 77, 0.2); }
+.eu-post__banner--blue { --emblem-glow: rgba(46, 139, 255, 0.22); }
+.eu-post__banner--white { --emblem-glow: rgba(160, 220, 255, 0.18); }
+.eu-post__banner--green { --emblem-glow: rgba(41, 209, 122, 0.2); }
+.eu-post__banner--gold { --emblem-glow: rgba(217, 164, 65, 0.2); }

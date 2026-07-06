@@ -4,7 +4,7 @@
  * Play/World/Manga trio, the secondary links, and the mobile menu button.
  * Rendered with react-dom/server (no DOM/browser needed) inside a MemoryRouter.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Home } from "../src/pages/Home";
@@ -53,6 +53,23 @@ describe("Home — the universe hub", () => {
     expect(html).toContain('href="/shop"');
   });
 
+  it("renders the Dispatch email form when Supabase is configured (never the fallback)", () => {
+    // The ONE shared InterestForm serves every viewport — there is no
+    // desktop/mobile branch. With env present it must render the real form;
+    // the "Signups open with the campaign" line is only the no-env fallback.
+    vi.stubEnv("VITE_SUPABASE_URL", "https://example.supabase.co");
+    vi.stubEnv("VITE_SUPABASE_ANON_KEY", "anon-key");
+    try {
+      const configured = render(<Home />);
+      expect(configured).toContain("Join the Euphoria Dispatch");
+      expect(configured).toContain("eu-signup");
+      expect(configured).toContain("Join the List");
+      expect(configured).not.toContain("Signups open with the campaign");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("puts the graffiti logo in the hero (optimized webp, not the 2.4MB png)", () => {
     expect(html).toContain("hub-hero__logo");
     expect(html).toContain("images/brand/euphoria.webp");
@@ -75,6 +92,12 @@ describe("Home — the universe hub", () => {
     expect(html).toContain('href="/blog/monks"');
     expect(html).toContain('href="/blog/surfers"');
     expect(html).toContain('href="/cards?faction=Sonic"');
+    // Dossier tiles: emblem bloom wrapper + faction title under each crest.
+    expect((html.match(/hub-faction__emblem/g) ?? []).length).toBe(4);
+    for (const title of ["Dwarf", "Monk", "Sonic", "Surfer"]) {
+      expect(html).toContain(`<span class="hub-faction__title">${title}</span>`);
+    }
+    expect((html.match(/Read the File/g) ?? []).length).toBe(4);
     // Shamans are an anomaly, never a nation tile.
     expect(html).not.toContain("shaman_faction");
   });

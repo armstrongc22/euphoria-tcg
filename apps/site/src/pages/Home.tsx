@@ -32,36 +32,33 @@ const cabinetCards = CABINET_FACTIONS.map(
  */
 const FACTION_TILES = [
   {
-    name: "Dwarves",
+    title: "Dwarf",
     tone: "green",
     img: "dwarf_faction.webp",
     line: "Strength, faith, and the weight of prosperity.",
     to: "/blog/dwarves",
-    ctaLabel: "Read the file",
   },
   {
-    name: "Monks",
+    title: "Monk",
     tone: "red",
     img: "monk_faction.webp",
     line: "Discipline, fire, empire, and inherited trauma.",
     to: "/blog/monks",
-    ctaLabel: "Read the file",
   },
   {
-    name: "Surfers",
-    tone: "blue",
-    img: "surfer_faction.webp",
-    line: "A wounded ocean nation fighting collapse from within.",
-    to: "/blog/surfers",
-    ctaLabel: "Read the file",
-  },
-  {
-    name: "Sonics",
+    // The Sonic archive entry isn't written yet — its "file" is the card set.
+    title: "Sonic",
     tone: "yellow",
     img: "sonic_faction.webp",
     line: "Isolation, intelligence, energy, and quiet control.",
     to: "/cards?faction=Sonic",
-    ctaLabel: "See the cards",
+  },
+  {
+    title: "Surfer",
+    tone: "blue",
+    img: "surfer_faction.webp",
+    line: "A wounded ocean nation fighting collapse from within.",
+    to: "/blog/surfers",
   },
 ] as const;
 
@@ -223,21 +220,24 @@ export function Home() {
         <div className="hub-factions">
           {FACTION_TILES.map((f) => (
             <Link
-              key={f.name}
+              key={f.title}
               to={f.to}
               className={`hub-faction hub-faction--${f.tone}`}
             >
-              <img
-                src={`${BASE}images/factions/${f.img}`}
-                alt={`${f.name} faction emblem`}
-                width={900}
-                height={507}
-                loading="lazy"
-                decoding="async"
-                className="hub-faction__logo"
-              />
+              <span className="hub-faction__emblem">
+                <img
+                  src={`${BASE}images/factions/${f.img}`}
+                  alt={`${f.title} faction emblem`}
+                  width={900}
+                  height={507}
+                  loading="lazy"
+                  decoding="async"
+                  className="hub-faction__logo"
+                />
+              </span>
+              <span className="hub-faction__title">{f.title}</span>
               <span className="hub-faction__line">{f.line}</span>
-              <span className="hub-faction__cta">{f.ctaLabel} →</span>
+              <span className="hub-faction__cta">Read the File →</span>
             </Link>
           ))}
         </div>
