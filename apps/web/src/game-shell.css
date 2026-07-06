@@ -768,6 +768,12 @@
   .gc-hud__title {
     font-size: 0.82rem;
   }
+  /* Three HUD buttons (Menu · Report · Account) share one thin row on
+     phones — tighten them so the title never collapses. */
+  .gc-hud__btn {
+    font-size: 0.72rem;
+    padding: 0.36rem 0.5rem;
+  }
   .gc-screen {
     padding: 0.75rem 0.6rem 3rem;
   }

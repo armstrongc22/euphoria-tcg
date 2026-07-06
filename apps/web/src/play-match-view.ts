@@ -478,28 +478,23 @@ export function renderPlayableMatch(
   };
 
   // --- Attack-card "super move" cinematic (ux-reboot) ------------------------
-  // The anim events don't say WHICH Attack card powered an attack, but the raw
-  // engine events in each resolved frame do (attackCardUsed carries the card +
+  // The anim events don't say WHICH Attack card was used, but the raw engine
+  // events in each resolved frame do (attackCardUsed carries the card +
   // attacker). Collect those when an action resolves, then fire a view-level
-  // CustomEvent at the matching attack step's visual moment — the FX layer
-  // renders the cinematic. Matching is positional: attackCardUsed always
-  // precedes ITS warriorAttacked event, so each pending entry stores the index
-  // of the attack it belongs to and fires only on that attack step (a basic
-  // attack in between never steals it). Presentation-only: nothing here feeds
-  // back into the match.
+  // CustomEvent at the matching "attackCard" step's visual moment — the FX
+  // layer renders the cinematic. Every attackCardUsed event IS its own step
+  // now, so matching is a simple in-order queue: the cinematic plays for
+  // EVERY Attack card at the moment it's used, whether or not its effect goes
+  // on to produce an attack (Megawatt Apocalypse and 7th Plague alike).
+  // Presentation-only: nothing here feeds back into the match.
   interface PendingCardFx {
-    readonly attackIndex: number;
     readonly card: Card;
     readonly actor: "player" | "opponent";
   }
   let pendingCardFx: PendingCardFx[] = [];
-  let attackEventsSeen = 0; // collect-side counter (frames walked)
-  let attackStepsSeen = 0; // fire-side counter (steps animated)
 
   const collectAttackCardFx = (frames: readonly MatchFrame[]): void => {
     pendingCardFx = [];
-    attackEventsSeen = 0;
-    attackStepsSeen = 0;
     for (const frame of frames) {
       for (const ev of frame.events) {
         if (ev.type === "attackCardUsed") {
@@ -509,14 +504,8 @@ export function renderPlayableMatch(
             owner.outDeck.find((c) => c.id === ev.cardId) ??
             owner.hand.find((c) => c.id === ev.cardId);
           if (card !== undefined) {
-            pendingCardFx.push({
-              attackIndex: attackEventsSeen,
-              card,
-              actor: frame.actor,
-            });
+            pendingCardFx.push({ card, actor: frame.actor });
           }
-        } else if (ev.type === "warriorAttacked") {
-          attackEventsSeen += 1;
         }
       }
     }
@@ -530,12 +519,9 @@ export function renderPlayableMatch(
   let stepFiredSuper = false;
 
   const fireAttackCardFx = (step: PlaybackStep): void => {
-    if (step.anim !== "attack") return;
-    const index = attackStepsSeen;
-    attackStepsSeen += 1;
-    const head = pendingCardFx[0];
-    if (head === undefined || head.attackIndex !== index) return;
-    pendingCardFx.shift();
+    if (step.anim !== "attackCard") return;
+    const head = pendingCardFx.shift();
+    if (head === undefined) return;
     const detail: AttackCardFxDetail = {
       cardName: head.card.name,
       artUrl: flags.noArt ? undefined : cardThumbUrl(head.card, LIVE_ART_BASE),
@@ -604,9 +590,9 @@ export function renderPlayableMatch(
       targetInstanceId: step.targetInstanceId,
       targetPlayer: step.targetPlayer,
     });
-    // Attack-card cinematic: fires only when this attack step's attack was
-    // powered by an Attack card (see collectAttackCardFx). Event-only here;
-    // the FX layer decides how (or whether) to render it.
+    // Attack-card cinematic: fires on every attack-card activation step
+    // (see collectAttackCardFx). Event-only here; the FX layer decides how
+    // (or whether) to render it.
     fireAttackCardFx(step);
     // The sound-ready event always fires; the visual motion is suppressed under
     // no-anim / reduced-motion so we can isolate animation as a reload cause.
@@ -635,6 +621,19 @@ export function renderPlayableMatch(
         );
         break;
       }
+      case "attackCard":
+        // Uniform charge-up on the Warrior using the card — every Attack card
+        // shows this, whatever its effect resolves to (or even if it doesn't).
+        playAnim(
+          target,
+          [
+            { filter: "brightness(1)", transform: "scale(1)" },
+            { filter: "brightness(1.8)", transform: "scale(1.06)" },
+            { filter: "brightness(1)", transform: "scale(1)" },
+          ],
+          { duration: 700, easing: "ease-out" },
+        );
+        break;
       case "damage":
       case "debuff":
         playAnim(

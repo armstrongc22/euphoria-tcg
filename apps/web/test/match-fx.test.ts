@@ -77,6 +77,8 @@ describe("attachMatchFx — spawning", () => {
     const detach = attachMatchFx(board, OPTS);
     fire(board, { kind: "heal", targetInstanceId: "warrior-1" });
     expect(board.querySelector(".match-fx--rise")).not.toBeNull();
+    fire(board, { kind: "attackCard", targetInstanceId: "warrior-1" });
+    expect(board.querySelector(".match-fx--burst")).not.toBeNull();
     fire(board, { kind: "destroy", targetInstanceId: "warrior-1" });
     expect(board.querySelector(".match-fx--shatter")).not.toBeNull();
     fire(board, { kind: "directAttack", targetPlayer: "player2" });
@@ -306,17 +308,17 @@ describe("attachMatchFx — attack-card super move", () => {
       const overlay = board.querySelector<HTMLElement>(".match-fx-super")!;
       // Reveal beat: on screen but not sweeping yet; desktop GO pacing set.
       expect(overlay.classList.contains("match-fx-super--go")).toBe(false);
-      expect(overlay.style.getPropertyValue("--super-go")).toBe("900ms");
+      expect(overlay.style.getPropertyValue("--super-go")).toBe("2900ms");
       // After the minimum beat (+ decode timeout at worst) the sweep starts.
       await vi.advanceTimersByTimeAsync(300);
       expect(overlay.classList.contains("match-fx-super--go")).toBe(true);
       expect(board.querySelector(".match-fx--impact")).toBeNull(); // not yet
-      // The impact lands in the GO phase's final third (900 × 0.66 = 594).
-      await vi.advanceTimersByTimeAsync(600);
+      // The impact lands in the GO phase's final third (2900 × 0.66 = 1914).
+      await vi.advanceTimersByTimeAsync(1950);
       expect(board.querySelector(".match-fx--impact")).not.toBeNull();
       expect(animate).toHaveBeenCalledTimes(1); // the slam shake
-      // Cleanup just after the GO fade (900ms + slack).
-      await vi.advanceTimersByTimeAsync(400);
+      // Cleanup just after the GO fade (2900ms + slack).
+      await vi.advanceTimersByTimeAsync(1100);
       expect(board.querySelector(".match-fx-super")).toBeNull();
       detach();
     } finally {

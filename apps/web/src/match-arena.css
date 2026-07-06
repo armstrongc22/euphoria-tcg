@@ -279,10 +279,12 @@
   padding: 0.32rem 0.65rem;
   cursor: pointer;
 }
+/* The arena's own Report control stays in the DOM as the rich-context report
+   trigger (live-match counts etc.), but the VISIBLE Report button now lives in
+   the shell HUD next to Account (#gc-report-btn proxies a click here) — so it
+   can never crowd or overlap Concede again. */
 .gc .play-match__report {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: var(--gc-line);
-  color: var(--gc-dim);
+  display: none;
 }
 
 /* ---- Phase banner ------------------------------------------------------- */
@@ -1396,6 +1398,22 @@
   .gc .play-match__hud .play-match__quit,
   .gc .play-match__hud .play-match__report {
     white-space: nowrap;
+  }
+
+  /* Field-card magnifier: phone-sized. The desktop 1.7rem circle reads as a
+     huge badge on small field tiles — shrink the circle AND the glyph, keep
+     it pinned bottom-right and still comfortably tappable (~21px). Hand
+     cards (.play-match__card-inspect) keep their size: they're bigger tiles
+     and the primary inspect surface. */
+  .gc .play-match__warrior-inspect,
+  .gc .play-match__weapon-inspect {
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 0.6rem;
+    line-height: 1;
+    padding: 0;
+    right: 0.15rem;
+    bottom: 0.15rem;
   }
 
   /* 2) Compact center lane (phase banner + notices). */

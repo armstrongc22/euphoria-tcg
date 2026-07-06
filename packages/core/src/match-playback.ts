@@ -37,6 +37,7 @@ export type AnimationKind =
   | "summon"
   | "play"
   | "equip"
+  | "attackCard"
   | "attack"
   | "damage"
   | "heal"
@@ -290,10 +291,13 @@ function animFor(ev: GameEvent): AnimationKind {
     case "warriorRevived":
       return "revive";
     case "itemPlayed":
-    case "attackCardUsed":
     case "deckSearched":
     case "cardStolenFromHand":
       return "play";
+    // Every Attack card gets the same activation moment, anchored on the
+    // attacker — regardless of what (if anything) its effect goes on to emit.
+    case "attackCardUsed":
+      return "attackCard";
     case "weaponEquipped":
       return "equip";
     case "warriorAttacked":
@@ -329,12 +333,17 @@ export function toPlaybackSteps(frames: readonly MatchFrame[]): PlaybackStep[] {
       const tone = float?.tone ?? "info";
       const attackerInstanceId =
         ev.type === "warriorAttacked" ? ev.attackerInstanceId : undefined;
+      // Attack-card activation has no floating overlay, but the moment still
+      // anchors on the Warrior using the card so the board/FX can center on it.
+      const targetInstanceId =
+        float?.targetInstanceId ??
+        (ev.type === "attackCardUsed" ? ev.attackerInstanceId : undefined);
       steps.push({
         message: message ?? "",
         actor: frame.actor,
         tone,
         floatingText: float?.floatingText,
-        targetInstanceId: float?.targetInstanceId,
+        targetInstanceId,
         targetPlayer: float?.targetPlayer,
         durationMs: DURATION[tone],
         anim: animFor(ev),

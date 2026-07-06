@@ -2855,19 +2855,65 @@ describe("renderPlayableMatch — opponent attack-card super plays in full", () 
     );
     root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
 
-    // Step 1 ("used <card>", anim: play) — no cinematic yet.
-    expect(root.querySelector(".match-fx-super")).toBeNull();
-    expect(delays).toHaveLength(1);
-    // Advance to step 2 (the attack): the OPPONENT's cinematic appears…
-    queued[0]!();
+    // Step 1 (the attack-card activation): the OPPONENT's cinematic appears
+    // immediately — it no longer waits for (or requires) a follow-up attack.
     const overlay = root.querySelector<HTMLElement>(".match-fx-super");
     expect(overlay).not.toBeNull();
     expect(overlay!.classList.contains("match-fx-super--opponent")).toBe(true);
     // …and THAT step's dwell is extended so the next repaint (which replaces
     // the board's children) can't cut the cinematic short.
+    expect(delays).toHaveLength(1);
+    expect(delays[0]!).toBeGreaterThanOrEqual(600 + SUPER_PLAYBACK_HOLD_MS);
+    // The follow-up attack step plays at normal pace (no second hold).
+    queued[0]!();
     expect(delays).toHaveLength(2);
-    expect(delays[1]! - delays[0]!).toBeGreaterThanOrEqual(SUPER_PLAYBACK_HOLD_MS - 200);
-    expect(delays[1]!).toBeGreaterThanOrEqual(750 + SUPER_PLAYBACK_HOLD_MS);
+    expect(delays[1]!).toBeLessThan(SUPER_PLAYBACK_HOLD_MS);
+    root.dispose();
+  });
+
+  it("plays the cinematic for attack cards whose effect never attacks (Megawatt-style)", () => {
+    // Same setup, but the attack card resolves WITHOUT a warriorAttacked
+    // event — the exact shape that used to skip the animation entirely.
+    const inner = newMatch();
+    const state = inner.state();
+    const atk = cards.find((c) => c.type === "Attack")!;
+    state.players.player2.outDeck = [...state.players.player2.outDeck, atk];
+    state.players.player2.field = [wip(state.players.player2.deck[0]!, "e1")];
+
+    const frames = [
+      {
+        state,
+        events: [
+          {
+            type: "attackCardUsed",
+            player: "player2",
+            cardId: atk.id,
+            attackerInstanceId: "e1",
+            cost: atk.cost,
+          },
+        ],
+        actor: "opponent" as const,
+      },
+    ];
+    const stub = {
+      playerFaction: inner.playerFaction,
+      opponentFaction: inner.opponentFaction,
+      seed: inner.seed,
+      state: () => state,
+      isOver: () => false,
+      legalActions: () => [{ kind: "endTurn" }],
+      apply: () => ({ ok: true as const, frames }),
+      history: () => [],
+      summary: inner.summary,
+    } as unknown as ReturnType<typeof createPlayableMatch>;
+
+    const root = renderPlayableMatch(
+      stub,
+      { onComplete: noop, onQuit: noop },
+      { scheduler: () => {} },
+    );
+    root.querySelector<HTMLButtonElement>(".play-match__end")!.click();
+    expect(root.querySelector(".match-fx-super")).not.toBeNull();
     root.dispose();
   });
 });

@@ -72,13 +72,15 @@ export interface AttackCardFxDetail {
  *  2. GO — the sweep/slam (CSS keyframes sized by the --super-go custom
  *     property so JS timers and CSS agree), with the faction impact flash in
  *     the final third and cleanup just after the fade.
- * Desktop totals ≈ 1.08–1.15s; small screens ≈ 0.88–0.95s; the reduced-motion
- * "lite" variant stays a quick calm pop (~460ms) — never the long form.
+ * Desktop totals ≈ 3.08–3.15s; small screens ≈ 2.88–2.95s (deliberately slow
+ * and readable — a super is a highlight moment, not a blink); the
+ * reduced-motion "lite" variant stays a quick calm pop (~460ms) — never the
+ * long form.
  */
 const SUPER_REVEAL_MIN_MS = 180;
 const SUPER_DECODE_TIMEOUT_MS = 250;
-const SUPER_GO_MS = 900;
-const SUPER_GO_MOBILE_MS = 700;
+const SUPER_GO_MS = 2900;
+const SUPER_GO_MOBILE_MS = 2700;
 /** Impact lands at this fraction of the GO phase (the final third). */
 const SUPER_IMPACT_FRACTION = 0.66;
 const SUPER_CLEANUP_SLACK_MS = 80;
@@ -89,11 +91,11 @@ const SUPER_CLEANUP_SLACK_MS = 80;
  * step's repaint replaces the board's children — which used to wipe the
  * cinematic mid-sweep, so opponent supers never played out while the
  * player's own (no follow-up repaint) ran in full. Sized so worst case
- * (reveal-with-decode-timeout + desktop GO + slack ≈ 1.23s) completes within
- * the attack step's own 750ms + this hold: both sides now see the identical,
- * full-speed cinematic.
+ * (reveal-with-decode-timeout + desktop GO + slack ≈ 3.23s) completes within
+ * the activation step's own 750ms + this hold: both sides now see the
+ * identical, full-speed cinematic.
  */
-export const SUPER_PLAYBACK_HOLD_MS = 650;
+export const SUPER_PLAYBACK_HOLD_MS = 2650;
 const SUPER_LITE_LIFETIME_MS = 460;
 
 /** Small-screen check for the shorter mobile pacing; safe anywhere. */
@@ -229,6 +231,7 @@ export function attachMatchFx(
     const tile = tileOf(detail.targetInstanceId);
     switch (detail.kind) {
       case "summon":
+      case "attackCard":
         spawn("match-fx--burst", tile, faction);
         break;
       case "attack":

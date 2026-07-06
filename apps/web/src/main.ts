@@ -112,6 +112,7 @@ app.innerHTML = `
     <header class="gc-hud" id="gc-hud">
       <button type="button" class="gc-hud__btn" id="gc-menu-btn" aria-label="Main menu">☰ Menu</button>
       <span class="gc-hud__title" id="gc-screen-title">Euphoria</span>
+      <button type="button" class="gc-hud__btn" id="gc-report-btn">Report</button>
       <button type="button" class="gc-hud__btn" id="gc-account-btn">Account</button>
     </header>
     <main class="gc-screen-root" id="game-screen-root"></main>
@@ -612,6 +613,27 @@ document.querySelector<HTMLButtonElement>("#gc-menu-btn")!.addEventListener("cli
 });
 document.querySelector<HTMLButtonElement>("#gc-account-btn")!.addEventListener("click", () => {
   if (authState === "loggedIn") renderActiveScreen("rewards");
+});
+document.querySelector<HTMLButtonElement>("#gc-report-btn")!.addEventListener("click", () => {
+  if (authState !== "loggedIn") return;
+  // A live match renders its own (hidden) report control carrying rich match
+  // context — proxy to it so those reports stay detailed. Anywhere else,
+  // open the general feedback modal pre-set to a bug report.
+  const matchReport = root.querySelector<HTMLButtonElement>(".play-match__report");
+  if (matchReport !== null) {
+    matchReport.click();
+    return;
+  }
+  openFeedbackModal({
+    auth,
+    defaultType: "bug",
+    context: () => ({
+      view: currentView,
+      userId: session?.userId ?? null,
+      email: session?.email ?? null,
+      selectedFaction: currentFaction,
+    }),
+  });
 });
 document
   .querySelector<HTMLButtonElement>("#footer-feedback")!

@@ -91,6 +91,30 @@ describe("toPlaybackSteps", () => {
     expect(byTone["revive"]).toBe("REVIVED");
   });
 
+  it("maps every attack-card use to the 'attackCard' moment anchored on the attacker", () => {
+    const attackCard = cards.find((c) => c.type === "Attack")!;
+    const steps = toPlaybackSteps([
+      frame(
+        [
+          {
+            type: "attackCardUsed",
+            player: "player1",
+            cardId: attackCard.id,
+            attackerInstanceId: "a1",
+            cost: 1,
+          },
+        ],
+        "player",
+        [attackCard],
+      ),
+    ]);
+    expect(steps).toHaveLength(1);
+    expect(steps[0]!.anim).toBe("attackCard");
+    expect(steps[0]!.targetInstanceId).toBe("a1");
+    expect(steps[0]!.message).toBe(`You used ${attackCard.name}.`);
+    expect(steps[0]!.floatingText).toBeUndefined();
+  });
+
   it("maps a direct attack to a -1 LIFE float on the player who lost the life", () => {
     const steps = toPlaybackSteps([
       frame([{ type: "directAttacked", player: "player2", attackerInstanceId: "x", livesRemaining: 2 }], "opponent"),
