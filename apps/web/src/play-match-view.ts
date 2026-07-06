@@ -1001,53 +1001,27 @@ export function renderPlayableMatch(
       };
     }
 
+    // Battlefield tiles are COMPACT STAT TILES, not mini card images: name on
+    // top, then a stat line whose chips (⚔ ATK · ♥ HP · ◆ cost · ⚡ uses) never
+    // shrink or truncate — only the NAME may ellipsize. Full art stays where it
+    // belongs: the hand cards and the inspect/zoom modal.
     const face = document.createElement("div");
     face.className = "play-match__warrior-face";
-
-    // The art region (art + ATK/HP overlay + the corner inspect button). Keeping
-    // the inspect button in here anchors it to the bottom-right of the IMAGE, so
-    // it never covers the top stat overlay nor the name/controls below.
-    const artWrap = document.createElement("div");
-    artWrap.className = "play-match__art-wrap";
-    artWrap.append(cardArt(w.card, `field:${w.instanceId}`));
-    const overlay = document.createElement("span");
-    overlay.className = "play-match__warrior-overlay";
-    overlay.innerHTML =
-      `<span class="play-match__overlay-atk" title="Attack">⚔${w.currentAttack}</span>` +
-      `<span class="play-match__overlay-hp" title="Health">♥${w.currentHealth}</span>`;
-    artWrap.append(overlay);
-
-    face.append(artWrap);
-
-    // Small dedicated inspect affordance (the detail modal stays one tap away),
-    // pinned to the bottom-right of the CARD itself — not the art region — so
-    // it sits in the same corner on every field card and never drifts toward
-    // the middle on short mobile rows or covers the top ATK/HP overlay.
-    const insp = document.createElement("button");
-    insp.type = "button";
-    insp.className = "play-match__warrior-inspect";
-    insp.title = "View card details";
-    insp.setAttribute("aria-label", `Inspect ${w.card.name}`);
-    insp.textContent = "🔍";
-    insp.addEventListener("click", (e) => {
-      e.stopPropagation();
-      inspect(w.card);
-    });
-    el.append(insp);
 
     const statusChips = warriorStatusChips(w)
       .map((c) => `<span class="play-match__warrior-status">${escapeHtml(c)}</span>`)
       .join("");
-    const info = document.createElement("span");
-    info.className = "play-match__warrior-info";
-    info.innerHTML =
-      `<span class="play-match__warrior-name">${escapeHtml(w.card.name)}</span>` +
-      `<span class="play-match__warrior-stats" title="Attack / Health">` +
-      `⚔${w.currentAttack} · ♥${w.currentHealth}</span>` +
-      `<span class="play-match__warrior-meta" title="Attacks remaining">⚡${w.attacksRemaining}</span>` +
+    face.innerHTML =
+      `<span class="play-match__warrior-name" title="${escapeHtml(w.card.name)}">` +
+      `${escapeHtml(w.card.name)}</span>` +
+      `<span class="play-match__warrior-stats play-match__warrior-statline">` +
+      `<span class="play-match__stat play-match__stat--atk" title="Attack">⚔${w.currentAttack}</span>` +
+      `<span class="play-match__stat play-match__stat--hp" title="Health">♥${w.currentHealth}</span>` +
+      `<span class="play-match__stat play-match__stat--cost" title="Spirit cost">◆${w.card.cost}</span>` +
+      `<span class="play-match__stat play-match__warrior-meta" title="Attacks remaining">⚡${w.attacksRemaining}</span>` +
+      `</span>` +
       (statusChips ? `<span class="play-match__warrior-statuses">${statusChips}</span>` : "") +
       (opts.badge ? `<span class="play-match__warrior-badge">${escapeHtml(opts.badge)}</span>` : "");
-    face.append(info);
     el.append(face);
 
     if (w.attachedWeapon !== undefined) {
@@ -1061,8 +1035,23 @@ export function renderPlayableMatch(
         e.stopPropagation();
         inspect(weapon);
       });
-      el.append(weaponBtn);
+      face.append(weaponBtn);
     }
+
+    // Small dedicated inspect affordance (the full card art + details stay one
+    // tap away), pinned to the bottom-right corner of the tile; the face keeps
+    // a clear bottom strip for it so it never overlaps name/stats/weapon.
+    const insp = document.createElement("button");
+    insp.type = "button";
+    insp.className = "play-match__warrior-inspect";
+    insp.title = "View card details";
+    insp.setAttribute("aria-label", `Inspect ${w.card.name}`);
+    insp.textContent = "🔍";
+    insp.addEventListener("click", (e) => {
+      e.stopPropagation();
+      inspect(w.card);
+    });
+    el.append(insp);
 
     if (opts.controls && opts.controls.length > 0) {
       const controls = document.createElement("div");

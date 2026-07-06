@@ -144,12 +144,14 @@
   gap: 0.4rem;
   padding: 0.2rem;
 }
-/* Warriors are FULL mini-cards scaled to fit the field height — the whole image
-   is contained (never cropped), width capped so tall rows don't over-inflate. */
+/* Battlefield Warriors are COMPACT STAT TILES (no card art): name + a stat
+   line + status/weapon chips. Wide enough that 4-digit ATK/HP plus the cost
+   and uses chips always fit — stats never ellipsize; only the name may. */
 .gc .arena__opp .play-match__warrior,
 .gc .arena__mine .play-match__warrior {
   height: 100%;
-  width: clamp(115px, 8vw, 160px);
+  min-width: 158px;
+  max-width: 220px;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -159,32 +161,51 @@
   flex: 1;
   min-height: 0;
   display: flex;
-  flex-direction: column; /* art-wrap on top, name/stats below */
+  flex-direction: column;
+  gap: 0.3rem;
+  /* The bottom strip stays clear for the corner magnifier. */
+  padding: 0.45rem 0.55rem 1.7rem;
 }
-.gc .arena__opp .play-match__art-wrap,
-.gc .arena__mine .play-match__art-wrap {
-  position: relative;
-  flex: 1;
-  min-height: 0;
+/* Tile typography: only the NAME may truncate; stat chips never do. */
+.gc .play-match__warrior-face .play-match__warrior-name {
+  display: block;
+  font-weight: 800;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gc .play-match__warrior-statline {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  gap: 0.2rem 0.45rem;
 }
-.gc .arena__opp .play-match__art-wrap .play-match__art,
-.gc .arena__mine .play-match__art-wrap .play-match__art {
-  max-height: 100%;
-  max-width: 100%;
-  width: auto;
-  height: auto;
-  aspect-ratio: auto; /* keep the image's real ratio */
-  object-fit: contain;
-}
-.gc .arena__opp .play-match__warrior-info,
-.gc .arena__mine .play-match__warrior-info {
+.gc .play-match__stat {
   flex: 0 0 auto;
-  padding: 0.15rem 0.3rem;
-  font-size: 0.66rem;
-  line-height: 1.15;
+  white-space: nowrap;
+  font-weight: 800;
+  font-size: 0.82rem;
+  text-shadow: 0 1px 3px #000;
+}
+.gc .play-match__stat--atk {
+  color: #ffd27a;
+}
+.gc .play-match__stat--hp {
+  color: #7ad0ff;
+}
+.gc .play-match__stat--cost {
+  color: var(--gc-dim);
+}
+.gc .play-match__warrior-face .play-match__warrior-meta {
+  color: var(--gc-dim);
+  font-size: 0.72rem;
+}
+.gc .play-match__warrior-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
 }
 
 /* Center action / phase / targeting lane (compact status only). */
@@ -441,13 +462,6 @@
   0%, 100% { box-shadow: 0 0 14px -6px var(--f-monk); }
   50% { box-shadow: 0 0 26px -2px var(--f-monk); }
 }
-/* Attack/health overlays read as combat stats. */
-.gc .play-match__overlay-atk,
-.gc .play-match__overlay-hp {
-  font-weight: 800;
-  text-shadow: 0 1px 3px #000;
-}
-
 /* ---- Hand dock (anchored near the bottom) ------------------------------ */
 .gc .play-match__zone--hand {
   margin: 0;
@@ -515,10 +529,9 @@
 /* Inspect / magnifier stays anchored bottom-right of a card or warrior.
    `top: auto` cancels the base stylesheet's top-right anchoring — field
    magnifiers hang off the CARD root now, so without it they'd jump to the
-   top corner and cover the ATK/HP overlay. */
+   top corner and cover the stat line. */
 .gc .play-match__card-inspect,
-.gc .play-match__warrior-inspect,
-.gc .play-match__weapon-inspect {
+.gc .play-match__warrior-inspect {
   position: absolute;
   top: auto;
   right: 4px;
@@ -532,11 +545,29 @@
   color: var(--gc-ink);
   cursor: pointer;
 }
-/* Armed Warriors: the weapon chip takes the bottom-LEFT corner so it can
-   never collide with the magnifier in the bottom-right. */
+/* Armed Warriors: the weapon reads as an inline pill row in the stat tile —
+   in normal flow, so it can never overlap the name, stats, or magnifier.
+   (Only the weapon NAME may ellipsize.) */
 .gc .play-match__weapon-inspect {
-  right: auto;
-  left: 4px;
+  position: static;
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--gc-dim);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  padding: 0.14rem 0.4rem;
+  cursor: pointer;
+}
+.gc .play-match__weapon-inspect:hover {
+  color: var(--gc-ink);
+  border-color: var(--gc-ink);
 }
 
 /* ---- Action bar (Enter Battle / End Turn) ------------------------------ */
@@ -1410,33 +1441,36 @@
     white-space: nowrap;
   }
 
-  /* Field-card magnifier: phone-sized. The desktop 1.7rem circle reads as a
+  /* Field-tile magnifier: phone-sized. The desktop 1.7rem circle reads as a
      huge badge on small field tiles — shrink the circle AND the glyph, keep
      it pinned bottom-right and still comfortably tappable (~21px). Hand
      cards (.play-match__card-inspect) keep their size: they're bigger tiles
      and the primary inspect surface. */
-  .gc .play-match__warrior-inspect,
-  .gc .play-match__weapon-inspect {
+  .gc .play-match__warrior-inspect {
     width: 1.3rem;
     height: 1.3rem;
     font-size: 0.6rem;
     line-height: 1;
     padding: 0;
     bottom: 3px;
-  }
-  .gc .play-match__warrior-inspect {
     right: 3px;
   }
-  .gc .play-match__weapon-inspect {
-    left: 3px;
-  }
 
-  /* Compact stat overlay on phone field cards: smaller type + tighter padding
-     so ⚔2500 · ♥3500 both fit the narrow card with no clipped digits. */
-  .gc .play-match__warrior-overlay {
-    font-size: 0.68rem;
-    padding: 0.1rem 0.25rem;
-    gap: 0.2rem;
+  /* Compact stat tiles on phones: slightly tighter type, but every stat chip
+     stays whole — 4-digit ATK/HP, ◆cost, and ⚡uses all render un-clipped. */
+  .gc .arena__opp .play-match__warrior,
+  .gc .arena__mine .play-match__warrior {
+    min-width: 150px;
+    max-width: 200px;
+  }
+  .gc .play-match__warrior-face {
+    padding: 0.35rem 0.45rem 1.45rem;
+  }
+  .gc .play-match__warrior-face .play-match__warrior-name {
+    font-size: 0.74rem;
+  }
+  .gc .play-match__stat {
+    font-size: 0.78rem;
   }
 
   /* 2) Compact center lane (phase banner + notices). */

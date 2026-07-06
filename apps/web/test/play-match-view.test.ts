@@ -202,11 +202,10 @@ describe("renderPlayableMatch — card inspection", () => {
     const warrior = root.querySelector<HTMLElement>(
       ".play-match__field--mine .play-match__warrior",
     )!;
-    const artWrap = warrior.querySelector<HTMLElement>(".play-match__art-wrap")!;
-    // The ATK/HP overlay lives on the art region; the inspect button hangs off
-    // the CARD root (positioned bottom-right of the whole card in CSS) so it
-    // never covers the stat overlay.
-    expect(artWrap.querySelector(".play-match__warrior-overlay")).not.toBeNull();
+    // Battlefield tiles are compact STAT tiles: no art region, a visible stat
+    // line, and the inspect button hanging off the CARD root (bottom-right).
+    expect(warrior.querySelector(".play-match__art-wrap")).toBeNull();
+    expect(warrior.querySelector(".play-match__warrior-statline")).not.toBeNull();
     const inspectBtn = warrior.querySelector<HTMLButtonElement>(":scope > .play-match__warrior-inspect");
     expect(inspectBtn).not.toBeNull();
     expect(inspectBtn!.getAttribute("aria-label")).toMatch(/^Inspect /);
@@ -1698,16 +1697,15 @@ describe("renderPlayableMatch — battlefield card visuals (milestone)", () => {
     }
   });
 
-  it("renders field Warriors as card-like cards with an image", () => {
+  it("renders field Warriors as compact stat tiles without card art", () => {
     const match = newMatch();
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
     buttonByText(root, ".play-match__card-btn", "Summon")!.click();
     const warrior = root.querySelector(".play-match__field--mine .play-match__warrior");
     expect(warrior).not.toBeNull();
-    const art = warrior!.querySelector<HTMLImageElement>(".play-match__art");
-    expect(art).not.toBeNull();
-    expect(art!.getAttribute("src")).toBeTruthy();
-    // Card-like: it shows the name and current ATK/HEALTH stats.
+    // Battlefield tiles carry NO art image — the compact tile shows the name
+    // and current ATK/HEALTH stats; full art stays in hand + inspect modal.
+    expect(warrior!.querySelector(".play-match__art")).toBeNull();
     expect(warrior!.querySelector(".play-match__warrior-name")?.textContent).toBeTruthy();
     expect(warrior!.querySelector(".play-match__warrior-stats")?.textContent).toBeTruthy();
   });
@@ -2607,7 +2605,7 @@ describe("renderPlayableMatch — full-card display (no crop) + magnifier", () =
     expect(inspected).not.toBeNull();
   });
 
-  it("renders a summoned Warrior as a full image tile with a magnifier", () => {
+  it("renders a summoned Warrior as a compact stat tile (no art) with a magnifier", () => {
     const match = newMatch();
     const root = renderPlayableMatch(match, { onComplete: noop, onQuit: noop });
     buttonByText(root, ".play-match__card-btn", "Summon")!
@@ -2617,7 +2615,17 @@ describe("renderPlayableMatch — full-card display (no crop) + magnifier", () =
     root.querySelector<HTMLButtonElement>(".arena__mine .play-match__primary-action")!.click();
     const warrior = root.querySelector<HTMLElement>(".arena__mine .play-match__warrior")!;
     expect(warrior).not.toBeNull();
-    expect(warrior.querySelector(".play-match__art-wrap .play-match__art")).not.toBeNull();
+    // No card art on the battlefield tile — full art lives in hand + inspect.
+    expect(warrior.querySelector(".play-match__art-wrap")).toBeNull();
+    expect(warrior.querySelector("img")).toBeNull();
+    // Name + full stat chips: attack, health, spirit cost, attacks-remaining.
+    expect(warrior.querySelector(".play-match__warrior-name")?.textContent).toBeTruthy();
+    const statline = warrior.querySelector<HTMLElement>(".play-match__warrior-statline")!;
+    expect(statline).not.toBeNull();
+    expect(statline.querySelector(".play-match__stat--atk")?.textContent).toMatch(/^⚔\d+$/);
+    expect(statline.querySelector(".play-match__stat--hp")?.textContent).toMatch(/^♥\d+$/);
+    expect(statline.querySelector(".play-match__stat--cost")?.textContent).toMatch(/^◆\d+$/);
+    expect(statline.querySelector(".play-match__warrior-meta")?.textContent).toMatch(/^⚡\d+$/);
     expect(warrior.querySelector(".play-match__warrior-inspect")).not.toBeNull();
   });
 });

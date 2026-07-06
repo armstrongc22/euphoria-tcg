@@ -2392,39 +2392,10 @@ body {
 
 /* Compact ATK/HP overlay on Warrior art (Feature A.4). The textual stat line
  * below stays in the DOM (a11y/tests) but is hidden in favor of the overlay. */
-.play-match__warrior-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-between;
-  gap: 0.3rem;
-  padding: 0.15rem 0.35rem;
-  font-weight: 800;
-  font-size: 0.82rem;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.78), transparent);
-  border-radius: 7px 7px 0 0;
-  pointer-events: none;
-  /* Above the art AND the corner magnifier: stats are never hidden. */
-  z-index: 4;
-}
-/* Stat chips never shrink or wrap — 4-digit values (1000/2500/3500) stay
-   fully readable instead of losing their leading digit on narrow cards. */
-.play-match__overlay-atk,
-.play-match__overlay-hp {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-.play-match__overlay-atk {
-  color: #ffd27a;
-}
-.play-match__overlay-hp {
-  color: #7ad0ff;
-}
-.play-match__warrior .play-match__warrior-stats {
-  display: none;
-}
+/* Battlefield tiles are compact STAT tiles (no art): the visible stat line is
+   .play-match__warrior-statline (which carries the legacy __warrior-stats
+   class), styled in match-arena.css. The old art-overlay rules are gone with
+   the art itself. */
 
 /* Selected state on the tile itself. */
 .play-match__card--selected,
