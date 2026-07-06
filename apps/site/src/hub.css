@@ -500,3 +500,90 @@
   color: var(--eu-ink);
   border-bottom: 2px solid var(--eu-energy-neutral);
 }
+
+/* ---- Hero graffiti logo -------------------------------------------------- */
+.hub-hero__logo {
+  margin: 0 0 0.75rem;
+  line-height: 0;
+}
+
+.hub-hero__logo img {
+  width: min(620px, 92%);
+  height: auto;
+  filter: drop-shadow(0 0 28px rgba(155, 92, 255, 0.28))
+    drop-shadow(0 6px 18px rgba(0, 0, 0, 0.6));
+}
+
+/* The old title becomes the tagline under the logo mark. */
+.hub-hero__tagline {
+  font-size: clamp(1.15rem, 2.6vw, 1.6rem);
+  margin: 0 0 0.9rem;
+}
+
+/* ---- Factions strip ------------------------------------------------------ */
+.hub-panel--factions {
+  display: block;
+}
+
+.hub-factions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 1.75rem;
+}
+
+.hub-faction {
+  --energy: var(--eu-energy-neutral);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1.1rem 1.1rem 1.2rem;
+  background:
+    radial-gradient(120% 90% at 50% -20%, color-mix(in srgb, var(--energy) 14%, transparent), transparent 65%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.25)),
+    var(--c-panel, #12151f);
+  border: 1px solid var(--c-line, #232838);
+  border-top: 3px solid var(--energy);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.2s ease;
+}
+
+.hub-faction:hover {
+  transform: translateY(-4px);
+  border-color: var(--energy);
+  box-shadow: 0 14px 34px -18px var(--energy);
+}
+
+.hub-faction--green { --energy: var(--eu-energy-dwarf); }
+.hub-faction--red { --energy: var(--eu-energy-monk); }
+.hub-faction--blue { --energy: var(--eu-energy-surfer); }
+.hub-faction--yellow { --energy: var(--eu-energy-sonic); }
+
+.hub-faction__logo {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.55));
+}
+
+.hub-faction__line {
+  color: var(--c-ink-dim, #9aa3b2);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.hub-faction__cta {
+  font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--energy);
+}
+
+@media (max-width: 560px) {
+  .hub-factions {
+    grid-template-columns: 1fr;
+  }
+}

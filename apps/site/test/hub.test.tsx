@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Home } from "../src/pages/Home";
 import { Nav } from "../src/layout/Nav";
 
@@ -42,14 +42,61 @@ describe("Home — the universe hub", () => {
     expect(html).toContain('href="/map"');
   });
 
-  it("renders manga, founders, and shop sections with their destinations", () => {
+  it("renders manga, dispatch, and shop sections with their destinations", () => {
     expect(html).toContain("hub-panel--manga");
     expect(html).toContain('href="/manga"');
     expect(html).toContain("hub-panel--founders");
+    expect(html).toContain("Euphoria Dispatch");
     expect(html).toContain("Kickstarter");
     expect(html).toContain("hub-panel--shop");
     expect(html).toContain("Volume 1");
     expect(html).toContain('href="/shop"');
+  });
+
+  it("puts the graffiti logo in the hero (optimized webp, not the 2.4MB png)", () => {
+    expect(html).toContain("hub-hero__logo");
+    expect(html).toContain("images/brand/euphoria.webp");
+    expect(html).not.toContain("images/brand/euphoria.png");
+    expect(html).toContain('alt="Euphoria"');
+  });
+
+  it("renders the four-nation faction strip with emblems and destinations", () => {
+    expect(html).toContain("hub-panel--factions");
+    expect((html.match(/hub-faction__logo/g) ?? []).length).toBe(4);
+    for (const img of [
+      "images/factions/dwarf_faction.webp",
+      "images/factions/monk_faction.webp",
+      "images/factions/surfer_faction.webp",
+      "images/factions/sonic_faction.webp",
+    ]) {
+      expect(html).toContain(img);
+    }
+    expect(html).toContain('href="/blog/dwarves"');
+    expect(html).toContain('href="/blog/monks"');
+    expect(html).toContain('href="/blog/surfers"');
+    expect(html).toContain('href="/cards?faction=Sonic"');
+    // Shamans are an anomaly, never a nation tile.
+    expect(html).not.toContain("shaman_faction");
+  });
+});
+
+describe("BlogPost — faction banner", () => {
+  it("shows the faction emblem on faction files but never on the Shamans page", async () => {
+    const { BlogPost } = await import("../src/pages/BlogPost");
+    const page = (path: string): string =>
+      renderToStaticMarkup(
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/blog/:slug" element={<BlogPost />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    expect(page("/blog/dwarves")).toContain("images/factions/dwarf_faction.webp");
+    expect(page("/blog/monks")).toContain("images/factions/monk_faction.webp");
+    expect(page("/blog/surfers")).toContain("images/factions/surfer_faction.webp");
+    const shamans = page("/blog/shamans");
+    expect(shamans).not.toContain("images/factions/");
+    expect(shamans).toContain("RESTRICTED");
   });
 });
 

@@ -1608,3 +1608,32 @@ code {
     width: 11.5rem;
   }
 }
+
+/* ---- Blog: faction banner hero ------------------------------------------ */
+.eu-post__banner {
+  max-width: 44rem;
+  margin: 0.25rem 0 1.4rem;
+  padding: 1.1rem 1.25rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.3)),
+    var(--c-bg-2);
+  border: 1px solid var(--c-line);
+  border-left: 4px solid var(--c-line);
+  border-radius: 15px;
+  overflow: hidden;
+}
+
+.eu-post__banner img {
+  display: block;
+  width: 100%;
+  max-width: 30rem;
+  height: auto;
+  margin: 0 auto;
+  filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.6));
+}
+
+.eu-post__banner--red { border-left-color: var(--c-red); }
+.eu-post__banner--blue { border-left-color: var(--c-blue); }
+.eu-post__banner--white { border-left-color: var(--c-white); }
+.eu-post__banner--green { border-left-color: var(--c-green); }
+.eu-post__banner--gold { border-left-color: var(--c-gold); }

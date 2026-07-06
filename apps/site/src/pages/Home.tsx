@@ -24,6 +24,47 @@ const cabinetCards = CABINET_FACTIONS.map(
     cards.find((c) => c.faction === faction && c.type === "Warrior") ?? cards[0]!,
 );
 
+/**
+ * The four-nation strip: graffiti faction emblems as portal banners. Dwarves,
+ * Monks, and Surfers link to their archive files; the Sonic archive entry
+ * isn't written yet, so Sonics deep-link to their card set until it lands.
+ * Shamans are deliberately absent — they are an anomaly, not a nation tile.
+ */
+const FACTION_TILES = [
+  {
+    name: "Dwarves",
+    tone: "green",
+    img: "dwarf_faction.webp",
+    line: "Strength, faith, and the weight of prosperity.",
+    to: "/blog/dwarves",
+    ctaLabel: "Read the file",
+  },
+  {
+    name: "Monks",
+    tone: "red",
+    img: "monk_faction.webp",
+    line: "Discipline, fire, empire, and inherited trauma.",
+    to: "/blog/monks",
+    ctaLabel: "Read the file",
+  },
+  {
+    name: "Surfers",
+    tone: "blue",
+    img: "surfer_faction.webp",
+    line: "A wounded ocean nation fighting collapse from within.",
+    to: "/blog/surfers",
+    ctaLabel: "Read the file",
+  },
+  {
+    name: "Sonics",
+    tone: "yellow",
+    img: "sonic_faction.webp",
+    line: "Isolation, intelligence, energy, and quiet control.",
+    to: "/cards?faction=Sonic",
+    ctaLabel: "See the cards",
+  },
+] as const;
+
 /** Map-teaser pins: a few landmark markers, positioned by their real coords. */
 const TEASER_MARKER_IDS = ["musa", "metallstadt", "burne", "marina"] as const;
 /** The base map's natural size (the starter markers' coordinate space). */
@@ -47,11 +88,20 @@ export function Home() {
       <section className="hub-hero">
         <div className="hub-hero__sweep" aria-hidden="true" />
         <p className="hub-hero__eyebrow">The Euphoria Universe</p>
-        <h1 className="hub-hero__title">
-          A world at war.
-          <br />
-          <span className="hub-hero__title-accent">A game in your hands.</span>
+        <h1 className="hub-hero__logo">
+          <img
+            src={`${BASE}images/brand/euphoria.webp`}
+            alt="Euphoria"
+            width={1200}
+            height={514}
+            decoding="async"
+            fetchPriority="high"
+          />
         </h1>
+        <p className="hub-hero__title hub-hero__tagline">
+          A world at war.{" "}
+          <span className="hub-hero__title-accent">A game in your hands.</span>
+        </p>
         <p className="hub-hero__lede">
           A trading card game, a manga, and an explorable world — one
           high-energy universe. The beta is live. The map is open. The story is
@@ -160,6 +210,39 @@ export function Home() {
         </Link>
       </section>
 
+      {/* ---- Factions: the four nations ----------------------------------- */}
+      <section className="hub-panel hub-panel--factions" aria-label="Factions">
+        <div className="hub-panel__copy hub-panel__copy--center">
+          <p className="hub-panel__eyebrow">The Factions</p>
+          <h2 className="hub-panel__title">Four nations. One continent.</h2>
+          <p className="hub-panel__lede">
+            Every card, every border, every war traces back to them. Pick a
+            nation and read its file.
+          </p>
+        </div>
+        <div className="hub-factions">
+          {FACTION_TILES.map((f) => (
+            <Link
+              key={f.name}
+              to={f.to}
+              className={`hub-faction hub-faction--${f.tone}`}
+            >
+              <img
+                src={`${BASE}images/factions/${f.img}`}
+                alt={`${f.name} faction emblem`}
+                width={900}
+                height={507}
+                loading="lazy"
+                decoding="async"
+                className="hub-faction__logo"
+              />
+              <span className="hub-faction__line">{f.line}</span>
+              <span className="hub-faction__cta">{f.ctaLabel} →</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       {/* ---- Manga -------------------------------------------------------- */}
       <section className="hub-panel hub-panel--manga" aria-label="Manga">
         <div className="hub-panel__copy">
@@ -180,16 +263,18 @@ export function Home() {
         </div>
       </section>
 
-      {/* ---- Founders / Kickstarter --------------------------------------- */}
-      <section className="hub-panel hub-panel--founders" aria-label="Founder list">
+      {/* ---- The Euphoria Dispatch (email capture) ------------------------- */}
+      <section className="hub-panel hub-panel--founders" aria-label="Email list">
         <div className="hub-panel__copy hub-panel__copy--center">
-          <p className="hub-panel__eyebrow hub-panel__eyebrow--gold">Founders</p>
-          <h2 className="hub-panel__title">Be there when it launches</h2>
-          <p className="hub-panel__lede">
-            The manga&rsquo;s Kickstarter is coming. Founders hear first —
-            campaign start, early rewards, and behind-the-scenes drops.
+          <p className="hub-panel__eyebrow hub-panel__eyebrow--gold">
+            The Dispatch
           </p>
-          <InterestForm source="kickstarter" />
+          <h2 className="hub-panel__title">Join the Euphoria Dispatch</h2>
+          <p className="hub-panel__lede">
+            Get beta updates, chapter drops, faction archives, merch releases,
+            and Kickstarter announcements before they go public.
+          </p>
+          <InterestForm source="home" submitLabel="Join the List" />
         </div>
       </section>
 

@@ -10,6 +10,19 @@ import type { Card } from "../cards/types";
 const entryNo = (post: Post) => String(post.number).padStart(2, "0");
 
 /**
+ * Graffiti faction emblems shown as the banner/hero of each faction file
+ * (public/images/factions, optimized webp). Keyed by slug so the restricted
+ * Shamans entry can never pick one up — its corrupted-archive treatment IS
+ * its identity. "sonics" is pre-wired for when that archive entry lands.
+ */
+const FACTION_BANNERS: Record<string, { src: string; alt: string }> = {
+  dwarves: { src: "images/factions/dwarf_faction.webp", alt: "Dwarf faction emblem" },
+  monks: { src: "images/factions/monk_faction.webp", alt: "Monk faction emblem" },
+  surfers: { src: "images/factions/surfer_faction.webp", alt: "Surfer faction emblem" },
+  sonics: { src: "images/factions/sonic_faction.webp", alt: "Sonic faction emblem" },
+};
+
+/**
  * Single blog post page (/blog/:slug). Articles render as a polished
  * long-form reading page; the Shaman entry renders as a restricted/corrupted
  * archive file — deliberately NO lore body, the withheld information is the
@@ -52,9 +65,21 @@ function ArticlePost({ post }: { readonly post: Post }) {
     featured.filter((f) => f.anchor === heading);
 
   let firstParagraphSeen = false;
+  const banner = FACTION_BANNERS[post.slug];
 
   return (
     <article className={`eu-page eu-page--${post.tone} eu-post`}>
+      {banner !== undefined && (
+        <div className={`eu-post__banner eu-post__banner--${post.tone}`}>
+          <img
+            src={`${import.meta.env.BASE_URL}${banner.src}`}
+            alt={banner.alt}
+            width={900}
+            height={507}
+            decoding="async"
+          />
+        </div>
+      )}
       <p className="eu-page__eyebrow">
         <Link to="/blog" className="eu-post__back">
           Blog
