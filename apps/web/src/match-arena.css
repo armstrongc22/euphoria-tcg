@@ -512,13 +512,17 @@
   box-shadow: 0 0 24px -6px var(--arena), 0 12px 24px -14px #000;
   transform: translateY(-6px);
 }
-/* Inspect / magnifier stays anchored bottom-right of a card or warrior. */
+/* Inspect / magnifier stays anchored bottom-right of a card or warrior.
+   `top: auto` cancels the base stylesheet's top-right anchoring — field
+   magnifiers hang off the CARD root now, so without it they'd jump to the
+   top corner and cover the ATK/HP overlay. */
 .gc .play-match__card-inspect,
 .gc .play-match__warrior-inspect,
 .gc .play-match__weapon-inspect {
   position: absolute;
-  right: 0.3rem;
-  bottom: 0.3rem;
+  top: auto;
+  right: 4px;
+  bottom: 4px;
   z-index: 3;
   width: 1.7rem;
   height: 1.7rem;
@@ -527,6 +531,12 @@
   background: rgba(7, 8, 13, 0.85);
   color: var(--gc-ink);
   cursor: pointer;
+}
+/* Armed Warriors: the weapon chip takes the bottom-LEFT corner so it can
+   never collide with the magnifier in the bottom-right. */
+.gc .play-match__weapon-inspect {
+  right: auto;
+  left: 4px;
 }
 
 /* ---- Action bar (Enter Battle / End Turn) ------------------------------ */
@@ -1412,8 +1422,21 @@
     font-size: 0.6rem;
     line-height: 1;
     padding: 0;
-    right: 0.15rem;
-    bottom: 0.15rem;
+    bottom: 3px;
+  }
+  .gc .play-match__warrior-inspect {
+    right: 3px;
+  }
+  .gc .play-match__weapon-inspect {
+    left: 3px;
+  }
+
+  /* Compact stat overlay on phone field cards: smaller type + tighter padding
+     so ⚔2500 · ♥3500 both fit the narrow card with no clipped digits. */
+  .gc .play-match__warrior-overlay {
+    font-size: 0.68rem;
+    padding: 0.1rem 0.25rem;
+    gap: 0.2rem;
   }
 
   /* 2) Compact center lane (phase banner + notices). */

@@ -1017,8 +1017,12 @@ export function renderPlayableMatch(
       `<span class="play-match__overlay-hp" title="Health">♥${w.currentHealth}</span>`;
     artWrap.append(overlay);
 
+    face.append(artWrap);
+
     // Small dedicated inspect affordance (the detail modal stays one tap away),
-    // pinned to the bottom-right of the art.
+    // pinned to the bottom-right of the CARD itself — not the art region — so
+    // it sits in the same corner on every field card and never drifts toward
+    // the middle on short mobile rows or covers the top ATK/HP overlay.
     const insp = document.createElement("button");
     insp.type = "button";
     insp.className = "play-match__warrior-inspect";
@@ -1029,8 +1033,7 @@ export function renderPlayableMatch(
       e.stopPropagation();
       inspect(w.card);
     });
-    artWrap.append(insp);
-    face.append(artWrap);
+    el.append(insp);
 
     const statusChips = warriorStatusChips(w)
       .map((c) => `<span class="play-match__warrior-status">${escapeHtml(c)}</span>`)

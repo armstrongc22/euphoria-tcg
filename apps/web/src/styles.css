@@ -2399,12 +2399,22 @@ body {
   right: 0;
   display: flex;
   justify-content: space-between;
+  gap: 0.3rem;
   padding: 0.15rem 0.35rem;
   font-weight: 800;
   font-size: 0.82rem;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.78), transparent);
   border-radius: 7px 7px 0 0;
   pointer-events: none;
+  /* Above the art AND the corner magnifier: stats are never hidden. */
+  z-index: 4;
+}
+/* Stat chips never shrink or wrap — 4-digit values (1000/2500/3500) stay
+   fully readable instead of losing their leading digit on narrow cards. */
+.play-match__overlay-atk,
+.play-match__overlay-hp {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .play-match__overlay-atk {
   color: #ffd27a;

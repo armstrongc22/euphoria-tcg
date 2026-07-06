@@ -203,10 +203,11 @@ describe("renderPlayableMatch — card inspection", () => {
       ".play-match__field--mine .play-match__warrior",
     )!;
     const artWrap = warrior.querySelector<HTMLElement>(".play-match__art-wrap")!;
-    // Both the ATK/HP overlay and the inspect button share the art region; the
-    // inspect button is a distinct element (positioned bottom-right in CSS).
+    // The ATK/HP overlay lives on the art region; the inspect button hangs off
+    // the CARD root (positioned bottom-right of the whole card in CSS) so it
+    // never covers the stat overlay.
     expect(artWrap.querySelector(".play-match__warrior-overlay")).not.toBeNull();
-    const inspectBtn = artWrap.querySelector<HTMLButtonElement>(".play-match__warrior-inspect");
+    const inspectBtn = warrior.querySelector<HTMLButtonElement>(":scope > .play-match__warrior-inspect");
     expect(inspectBtn).not.toBeNull();
     expect(inspectBtn!.getAttribute("aria-label")).toMatch(/^Inspect /);
     inspectBtn!.click();
