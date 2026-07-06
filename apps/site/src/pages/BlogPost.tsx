@@ -1,5 +1,11 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { adjacentPosts, findPost, type BlogPost as Post } from "../blog/posts";
+import { BlogCta } from "../blog/BlogCta";
+import { LoreCardAside } from "../blog/LoreCardAside";
+import { resolveFeaturedCards } from "../blog/featured";
+import { CardDetailModal } from "../cards/CardDetailModal";
+import type { Card } from "../cards/types";
 
 const entryNo = (post: Post) => String(post.number).padStart(2, "0");
 
@@ -30,6 +36,23 @@ export function BlogPost() {
 
   if (post.kind === "restricted") return <RestrictedArchive post={post} />;
 
+  return <ArticlePost post={post} />;
+}
+
+/**
+ * Normal article layout. Featured cards render as editorial callouts woven
+ * into the body: anchored cards follow their h2, unanchored ones follow the
+ * lead paragraph. One shared detail modal serves every callout.
+ */
+function ArticlePost({ post }: { readonly post: Post }) {
+  const [selected, setSelected] = useState<Card | null>(null);
+  const featured = resolveFeaturedCards(post.featuredCards ?? []);
+  const leadCards = featured.filter((f) => f.anchor === undefined);
+  const cardsAfterHeading = (heading: string) =>
+    featured.filter((f) => f.anchor === heading);
+
+  let firstParagraphSeen = false;
+
   return (
     <article className={`eu-page eu-page--${post.tone} eu-post`}>
       <p className="eu-page__eyebrow">
@@ -40,25 +63,42 @@ export function BlogPost() {
       </p>
       <h1 className="eu-page__title">{post.title}</h1>
       <div className="eu-post__body">
-        {(post.blocks ?? []).map((block, i) => {
+        {(post.blocks ?? []).flatMap((block, i) => {
           switch (block.kind) {
             case "h2":
-              return (
+              return [
                 <h2 key={i} className="eu-post__heading">
                   {block.text}
-                </h2>
-              );
+                </h2>,
+                ...cardsAfterHeading(block.text).map((f) => (
+                  <LoreCardAside key={`card-${f.card.id}`} card={f.card} onSelect={setSelected} />
+                )),
+              ];
             case "pull":
-              return (
+              return [
                 <p key={i} className={`eu-post__pull eu-post__pull--${post.tone}`}>
                   {block.text}
-                </p>
-              );
-            default:
-              return <p key={i}>{block.text}</p>;
+                </p>,
+              ];
+            default: {
+              const nodes = [<p key={i}>{block.text}</p>];
+              if (!firstParagraphSeen) {
+                firstParagraphSeen = true;
+                nodes.push(
+                  ...leadCards.map((f) => (
+                    <LoreCardAside key={`card-${f.card.id}`} card={f.card} onSelect={setSelected} />
+                  )),
+                );
+              }
+              return nodes;
+            }
           }
         })}
       </div>
+      {post.cta !== undefined && <BlogCta cta={post.cta} tone={post.tone} />}
+      {selected !== null && (
+        <CardDetailModal card={selected} onClose={() => setSelected(null)} />
+      )}
       <footer className="eu-post__footer">
         <DocketNav slug={post.slug} />
         <Link className="eu-btn eu-btn--blue eu-btn--ghost eu-btn--sm" to="/blog">
@@ -152,15 +192,29 @@ function RestrictedArchive({ post }: { readonly post: Post }) {
           IF YOU ARE FACE TO FACE WITH A SHAMAN, RUN.
         </p>
 
+        {post.cta !== undefined && (
+          <div className="eu-restricted__cta">
+            <p className="eu-restricted__cta-head">{post.cta.headline}</p>
+            <div className="eu-restricted__cta-links">
+              {post.cta.links.map((link) => (
+                <Link
+                  key={link.label}
+                  to={link.to === "beta" ? "/" : link.to}
+                  className="eu-restricted__exit"
+                >
+                  {link.label.toUpperCase()}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         <nav className="eu-restricted__nav" aria-label="Blog entries">
           {prev !== undefined && (
             <Link to={`/blog/${prev.slug}`} className="eu-restricted__exit">
               ← ENTRY {String(prev.number).padStart(2, "0")}
             </Link>
           )}
-          <Link to="/blog" className="eu-restricted__exit">
-            UNRESTRICTED ARCHIVE
-          </Link>
           {next !== undefined && (
             <Link to={`/blog/${next.slug}`} className="eu-restricted__exit">
               ENTRY {String(next.number).padStart(2, "0")} →

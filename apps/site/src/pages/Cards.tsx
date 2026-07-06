@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { cards } from "@euphoria/core/cards";
 import { filterCards, uniqueFactions, uniqueTypes } from "@euphoria/core/filters";
 import { sortCards } from "@euphoria/core/sort";
@@ -41,8 +42,14 @@ function applySort(list: readonly Card[], key: SortKey): Card[] {
  * `filterCards`; name search is applied on top so it stays name-only.
  */
 export function Cards() {
+  // Deep links like /cards?faction=Dwarf (used by the blog faction pages)
+  // start the archive pre-filtered; unknown values fall back to "all".
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
-  const [faction, setFaction] = useState("all");
+  const [faction, setFaction] = useState(() => {
+    const wanted = searchParams.get("faction");
+    return wanted !== null && FACTIONS.includes(wanted) ? wanted : "all";
+  });
   const [type, setType] = useState("all");
   const [sort, setSort] = useState<SortKey>("grouped");
   const [selected, setSelected] = useState<Card | null>(null);

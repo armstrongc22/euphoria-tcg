@@ -1501,3 +1501,110 @@ code {
 .eu-restricted__nav .eu-restricted__exit {
   margin-top: 0;
 }
+
+/* ---- Blog: end-of-article CTA panel ------------------------------------- */
+.eu-post-cta {
+  max-width: 44rem;
+  margin: 2.5rem 0 0.5rem;
+  padding: 1.6rem 1.7rem;
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-left: 4px solid var(--c-line);
+  border-radius: 15px;
+}
+
+.eu-post-cta--red { border-left-color: var(--c-red); }
+.eu-post-cta--blue { border-left-color: var(--c-blue); }
+.eu-post-cta--white { border-left-color: var(--c-white); }
+.eu-post-cta--green { border-left-color: var(--c-green); }
+.eu-post-cta--purple { border-left-color: var(--c-purple); }
+.eu-post-cta--gold { border-left-color: var(--c-gold); }
+
+.eu-post-cta__headline {
+  margin: 0 0 0.45rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.eu-post-cta__body {
+  margin: 0 0 1.1rem;
+  color: var(--c-ink-dim);
+  font-size: 0.98rem;
+}
+
+.eu-post-cta__links {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+/* ---- Restricted page: muted in-universe CTA ------------------------------ */
+.eu-restricted__cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.6rem;
+  padding: 0.9rem 1.3rem;
+  border: 1px dashed rgba(154, 163, 178, 0.35);
+  border-radius: 4px;
+}
+
+.eu-restricted__cta-head {
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.34em;
+  padding-left: 0.34em;
+  color: var(--c-ink-dim);
+}
+
+.eu-restricted__cta-links {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ---- Blog: editorial card callouts --------------------------------------
+   Magazine-style asides. ≥1100px: the card sits in the empty right rail
+   beside the 44rem text column. 700–1099px: it floats inside the column and
+   the article text wraps around it. <700px: it stacks in-flow, centered. */
+.eu-post__callout {
+  width: min(11.5rem, 44%);
+  margin: 0.35rem auto 1.2rem;
+}
+
+.eu-post__callout-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--c-ink-dim);
+}
+
+.eu-post__callout .eu-tile__own {
+  display: none; /* collection chrome is noise inside an article */
+}
+
+@media (min-width: 700px) {
+  .eu-post__callout {
+    float: right;
+    margin: 0.35rem 0 1rem 1.4rem;
+  }
+
+  /* New sections start below any hanging callout from the previous one. */
+  .eu-post__heading {
+    clear: right;
+  }
+}
+
+@media (min-width: 1100px) {
+  /* Slide the callout out of the text column into the right rail. */
+  .eu-post__callout {
+    margin-right: -13.5rem;
+    width: 11.5rem;
+  }
+}

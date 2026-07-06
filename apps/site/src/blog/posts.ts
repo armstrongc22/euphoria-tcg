@@ -18,6 +18,41 @@ export type BlogBlock =
   | { readonly kind: "h2"; readonly text: string }
   | { readonly kind: "pull"; readonly text: string };
 
+/**
+ * A CTA button on a post page. `to: "beta"` is special-cased to the bundled
+ * beta (a real <a href> navigation via BETA_URL, not a router route); every
+ * other `to` is an internal router path. `primary` gets the loud treatment.
+ */
+export interface BlogCtaLink {
+  readonly label: string;
+  readonly to: "beta" | `/${string}`;
+  readonly primary?: boolean;
+}
+
+export interface BlogCta {
+  readonly headline: string;
+  readonly body?: string;
+  readonly links: readonly BlogCtaLink[];
+}
+
+/**
+ * A card called out beside the article body. `name` must exactly match a card
+ * in @euphoria/core/cards (tests enforce this). `anchor` is the exact text of
+ * the h2 the callout accompanies; omit it to place the card by the lead
+ * paragraph. Restricted entries must never carry featured cards.
+ */
+export interface FeaturedCard {
+  readonly name: string;
+  readonly anchor?: string;
+  /**
+   * Marks a deliberate lore-based faction exception: the card's database
+   * faction differs from the page's faction but it belongs here in the story
+   * (e.g. A Dragon's Judgement — a Neutral Item depicting the Monk royal
+   * family — on the Monk page). Tests reject off-faction cards without it.
+   */
+  readonly loreException?: true;
+}
+
 export interface BlogPost {
   readonly slug: string;
   readonly number: number;
@@ -28,6 +63,10 @@ export interface BlogPost {
   readonly sourceDoc: string;
   readonly kind: "article" | "restricted";
   readonly blocks?: readonly BlogBlock[];
+  /** End-of-article CTA. The restricted entry gets its own muted variant. */
+  readonly cta?: BlogCta;
+  /** Editorial card callouts shown beside the article body. */
+  readonly featuredCards?: readonly FeaturedCard[];
 }
 
 const p = (text: string): BlogBlock => ({ kind: "p", text });
@@ -69,6 +108,15 @@ export const BLOG_POSTS: readonly BlogPost[] = [
       ),
       pull("Your support could be the building blocks for Euphoria."),
     ],
+    cta: {
+      headline: "Enter the Euphoria Universe",
+      body: "Explore the factions, play the beta, and begin learning the world before Chapter One arrives.",
+      links: [
+        { label: "Play the Beta", to: "beta", primary: true },
+        { label: "Explore the Cards", to: "/cards" },
+        { label: "Explore the Map", to: "/map" },
+      ],
+    },
   },
   {
     slug: "the-world-of-euphoria",
@@ -102,6 +150,15 @@ export const BLOG_POSTS: readonly BlogPost[] = [
         "Euphoria is the search for the center of all things. And everything along the path to it.",
       ),
     ],
+    cta: {
+      headline: "Study the Continent",
+      body: "Explore the map, read the faction archives, or test the nations in the beta.",
+      links: [
+        { label: "Explore the Map", to: "/map", primary: true },
+        { label: "Read the Faction Archives", to: "/blog" },
+        { label: "Play the Beta", to: "beta" },
+      ],
+    },
   },
   {
     slug: "dwarves",
@@ -153,6 +210,21 @@ export const BLOG_POSTS: readonly BlogPost[] = [
       p("The future of the Dwarves, like all of Euphoria, is uncertain."),
       pull("And from their perch, it would be a long fall."),
     ],
+    featuredCards: [
+      { name: "Prosperity" },
+      { name: "Atlas Alacapati", anchor: "The Alacapati Rajahs" },
+      { name: "Aaron Alacapati", anchor: "The Four Lords" },
+      { name: "Durga Highstone", anchor: "Cracks in the Armor" },
+    ],
+    cta: {
+      headline: "Command the Dwarves in the Beta",
+      body: "Study their warriors, learn their playstyle, and take them into battle.",
+      links: [
+        { label: "Play the Beta", to: "beta", primary: true },
+        { label: "Explore Dwarf Cards", to: "/cards?faction=Dwarf" },
+        { label: "Return to Archives", to: "/blog" },
+      ],
+    },
   },
   {
     slug: "monks",
@@ -206,6 +278,23 @@ export const BLOG_POSTS: readonly BlogPost[] = [
       ),
       pull("The direction of that lean has yet to be decided."),
     ],
+    featuredCards: [
+      // Neutral in the database, Monk in the lore — it depicts the Monk royal
+      // family, so it sits by the Molt the Dragon Tamer lead by design.
+      { name: "A Dragon’s Judgement", loreException: true },
+      { name: "Gōuhuǒ Yǒnghéng", anchor: "The Kindling" },
+      { name: "“Hope” Cyrus", anchor: "The Holy Emperor" },
+      { name: "Blaize Azazel", anchor: "A Leaning Tower" },
+    ],
+    cta: {
+      headline: "Command the Monks in the Beta",
+      body: "Study their warriors, learn their playstyle, and take them into battle.",
+      links: [
+        { label: "Play the Beta", to: "beta", primary: true },
+        { label: "Explore Monk Cards", to: "/cards?faction=Monk" },
+        { label: "Return to Archives", to: "/blog" },
+      ],
+    },
   },
   {
     slug: "surfers",
@@ -269,6 +358,21 @@ export const BLOG_POSTS: readonly BlogPost[] = [
       p("The Surfer nation is already teetering on the brink."),
       pull("One has to wonder whether any of the other nations will finally push them over the edge."),
     ],
+    featuredCards: [
+      { name: "Delta Renvatten" },
+      { name: "Freia Renvatten", anchor: "Assistance Becomes Control" },
+      { name: "Captain “Cold Rain” Kai", anchor: "Sailors and Pirates" },
+      { name: "Kaltvatten", anchor: "The Euphrates Tribe" },
+    ],
+    cta: {
+      headline: "Command the Surfers in the Beta",
+      body: "Study their warriors, learn their playstyle, and take them into battle.",
+      links: [
+        { label: "Play the Beta", to: "beta", primary: true },
+        { label: "Explore Surfer Cards", to: "/cards?faction=Surfer" },
+        { label: "Return to Archives", to: "/blog" },
+      ],
+    },
   },
   {
     slug: "shamans",
@@ -280,6 +384,15 @@ export const BLOG_POSTS: readonly BlogPost[] = [
       "ACCESS DENIED · ARCHIVE STATUS: COMPROMISED · CLASSIFICATION: EXTREME RISK",
     sourceDoc: "blog-6-shamans.docx",
     kind: "restricted",
+    // Deliberately muted, in-universe only. Never a marketing block, never
+    // "Command the Shamans", never card previews — the withholding is the point.
+    cta: {
+      headline: "PUBLIC ARCHIVES AVAILABLE",
+      links: [
+        { label: "Return to Archives", to: "/blog" },
+        { label: "Access Public Records", to: "/cards" },
+      ],
+    },
   },
   {
     slug: "port-troy",
@@ -333,6 +446,15 @@ export const BLOG_POSTS: readonly BlogPost[] = [
       p("How long can that truly last?"),
       pull("And what force is strong enough to shift a dynamic built into the very foundation of the city?"),
     ],
+    cta: {
+      headline: "Enter the City",
+      body: "Explore the world map, read more archives, or see how Port Troy connects to the larger Euphoria conflict.",
+      links: [
+        { label: "Explore the Map", to: "/map", primary: true },
+        { label: "Read More Archives", to: "/blog" },
+        { label: "Play the Beta", to: "beta" },
+      ],
+    },
   },
 ];
 
