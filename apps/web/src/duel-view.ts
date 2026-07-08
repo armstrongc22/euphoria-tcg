@@ -29,6 +29,12 @@ import {
   type PvpRoom,
 } from "@euphoria/core/pvp";
 import { createPvpMatch, type PvpPlayableMatch } from "@euphoria/core/pvp-match";
+import { getRecoveryStore } from "@euphoria/core/match-recovery";
+import {
+  clearPvpPointer,
+  loadPvpPointer,
+  savePvpPointer,
+} from "@euphoria/core/pvp-recovery";
 import { renderPlayableMatch, type PlayableMatchBoard } from "./play-match-view";
 import { createCardDetail } from "./detail";
 
@@ -73,6 +79,10 @@ export function mountDuel(container: HTMLElement, options: DuelOptions): void {
   let startingMatch = false;
   let arenaBoard: PlayableMatchBoard | null = null;
   let arenaController: PvpPlayableMatch | null = null;
+  // Crash/refresh recovery: an unfinished duel found on mount. While set, the
+  // home screen is replaced by a Continue/Concede prompt.
+  let recovery: PvpMatch | null = null;
+  const recoveryStore = getRecoveryStore();
 
   const disposeSub = (): void => {
     if (unsubscribe !== null) {
@@ -175,11 +185,147 @@ export function mountDuel(container: HTMLElement, options: DuelOptions): void {
         client,
         onSyncError: (message) => showSyncError(message),
       });
+      // Recovery pointer: this device is now in this duel. Cleared when the
+      // duel resolves (result/concede) — NOT on plain navigation, so a reload
+      // or closed tab can find its way back here.
+      if (recoveryStore !== null) {
+        savePvpPointer(recoveryStore, {
+          userId: session.userId,
+          matchId: match.id,
+          roomId: match.room_id,
+        });
+      }
       launchArena(controller);
     } catch (e) {
       error = e instanceof Error ? e.message : "The match could not be loaded.";
       startingMatch = false;
       render();
+    }
+  };
+
+  // ---- Crash/refresh recovery ------------------------------------------------
+
+  /**
+   * Mount-time check for an unfinished duel: the active-matches query finds
+   * duels still running (this device or any other); the local pointer
+   * additionally notices a duel that ENDED while the player was away, so they
+   * see its result instead of a stale prompt. Runs quietly in the background —
+   * the home screen re-renders only when something is found.
+   */
+  const checkRecovery = async (): Promise<void> => {
+    if (client === null) return;
+    let candidates: PvpMatch[] = [];
+    try {
+      candidates = await client.listMyActiveMatches();
+    } catch {
+      return; // offline/unreachable — recovery is best-effort
+    }
+    // The user may have created/joined a room while we were checking.
+    if (arenaBoard !== null || room !== null) return;
+    if (candidates.length > 0) {
+      recovery = candidates[0]!;
+      if (candidates.length > 1) {
+        console.warn(
+          `[duel] ${candidates.length} unfinished PvP matches found; offering the most recent. ` +
+            `Stale match ids for cleanup: ${candidates.slice(1).map((m) => m.id).join(", ")}`,
+        );
+      }
+      render();
+      return;
+    }
+    // No active duel — did the one this device was in end while we were gone?
+    const pointer = recoveryStore !== null ? loadPvpPointer(recoveryStore, session.userId) : null;
+    if (pointer === null) return;
+    try {
+      const match = await client.getMatch(pointer.matchId);
+      if (arenaBoard !== null || room !== null) return;
+      if (match !== null && match.status !== "active") {
+        showEndedWhileAway(match);
+        return;
+      }
+    } catch {
+      return; // keep the pointer; try again next visit
+    }
+    // Row missing entirely (cleaned up) — drop the stale pointer.
+    if (recoveryStore !== null) clearPvpPointer(recoveryStore);
+  };
+
+  /** A duel that finished while the player was away: show its result. */
+  const showEndedWhileAway = (match: PvpMatch): void => {
+    if (recoveryStore !== null) clearPvpPointer(recoveryStore);
+    try {
+      const controller = createPvpMatch({ match, userId: session.userId, pool, client: client! });
+      const summary = controller.summary();
+      controller.dispose();
+      recovery = null;
+      showResult(summary);
+    } catch {
+      // Decks/log no longer replayable — say what we can and move on.
+      recovery = null;
+      notice = "Your last duel ended while you were away.";
+      render();
+    }
+  };
+
+  /** Continue an unfinished duel: re-verify, then mount the arena fresh. */
+  const continueRecovery = async (matchId: string): Promise<void> => {
+    if (client === null || busy) return;
+    busy = true;
+    render();
+    try {
+      const fresh = await client.getMatch(matchId);
+      if (fresh === null) {
+        if (recoveryStore !== null) clearPvpPointer(recoveryStore);
+        recovery = null;
+        error = "That duel no longer exists.";
+        return;
+      }
+      if (fresh.status !== "active") {
+        busy = false;
+        showEndedWhileAway(fresh);
+        return;
+      }
+      recovery = null;
+      busy = false;
+      await enterMatch(fresh.id, fresh);
+      return;
+    } catch (e) {
+      error = e instanceof Error ? e.message : "The duel could not be restored.";
+    } finally {
+      busy = false;
+    }
+    if (arenaBoard === null) render();
+  };
+
+  /** Concede an unfinished duel from the prompt (the opponent wins). */
+  const concedeRecovery = async (match: PvpMatch): Promise<void> => {
+    if (client === null || busy) return;
+    busy = true;
+    render();
+    try {
+      const fresh = (await client.getMatch(match.id)) ?? match;
+      if (fresh.status !== "active") {
+        // The opponent conceded first / it completed — show that result.
+        busy = false;
+        showEndedWhileAway(fresh);
+        return;
+      }
+      // Replay the shared log into a controller purely to close the row
+      // properly (status + winner via the versioned push), then drop it.
+      const controller = createPvpMatch({ match: fresh, userId: session.userId, pool, client });
+      try {
+        await controller.concede();
+      } finally {
+        controller.dispose();
+      }
+      if (recoveryStore !== null) clearPvpPointer(recoveryStore);
+      recovery = null;
+      notice = "You conceded the duel.";
+    } catch (e) {
+      error = e instanceof Error ? e.message : "The duel could not be conceded.";
+    } finally {
+      busy = false;
+      if (arenaBoard === null) render();
     }
   };
 
@@ -235,6 +381,8 @@ export function mountDuel(container: HTMLElement, options: DuelOptions): void {
 
   /** The duel result panel. No rewards, no history writes — friendly match. */
   const showResult = (summary: MatchSummary): void => {
+    // The duel is resolved — nothing to recover anymore.
+    if (recoveryStore !== null) clearPvpPointer(recoveryStore);
     disposeArena();
     container.replaceChildren();
     const el = document.createElement("section");
@@ -376,7 +524,13 @@ export function mountDuel(container: HTMLElement, options: DuelOptions): void {
       return;
     }
 
-    root.append(room === null ? renderHome() : renderLobby(room));
+    root.append(
+      room !== null
+        ? renderLobby(room)
+        : recovery !== null
+          ? renderRecovery(recovery)
+          : renderHome(),
+    );
     container.append(root);
   }
 
@@ -417,6 +571,35 @@ export function mountDuel(container: HTMLElement, options: DuelOptions): void {
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") doJoin();
     });
+    el.querySelector<HTMLButtonElement>('[data-act="exit"]')!.addEventListener("click", onExit);
+    return el;
+  }
+
+  /** Continue/Concede prompt for an unfinished duel found on mount. */
+  function renderRecovery(match: PvpMatch): HTMLElement {
+    const el = document.createElement("div");
+    el.className = "gc-panel gc-duel__recovery";
+    const turns = match.action_log.length;
+    el.innerHTML = `
+      <h2 class="gc-panel__title">You have an unfinished duel.</h2>
+      <p class="gc-panel__line">${
+        turns > 0
+          ? `Your duel is still live (${turns} action${turns === 1 ? "" : "s"} played). Pick it back up, or concede it to your opponent.`
+          : "Your duel is still live. Pick it back up, or concede it to your opponent."
+      }</p>
+      ${banner()}
+      <button type="button" class="gc-btn gc-btn--primary" data-act="continue" ${busy ? "disabled" : ""}>
+        ${busy ? "Working…" : "Continue Duel"}
+      </button>
+      <button type="button" class="gc-btn" data-act="concede" ${busy ? "disabled" : ""}>Concede</button>
+      <button type="button" class="gc-link" data-act="exit">Back to menu</button>
+    `;
+    el.querySelector<HTMLButtonElement>('[data-act="continue"]')!.addEventListener("click", () =>
+      void continueRecovery(match.id),
+    );
+    el.querySelector<HTMLButtonElement>('[data-act="concede"]')!.addEventListener("click", () =>
+      void concedeRecovery(match),
+    );
     el.querySelector<HTMLButtonElement>('[data-act="exit"]')!.addEventListener("click", onExit);
     return el;
   }
@@ -495,5 +678,8 @@ export function mountDuel(container: HTMLElement, options: DuelOptions): void {
   render();
   if (pendingInvite !== null && pendingInvite !== undefined && client !== null) {
     void joinRoom(pendingInvite);
+  } else {
+    // No invite to honor — look for an unfinished duel to offer back.
+    void checkRecovery();
   }
 }

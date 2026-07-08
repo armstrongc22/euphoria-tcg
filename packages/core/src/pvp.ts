@@ -71,6 +71,11 @@ export interface PvpMatch {
   readonly version: number;
   /** The winner's uuid once the match completes (null while live / on draw). */
   readonly winner: string | null;
+  /**
+   * Last-write timestamp (ISO), used to pick the most recent duel when several
+   * are unfinished. Optional: absent on rows built by older fixtures/tests.
+   */
+  readonly updated_at?: string;
 }
 
 /** How long a freshly-created invite stays joinable. */
@@ -311,6 +316,12 @@ export interface PvpClient {
   /** Loads a match the current user participates in. */
   getMatch(matchId: string): Promise<PvpMatch | null>;
   /**
+   * All still-`active` matches the current user is seated in, most recently
+   * updated first. Used by crash/refresh recovery: entry [0] is the duel to
+   * offer back; any others are stale strays the caller may report for cleanup.
+   */
+  listMyActiveMatches(): Promise<PvpMatch[]>;
+  /**
    * Appends to the canonical game: writes the full action log plus turn/result
    * metadata, guarded by the `version` the caller last saw. A conflict (someone
    * else wrote first) comes back as `{ ok: false, conflict: true }` so the
@@ -333,7 +344,7 @@ export interface PvpClient {
 const ROOM_COLUMNS =
   "id,room_code,created_by,player_one,player_two,player_one_ready,player_two_ready,player_one_deck,player_two_deck,status,match_id,expires_at";
 const MATCH_COLUMNS =
-  "id,room_id,player_one,player_two,seed,player_one_deck,player_two_deck,current_player,status,action_log,version,winner";
+  "id,room_id,player_one,player_two,seed,player_one_deck,player_two_deck,current_player,status,action_log,version,winner,updated_at";
 const POLL_INTERVAL_MS = 2500;
 
 /**
@@ -482,6 +493,17 @@ export function createPvpClient(
         .maybeSingle();
       if (error !== null) throw new Error(error.message);
       return (data as PvpMatch | null) ?? null;
+    },
+
+    async listMyActiveMatches(): Promise<PvpMatch[]> {
+      const { data, error } = await client
+        .from("pvp_matches")
+        .select(MATCH_COLUMNS)
+        .eq("status", "active")
+        .or(`player_one.eq.${uid},player_two.eq.${uid}`)
+        .order("updated_at", { ascending: false });
+      if (error !== null) throw new Error(error.message);
+      return (data as PvpMatch[] | null) ?? [];
     },
 
     async pushMatch(

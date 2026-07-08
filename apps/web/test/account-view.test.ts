@@ -451,4 +451,61 @@ describe("mountAccount — interrupted-match recovery", () => {
     await flush();
     expect(window.localStorage.getItem(ACTIVE_MATCH_KEY)).toBeNull();
   });
+
+  // The autoPlay path is the "Start Match" menu entry: with an interrupted
+  // match on disk it must gate on Continue/Concede instead of silently
+  // starting (and checkpoint-overwriting) a fresh game.
+  async function mountAutoPlay(): Promise<HTMLElement> {
+    const auth = createLocalAuth(memoryStore());
+    await auth.signUp("player@example.com", "pw");
+    await auth.saveFaction(
+      { userId: "local-demo", email: "player@example.com" },
+      "Dwarf",
+    );
+    const container = document.createElement("div");
+    await mountAccount(container, {
+      auth,
+      pool: cards,
+      onSignOut: () => {},
+      autoPlay: "Dwarf",
+    });
+    return container;
+  }
+
+  it("Start Match gates on the recovery prompt when a match was interrupted", async () => {
+    seedSavedMatch();
+    const container = await mountAutoPlay();
+    expect(container.querySelector(".play-match")).toBeNull();
+    const gate = container.querySelector(".account__resume");
+    expect(gate).not.toBeNull();
+    expect(gate?.textContent).toContain("You have an unfinished duel.");
+    expect(gate?.textContent).toContain("turn 4");
+  });
+
+  it("Continue Duel resumes the interrupted board", async () => {
+    seedSavedMatch();
+    const container = await mountAutoPlay();
+    container.querySelector<HTMLButtonElement>(".account__resume-btn")!.click();
+    await flush();
+    expect(container.querySelector(".play-match")).not.toBeNull();
+    // Still the same recovery record's game — the checkpoint persists.
+    expect(window.localStorage.getItem(ACTIVE_MATCH_KEY)).not.toBeNull();
+  });
+
+  it("Concede clears the snapshot (no reward path) and starts the fresh match", async () => {
+    seedSavedMatch();
+    const container = await mountAutoPlay();
+    container.querySelector<HTMLButtonElement>(".account__resume-discard")!.click();
+    await flush();
+    // The old snapshot is gone; the new match's own checkpoint replaces it.
+    const board = container.querySelector(".play-match");
+    expect(board).not.toBeNull();
+    expect(container.querySelector(".account__resume")).toBeNull();
+  });
+
+  it("Start Match proceeds straight to the board with nothing to recover", async () => {
+    const container = await mountAutoPlay();
+    expect(container.querySelector(".account__resume")).toBeNull();
+    expect(container.querySelector(".play-match")).not.toBeNull();
+  });
 });

@@ -791,6 +791,15 @@ export async function mountAccount(
   // the sim feeds the human's deck; on game over the board hands back the summary
   // and we route into the shared finishMatch flow (history + reward intact).
   const showPlayableMatch = async (faction: StarterFaction): Promise<void> => {
+    // Recovery gate: an interrupted match must be continued or conceded before
+    // a new one can start — otherwise "Start Match" would silently overwrite
+    // the crash/refresh snapshot mid-game.
+    const interrupted =
+      recoveryStore !== null ? loadActiveMatch(recoveryStore, session.userId) : null;
+    if (interrupted !== null) {
+      renderMatchRecoveryGate(interrupted, faction);
+      return;
+    }
     const chosen = await resolveActiveDeck(faction);
     const match = createPlayableMatch({
       faction,
@@ -798,6 +807,44 @@ export async function mountAccount(
       playerDeck: chosen.isCustom ? chosen.entries : undefined,
     });
     launchMatch(match, chosen);
+  };
+
+  // The Continue/Concede prompt shown when "Start Match" finds an interrupted
+  // match. Continue replays the snapshot (resumeMatch); Concede abandons it —
+  // no win, reward, or history is recorded for a conceded solo match — and
+  // starts the fresh match the player asked for.
+  const renderMatchRecoveryGate = (saved: SavedMatch, faction: StarterFaction): void => {
+    currentView = "match-recovery";
+    const panel = document.createElement("section");
+    panel.className = "account__panel account__resume";
+    const heading = document.createElement("h3");
+    heading.className = "account__panel-heading";
+    heading.textContent = "You have an unfinished duel.";
+    panel.append(heading);
+    const body = document.createElement("p");
+    body.className = "account__panel-body";
+    body.textContent =
+      `Your ${saved.faction} match is still in progress (turn ${saved.turn}). ` +
+      "Continue where you left off, or concede it to start fresh.";
+    panel.append(body);
+    const row = document.createElement("div");
+    row.className = "account__resume-actions";
+    const cont = document.createElement("button");
+    cont.type = "button";
+    cont.className = "account__play account__resume-btn";
+    cont.textContent = "Continue Duel";
+    cont.addEventListener("click", () => resumeMatch(saved));
+    const concede = document.createElement("button");
+    concede.type = "button";
+    concede.className = "account__signout account__resume-discard";
+    concede.textContent = "Concede";
+    concede.addEventListener("click", () => {
+      clearRecovery("conceded from recovery gate");
+      void showPlayableMatch(faction);
+    });
+    row.append(cont, concede);
+    panel.append(row);
+    swapMain(panel);
   };
 
   // Resume an interrupted match from its saved descriptor by replaying the saved

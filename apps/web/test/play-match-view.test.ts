@@ -2691,6 +2691,7 @@ function fakeDuelClient(): { client: PvpClient; row: () => PvpMatch } {
     leaveRoom: unsupported,
     subscribeRoom: unsupported,
     startMatch: unsupported,
+    listMyActiveMatches: unsupported,
     getMatch: async () => row,
     pushMatch: async (_id, expectedVersion, patch) => {
       if (row.version !== expectedVersion) {

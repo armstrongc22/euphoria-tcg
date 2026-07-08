@@ -258,6 +258,18 @@
   color: #fff;
   box-shadow: 0 0 16px -6px var(--gc-accent);
 }
+/* A chip that acts (the unfinished-duel nudge): same look, button semantics. */
+.gc-status__chip--action {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-color: var(--gc-impact);
+  box-shadow: 0 0 16px -6px var(--gc-impact);
+}
+.gc-status__chip--action:hover {
+  background: color-mix(in srgb, var(--gc-impact) 22%, var(--gc-panel));
+}
 
 .gc-menu__actions {
   display: grid;

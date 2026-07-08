@@ -55,6 +55,7 @@ function fakeMatchClient(initial: PvpMatch): {
     leaveRoom: unsupported,
     subscribeRoom: unsupported,
     startMatch: unsupported,
+    listMyActiveMatches: unsupported,
     async getMatch() {
       return row;
     },

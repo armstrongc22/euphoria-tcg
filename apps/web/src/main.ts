@@ -38,7 +38,8 @@ import { mountLore } from "./lore-view";
 import { installDiagnostics, setBuildStamp } from "@euphoria/core/debug-log";
 import { openFeedbackModal } from "./feedback-view";
 import { FLAG_DEBUG, flag, setFlag } from "./debug-flags";
-import { getRecoveryStore } from "@euphoria/core/match-recovery";
+import { getRecoveryStore, hasResumableMatch } from "@euphoria/core/match-recovery";
+import { loadPvpPointer } from "@euphoria/core/pvp-recovery";
 import { getPendingStore, syncPendingRewards } from "@euphoria/core/pending-reward";
 import { resetAllProgression } from "@euphoria/core/progression";
 import { nextRewardMilestone } from "@euphoria/core/rewards";
@@ -485,6 +486,25 @@ async function refreshMenuStatus(): Promise<void> {
     `<span class="gc-status__chip">${currentFaction !== null ? `Faction: ${escapeHtml(currentFaction)}` : "No deck selected"}</span>`,
   );
   statusEl.innerHTML = chips.join("");
+
+  // Unfinished-match nudge (local, instant — no network): a solo snapshot or a
+  // PvP pointer means "you were mid-duel". The chip routes to the screen that
+  // owns the real Continue/Concede prompt (which verifies against Supabase).
+  if (session !== null) {
+    const store = getRecoveryStore();
+    const soloPending = store !== null && hasResumableMatch(store, session.userId);
+    const pvpPending = store !== null && loadPvpPointer(store, session.userId) !== null;
+    if (soloPending || pvpPending) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "gc-status__chip gc-status__chip--accent gc-status__chip--action";
+      chip.textContent = "⚔ Unfinished duel — continue?";
+      chip.addEventListener("click", () =>
+        renderActiveScreen(soloPending ? "match" : "duel"),
+      );
+      statusEl.append(chip);
+    }
+  }
 
   if (session !== null) {
     const stats = await auth.getMatchStats(session).catch(() => null);
