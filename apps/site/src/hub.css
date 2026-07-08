@@ -518,19 +518,23 @@
   inset: -34%;
   z-index: -1;
   pointer-events: none;
+  /* Blooms echo the mark itself: acid-green core, red splatter up-left,
+     purple bevel shadow below. */
   background:
-    radial-gradient(circle at 50% 45%, rgba(41, 209, 122, 0.2), transparent 55%),
-    radial-gradient(circle at 82% 28%, rgba(155, 92, 255, 0.14), transparent 45%),
-    radial-gradient(circle at 16% 72%, rgba(255, 46, 77, 0.12), transparent 40%);
+    radial-gradient(circle at 50% 45%, rgba(41, 209, 122, 0.24), transparent 56%),
+    radial-gradient(circle at 14% 20%, rgba(255, 46, 77, 0.14), transparent 42%),
+    radial-gradient(circle at 55% 88%, rgba(155, 92, 255, 0.18), transparent 48%);
   filter: blur(22px);
 }
 
 .hub-hero__logo img {
-  width: min(720px, 92vw);
+  /* Viewport minus the page chrome: .eu-main's 1.25rem gutters + the hero's
+     own 1rem padding per side — otherwise the mark overflows small phones. */
+  width: min(760px, calc(100vw - 4.5rem));
   height: auto;
   background: transparent;
   filter: drop-shadow(0 24px 40px rgba(0, 0, 0, 0.75))
-    drop-shadow(0 0 28px rgba(44, 255, 136, 0.18));
+    drop-shadow(0 0 30px rgba(44, 255, 136, 0.2));
 }
 
 /* The old title becomes the tagline under the logo mark. */

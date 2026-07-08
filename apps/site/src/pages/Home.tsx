@@ -89,8 +89,8 @@ export function Home() {
           <img
             src={`${BASE}images/brand/euphoria.webp`}
             alt="Euphoria"
-            width={1200}
-            height={514}
+            width={1440}
+            height={617}
             decoding="async"
             fetchPriority="high"
           />

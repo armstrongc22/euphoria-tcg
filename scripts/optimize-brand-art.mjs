@@ -1,9 +1,11 @@
 /**
  * Brand/faction logo pipeline: checkerboard removal → true-alpha WebP.
  *
- * The raw exports in assets/source/** are RGB screenshots of transparency
- * previews — the grey/white checkerboard is BAKED INTO the pixels (no alpha
- * channel). This script reconstructs real transparency:
+ * Sources that already carry a real alpha channel (any fully transparent
+ * pixel) are resized + encoded as-is. The rest of the raw exports in
+ * assets/source/** are RGB screenshots of transparency previews — the
+ * grey/white checkerboard is BAKED INTO the pixels (no alpha channel).
+ * For those, this script reconstructs real transparency:
  *
  *   1. Detect the two checker colors (the two dominant flat colors in the
  *      image corners).
@@ -27,7 +29,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 
 /** [source png, output webp, target width px] — widths cover ~2× display size. */
 const JOBS = [
-  ["assets/source/brand/euphoria.png", "public/images/brand/euphoria.webp", 1200],
+  ["assets/source/brand/euphoria.png", "public/images/brand/euphoria.webp", 1440],
   ["assets/source/factions/dwarf_faction.png", "public/images/factions/dwarf_faction.webp", 900],
   ["assets/source/factions/monk_faction.png", "public/images/factions/monk_faction.webp", 900],
   ["assets/source/factions/sonic_faction.png", "public/images/factions/sonic_faction.webp", 900],
@@ -69,6 +71,27 @@ const dist = (data, i, c) =>
 
 async function process(src, out, width) {
   const input = path.join(repoRoot, src);
+
+  // Sources exported with a real alpha channel (any fully transparent pixel)
+  // need no checker reconstruction — resize + encode and we're done.
+  const meta = await sharp(input).metadata();
+  if (meta.hasAlpha) {
+    const stats = await sharp(input).stats();
+    const alpha = stats.channels[3];
+    if (alpha && alpha.min === 0) {
+      const output = path.join(repoRoot, out);
+      const res = await sharp(input)
+        .resize({ width, withoutEnlargement: true })
+        .webp({ quality: 82, alphaQuality: 90 })
+        .toFile(output);
+      console.log(
+        `✓ ${out} — ${res.width}×${res.height}, ${(res.size / 1024).toFixed(0)} KB ` +
+          `(true-alpha source, passed through)`,
+      );
+      return;
+    }
+  }
+
   const { data, info } = await sharp(input)
     .removeAlpha()
     .raw()
