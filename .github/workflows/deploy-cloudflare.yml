@@ -61,6 +61,12 @@ jobs:
           # (Supabase auth/rewards). Anon/publishable key only.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          # Fourthwall /shop page: the GitHub secrets keep their unprefixed
+          # names; Vite only inlines VITE_*-prefixed vars, so they're mapped
+          # here. The storefront token is Fourthwall's PUBLIC read-only
+          # catalog token (ptkn_…) — safe to embed in the client bundle.
+          VITE_FOURTHWALL_STOREFRONT_TOKEN: ${{ secrets.FOURTHWALL_STOREFRONT_TOKEN }}
+          VITE_FOURTHWALL_SHOP_DOMAIN: ${{ secrets.FOURTHWALL_SHOP_DOMAIN }}
 
       - name: Deploy to Cloudflare
         run: npx wrangler deploy

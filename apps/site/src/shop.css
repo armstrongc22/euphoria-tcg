@@ -1,0 +1,375 @@
+/* Euphoria /shop — Fourthwall catalog in the site's broadcast language.
+   Same vocabulary as hub.css: dark stage, one diagonal, faction energy as the
+   only color. Cards carry --energy (set inline per collection tone). */
+
+.eu-shop {
+  display: grid;
+  gap: clamp(2.2rem, 6vh, 3.6rem);
+}
+
+/* ---- hero ------------------------------------------------------------- */
+.eu-shop-hero {
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  padding: clamp(2.4rem, 7vh, 4.5rem) 1rem;
+  background:
+    radial-gradient(700px 260px at 50% 118%, rgba(41, 209, 122, 0.16), transparent 62%),
+    radial-gradient(2px 2px at 22% 32%, rgba(195, 200, 210, 0.12) 1px, transparent 1px),
+    var(--eu-stage);
+  background-size: auto, 26px 26px, auto;
+  border: 1px solid var(--eu-hairline);
+  border-radius: 12px;
+}
+.eu-shop-hero__eyebrow {
+  margin: 0 0 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--eu-energy-neutral);
+}
+.eu-shop-hero__title {
+  margin: 0;
+  font-size: clamp(2.2rem, 6vw, 3.8rem);
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: var(--eu-ink);
+  text-shadow: 0 0 34px rgba(41, 209, 122, 0.35);
+}
+.eu-shop-hero__copy {
+  margin: 0.9rem auto 0;
+  max-width: 46ch;
+  line-height: 1.6;
+  color: rgba(242, 244, 248, 0.75);
+}
+
+/* ---- promo (curation-driven discount/bundle callout) -------------------- */
+.eu-shop-promo {
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--eu-energy-sonic);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--eu-energy-sonic) 8%, var(--eu-stage));
+}
+.eu-shop-promo__headline {
+  margin: 0 0 0.3rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--eu-energy-sonic);
+}
+.eu-shop-promo__body {
+  margin: 0;
+  color: rgba(242, 244, 248, 0.85);
+}
+.eu-shop-promo__code {
+  padding: 0.1rem 0.45rem;
+  border: 1px dashed var(--eu-energy-sonic);
+  border-radius: 6px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* ---- collection tabs ----------------------------------------------------- */
+.eu-shop-tabs {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.eu-shop-tab {
+  --energy: var(--eu-energy-neutral);
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.92rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(242, 244, 248, 0.75);
+  background: var(--eu-stage-raised);
+  border: 1px solid var(--eu-hairline);
+  border-radius: 999px;
+  padding: 0.55rem 1.3rem;
+  cursor: pointer;
+  transition: border-color var(--eu-fx-fast) var(--eu-ease-out),
+    color var(--eu-fx-fast) var(--eu-ease-out),
+    box-shadow var(--eu-fx-fast) var(--eu-ease-out);
+}
+.eu-shop-tab:hover {
+  color: var(--eu-ink);
+  border-color: color-mix(in srgb, var(--energy) 60%, transparent);
+}
+.eu-shop-tab.is-active {
+  color: var(--eu-ink);
+  border-color: var(--energy);
+  box-shadow: 0 0 18px -6px var(--energy);
+}
+
+/* ---- sections ------------------------------------------------------------ */
+.eu-shop-section__title {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.3rem, 3vw, 1.8rem);
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  color: var(--eu-ink);
+}
+.eu-shop-section__title--quiet {
+  font-size: 1.05rem;
+  color: rgba(242, 244, 248, 0.65);
+}
+.eu-shop-section__blurb {
+  margin: 0 0 1.1rem;
+  color: rgba(242, 244, 248, 0.65);
+}
+
+/* ---- product grid --------------------------------------------------------- */
+.eu-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1.1rem;
+}
+.eu-shop-grid--featured {
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+}
+
+.eu-shop-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--eu-hairline);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--eu-stage-raised);
+  transition: transform var(--eu-fx-fast) var(--eu-ease-out),
+    border-color var(--eu-fx-fast) var(--eu-ease-out),
+    box-shadow var(--eu-fx-fast) var(--eu-ease-out);
+}
+.eu-shop-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(242, 244, 248, 0.4);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+}
+.eu-shop-card--skeleton {
+  min-height: 320px;
+  background: linear-gradient(
+    calc(90deg + var(--eu-diagonal)),
+    var(--eu-stage-raised) 30%,
+    rgba(242, 244, 248, 0.05) 50%,
+    var(--eu-stage-raised) 70%
+  );
+  background-size: 220% 100%;
+  animation: eu-shop-shimmer 1.4s var(--eu-ease-out) infinite;
+}
+@keyframes eu-shop-shimmer {
+  from { background-position: 130% 0; }
+  to { background-position: -30% 0; }
+}
+
+.eu-shop-card__media {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  background: #0e1015;
+}
+.eu-shop-card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.eu-shop-card__noart {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.2em;
+  color: rgba(242, 244, 248, 0.2);
+}
+.eu-shop-card__badge {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--eu-ink);
+  background: rgba(10, 12, 16, 0.85);
+  border: 1px solid var(--eu-hairline);
+}
+.eu-shop-card.is-soldout .eu-shop-card__media img {
+  filter: grayscale(0.7) brightness(0.75);
+}
+
+.eu-shop-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.85rem 0.95rem 1rem;
+  flex: 1;
+}
+.eu-shop-card__type {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(242, 244, 248, 0.5);
+}
+.eu-shop-card__name {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+.eu-shop-card__name a {
+  color: var(--eu-ink);
+  text-decoration: none;
+}
+.eu-shop-card__name a:hover {
+  text-decoration: underline;
+}
+.eu-shop-card__blurb {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: rgba(242, 244, 248, 0.62);
+}
+.eu-shop-card__price {
+  margin: 0.15rem 0 0;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-weight: 800;
+  color: var(--eu-ink);
+}
+.eu-shop-card__compare {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: rgba(242, 244, 248, 0.45);
+}
+.eu-shop-card__price--none {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: rgba(242, 244, 248, 0.55);
+}
+.eu-shop-card__buy {
+  margin-top: auto;
+  padding-top: 0.6rem;
+  font-weight: 800;
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  color: var(--eu-energy-dwarf);
+}
+.eu-shop-card__buy:hover {
+  text-shadow: 0 0 14px rgba(41, 209, 122, 0.6);
+}
+
+/* ---- collection cards (rack + fallback) ----------------------------------- */
+.eu-shop-collections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+.eu-shop-collection {
+  --energy: var(--eu-energy-neutral);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.2rem 1.25rem 1.1rem;
+  border: 1px solid var(--eu-hairline);
+  border-radius: 12px;
+  text-decoration: none;
+  background:
+    radial-gradient(340px 140px at 12% -30%, color-mix(in srgb, var(--energy) 22%, transparent), transparent 70%),
+    var(--eu-stage-raised);
+  transition: transform var(--eu-fx-fast) var(--eu-ease-out),
+    border-color var(--eu-fx-fast) var(--eu-ease-out);
+}
+.eu-shop-collection:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--energy) 65%, transparent);
+}
+.eu-shop-collection--wide {
+  padding: 1.8rem 1.5rem;
+}
+.eu-shop-collection__title {
+  font-size: 1.15rem;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  color: var(--eu-ink);
+}
+.eu-shop-collection__blurb {
+  color: rgba(242, 244, 248, 0.65);
+  line-height: 1.5;
+}
+.eu-shop-collection__cta {
+  margin-top: 0.4rem;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--energy);
+}
+
+/* ---- outro CTA -------------------------------------------------------------- */
+.eu-shop-outro {
+  text-align: center;
+  padding: clamp(1.8rem, 5vh, 3rem) 1rem;
+  border: 1px solid var(--eu-hairline);
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      calc(90deg + var(--eu-diagonal)),
+      rgba(41, 209, 122, 0.06),
+      transparent 45%,
+      rgba(46, 139, 255, 0.06)
+    ),
+    var(--eu-stage);
+}
+.eu-shop-outro__title {
+  margin: 0 0 1.2rem;
+  font-size: clamp(1.15rem, 3vw, 1.6rem);
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  color: var(--eu-ink);
+}
+.eu-shop-outro__ctas {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.eu-shop-link {
+  color: var(--eu-energy-sonic);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* ---- mobile -------------------------------------------------------------- */
+@media (max-width: 620px) {
+  .eu-shop-grid,
+  .eu-shop-grid--featured {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+  }
+  .eu-shop-card__info {
+    padding: 0.6rem 0.65rem 0.75rem;
+  }
+  .eu-shop-card__blurb {
+    display: none; /* cards stay scannable on phones; detail lives on Fourthwall */
+  }
+  .eu-shop-tabs {
+    gap: 0.4rem;
+  }
+  .eu-shop-tab {
+    padding: 0.5rem 0.9rem;
+    font-size: 0.8rem;
+  }
+}
