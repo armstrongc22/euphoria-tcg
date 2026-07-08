@@ -121,6 +121,51 @@
   display: block;
   width: 100%;
 }
+
+/* The duel board is nested one level deeper than the AI-match board
+   (.gc-screen-root > .gc-duel--arena > .play-match, not > .play-match), so
+   match-arena.css's direct-child viewport-fit rules never reach it: the fields
+   grow to natural height and push the hand below a screen root locked to
+   overflow:hidden. Duel-only fixes; the AI-match flow and phone layout (which
+   fits as-is) keep their existing rules. */
+
+/* Never trap the hand below the fold: while a duel board is live, the screen
+   root may scroll vertically (matters on mid-size windows where the arena
+   can't fit one screen). Same specificity as match-arena.css's overflow lock —
+   duel.css importing later wins. */
+.gc .gc-screen-root:has(.gc-duel--arena) {
+  overflow-y: auto;
+}
+
+/* Desktop: mirror the AI-match viewport-fit chain through the duel wrapper so
+   the board fills one screen — fields scroll internally, hand dock and action
+   bar stay on-screen, log is the full-height right column. */
+@media (min-width: 1100px) {
+  .gc .gc-screen-root:has(.arena) > .gc-duel--arena {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /* Same declarations as match-arena.css's
+     `.gc .gc-screen-root:has(.arena) > .play-match`. */
+  .gc .gc-duel--arena > .play-match {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0.35rem 0.5rem;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+}
 .gc-duel__sync-error {
   margin: 0 0 0.5rem;
   padding: 0.5rem 0.75rem;
