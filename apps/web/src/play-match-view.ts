@@ -493,8 +493,8 @@ export function renderPlayableMatch(
   }
   let pendingCardFx: PendingCardFx[] = [];
 
-  const collectAttackCardFx = (frames: readonly MatchFrame[]): void => {
-    pendingCardFx = [];
+  const attackCardFxOf = (frames: readonly MatchFrame[]): PendingCardFx[] => {
+    const out: PendingCardFx[] = [];
     for (const frame of frames) {
       for (const ev of frame.events) {
         if (ev.type === "attackCardUsed") {
@@ -504,11 +504,12 @@ export function renderPlayableMatch(
             owner.outDeck.find((c) => c.id === ev.cardId) ??
             owner.hand.find((c) => c.id === ev.cardId);
           if (card !== undefined) {
-            pendingCardFx.push({ card, actor: frame.actor });
+            out.push({ card, actor: frame.actor });
           }
         }
       }
     }
+    return out;
   };
 
   // Set when the step that just animated fired the super-move cinematic:
@@ -762,7 +763,9 @@ export function renderPlayableMatch(
     error = null;
     // Persist the move for crash/refresh recovery before any playback animates.
     actions.onAction?.();
-    collectAttackCardFx(res.frames);
+    // Fresh action, fresh queue: nothing older can still be animating here
+    // (input is locked during playback), so replace rather than append.
+    pendingCardFx = attackCardFxOf(res.frames);
     stepFiredSuper = false; // fresh cycle — no stale hold from a prior action
     const steps = toPlaybackSteps(res.frames);
     const passedTurn = res.frames.some((f) => f.actor === "opponent");
@@ -805,6 +808,12 @@ export function renderPlayableMatch(
       }
       clearSelections();
       error = null;
+      // The opponent's attack-card activations must fire THEIR cinematic here
+      // too — this queue used to be filled only in the local act() path, so
+      // the acting player saw the animation and the watching player never did.
+      // APPEND (don't replace): a batch can arrive while an earlier batch is
+      // still animating, and its un-fired activations are ahead in the queue.
+      pendingCardFx.push(...attackCardFxOf(frames));
       if (playback !== null) {
         playback.steps.push(...steps);
         return;

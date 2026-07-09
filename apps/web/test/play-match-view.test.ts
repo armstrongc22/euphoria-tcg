@@ -2794,6 +2794,88 @@ describe("renderPlayableMatch — PvP viewerSeat (joiner POV)", () => {
   });
 });
 
+describe("renderPlayableMatch — PvP remote attack-card cinematic", () => {
+  // The activation used to be collected only in the local act() path, so the
+  // acting player saw it and the watching player never did. These drive the
+  // REMOTE subscription with canonical frames, as the PvP sync layer does.
+  const remoteFrames = (actingSeat: "player1" | "player2") => {
+    const inner = newMatch();
+    const state = inner.state();
+    const atk = cards.find((c) => c.type === "Attack")!;
+    state.players[actingSeat].outDeck = [...state.players[actingSeat].outDeck, atk];
+    state.players[actingSeat].field = [wip(state.players[actingSeat].deck[0]!, "e1")];
+    const frames = [
+      {
+        state,
+        events: [
+          {
+            type: "attackCardUsed" as const,
+            player: actingSeat,
+            cardId: atk.id,
+            attackerInstanceId: "e1",
+            cost: atk.cost,
+          },
+        ],
+        actor: "opponent" as const,
+      },
+    ];
+    const stub = {
+      playerFaction: inner.playerFaction,
+      opponentFaction: inner.opponentFaction,
+      seed: inner.seed,
+      state: () => state,
+      isOver: () => false,
+      legalActions: () => [],
+      apply: () => ({ ok: false as const, message: "spectating" }),
+      history: () => [],
+      summary: inner.summary,
+    } as unknown as ReturnType<typeof createPlayableMatch>;
+    return { stub, frames };
+  };
+
+  it("fires the watcher's cinematic when the opponent's action arrives remotely", () => {
+    const { stub, frames } = remoteFrames("player2");
+    let emit: ((f: typeof frames) => void) | null = null;
+    const root = renderPlayableMatch(
+      stub,
+      { onComplete: noop, onQuit: noop },
+      {
+        remote: { subscribe: (cb) => ((emit = cb), () => {}) },
+        scheduler: () => {},
+      },
+    );
+    // Nothing has happened yet — no stale/replayed cinematic on mount.
+    expect(root.querySelector(".match-fx-super")).toBeNull();
+    emit!(frames);
+    const overlay = root.querySelector<HTMLElement>(".match-fx-super");
+    expect(overlay).not.toBeNull();
+    expect(overlay!.classList.contains("match-fx-super--opponent")).toBe(true);
+    root.dispose();
+  });
+
+  it("fires through the seat mirror for a player2 viewer (joiner POV)", () => {
+    // Canonical frames: the CREATOR (player1) used the attack card. The
+    // joiner's board mirrors seats at the view boundary; the collector must
+    // still find the spent card after the swap.
+    const { stub, frames } = remoteFrames("player1");
+    let emit: ((f: typeof frames) => void) | null = null;
+    const root = renderPlayableMatch(
+      stub,
+      { onComplete: noop, onQuit: noop },
+      {
+        viewerSeat: "player2",
+        remote: { subscribe: (cb) => ((emit = cb), () => {}) },
+        scheduler: () => {},
+      },
+    );
+    emit!(frames);
+    const overlay = root.querySelector<HTMLElement>(".match-fx-super");
+    expect(overlay).not.toBeNull();
+    expect(overlay!.classList.contains("match-fx-super--opponent")).toBe(true);
+    root.dispose();
+  });
+});
+
 describe("renderPlayableMatch — HUD stays lean (no Home/exit button)", () => {
   it("renders no Home button in the arena HUD (exit lives on the main menu)", () => {
     const root = renderPlayableMatch(newMatch(), { onComplete: noop, onQuit: noop });
