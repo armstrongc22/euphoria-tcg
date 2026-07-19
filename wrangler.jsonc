@@ -2,6 +2,13 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "euphoria-universe-site",
   "compatibility_date": "2026-06-25",
+  // Canonical public domain (zone is on Cloudflare NS; wrangler manages the
+  // DNS record + cert). www is unattached — add a redirect rule in the
+  // dashboard if/when www DNS is created.
+  "routes": [{ "pattern": "euphoriauniverse.com", "custom_domain": true }],
+  // Keep the original workers.dev URL serving too — existing shares and
+  // bookmarks must not break. Canonical metadata points at the custom domain.
+  "workers_dev": true,
   "assets": {
     "directory": "./apps/site/dist",
     "not_found_handling": "single-page-application"
