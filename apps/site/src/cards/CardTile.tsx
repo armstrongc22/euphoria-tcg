@@ -1,4 +1,4 @@
-import { cardImageUrl } from "@euphoria/core/cards";
+import { cardImageUrl, cardThumbUrl } from "@euphoria/core/cards";
 import type { Card } from "./types";
 import { factionTone } from "./factionTone";
 
@@ -19,7 +19,20 @@ export function CardTile({ card, onSelect }: CardTileProps) {
       aria-label={`${card.name} — ${card.faction} ${card.type}`}
     >
       <div className="eu-tile__art">
-        <img src={cardImageUrl(card, base)} alt={card.name} loading="lazy" />
+        {/* Grid tiles load the ~80KB web-optimized thumb, not the multi-MB
+            source PNG; the detail modal keeps the full-size art. */}
+        <img
+          src={cardThumbUrl(card, base)}
+          alt={card.name}
+          loading="lazy"
+          decoding="async"
+          onError={(e) => {
+            // Thumb missing → fall back to the full art (once).
+            const img = e.currentTarget;
+            const full = cardImageUrl(card, base);
+            if (img.src !== full) img.src = full;
+          }}
+        />
         {/* Ownership isn't wired into the public site yet (no auth here) — a
             neutral placeholder marks that collection tracking is coming. */}
         <span className="eu-tile__own" title="Collection tracking coming soon">

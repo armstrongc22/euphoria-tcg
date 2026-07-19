@@ -73,7 +73,7 @@ describe("mobile menu sheet", () => {
     expect(links).toContainEqual(["/cards", "Cards"]);
     expect(links).toContainEqual(["/shop", "Shop"]);
     expect(links).toContainEqual(["/blog", "Blog"]);
-    expect(links).toContainEqual(["/manga", "Founder List"]);
+    expect(links).toContainEqual(["/manga#kickstarter", "Founder List"]);
     // …and the beta CTA, prominent but not alone.
     expect(sheet.textContent).toContain("Play the Beta");
     expect(sheet.querySelectorAll("a").length).toBeGreaterThanOrEqual(9);

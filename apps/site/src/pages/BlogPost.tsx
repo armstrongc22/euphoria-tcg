@@ -6,6 +6,8 @@ import { LoreCardAside } from "../blog/LoreCardAside";
 import { resolveFeaturedCards } from "../blog/featured";
 import { CardDetailModal } from "../cards/CardDetailModal";
 import type { Card } from "../cards/types";
+import { usePageTitle } from "../usePageTitle";
+import { BETA_URL } from "../beta";
 
 const entryNo = (post: Post) => String(post.number).padStart(2, "0");
 
@@ -31,6 +33,7 @@ const FACTION_BANNERS: Record<string, { src: string; alt: string }> = {
 export function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
   const post = slug !== undefined ? findPost(slug) : undefined;
+  usePageTitle(post === undefined ? "Post not found" : post.title);
 
   if (post === undefined) {
     return (
@@ -221,15 +224,25 @@ function RestrictedArchive({ post }: { readonly post: Post }) {
           <div className="eu-restricted__cta">
             <p className="eu-restricted__cta-head">{post.cta.headline}</p>
             <div className="eu-restricted__cta-links">
-              {post.cta.links.map((link) => (
-                <Link
-                  key={link.label}
-                  to={link.to === "beta" ? "/" : link.to}
-                  className="eu-restricted__exit"
-                >
-                  {link.label.toUpperCase()}
-                </Link>
-              ))}
+              {post.cta.links.map((link) =>
+                link.to === "beta" ? (
+                  <a
+                    key={link.label}
+                    href={BETA_URL}
+                    className="eu-restricted__exit"
+                  >
+                    {link.label.toUpperCase()}
+                  </a>
+                ) : (
+                  <Link
+                    key={link.label}
+                    to={link.to}
+                    className="eu-restricted__exit"
+                  >
+                    {link.label.toUpperCase()}
+                  </Link>
+                ),
+              )}
             </div>
           </div>
         )}

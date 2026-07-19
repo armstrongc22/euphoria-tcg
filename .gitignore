@@ -21,3 +21,6 @@ dist/
 # Supabase CLI local state (never contains committed schema; can hold tokens)
 supabase/.temp/
 supabase/.branches/
+
+# Wrangler local dev state
+.wrangler/

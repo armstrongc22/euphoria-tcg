@@ -1,4 +1,5 @@
 import { InteractiveMap } from "../map/InteractiveMap";
+import { usePageTitle } from "../usePageTitle";
 
 /**
  * The Euphoria world map section. Shows the base map with lore markers for every
@@ -7,6 +8,7 @@ import { InteractiveMap } from "../map/InteractiveMap";
  * the 2D annotated map is the live experience for now — no heavy 3D deps loaded.
  */
 export function MapPage() {
+  usePageTitle("World Map");
   return (
     <div className="eu-page eu-page--purple">
       <p className="eu-page__eyebrow">Explore</p>

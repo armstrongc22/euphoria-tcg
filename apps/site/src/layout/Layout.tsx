@@ -6,6 +6,9 @@ import { Footer } from "./Footer";
 export function Layout() {
   return (
     <div className="eu-shell">
+      <a className="eu-skip" href="#main">
+        Skip to content
+      </a>
       <Nav />
       <main className="eu-main" id="main">
         <Outlet />

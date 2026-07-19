@@ -28,6 +28,10 @@ const MIME: Record<string, string> = {
   ".gif": "image/gif",
   ".svg": "image/svg+xml",
   ".json": "application/json",
+  ".txt": "text/plain",
+  ".xml": "application/xml",
+  ".ico": "image/x-icon",
+  ".webmanifest": "application/manifest+json",
 };
 
 function rootPublicAssets(dir: string): Plugin {

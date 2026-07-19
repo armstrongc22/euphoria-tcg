@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { BLOG_POSTS } from "../blog/posts";
+import { usePageTitle } from "../usePageTitle";
 
 /**
  * Blog index — the post feed for the Euphoria Universe blog. Every entry
@@ -7,6 +8,7 @@ import { BLOG_POSTS } from "../blog/posts";
  * "classified" card treatment instead of a normal summary card.
  */
 export function Blog() {
+  usePageTitle("Blog");
   return (
     <div className="eu-page eu-page--blue">
       <p className="eu-page__eyebrow">Updates &amp; Lore</p>

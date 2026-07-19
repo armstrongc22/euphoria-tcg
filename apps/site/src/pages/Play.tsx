@@ -1,4 +1,5 @@
 import { BETA_URL } from "../beta";
+import { usePageTitle } from "../usePageTitle";
 
 /**
  * /play — launcher for the TCG beta. The beta itself (apps/web) is bundled into
@@ -8,6 +9,7 @@ import { BETA_URL } from "../beta";
  * nav/hero go straight to /beta/; this page is the landing for the section tab.
  */
 export function Play() {
+  usePageTitle("Play the Beta");
   return (
     <div className="eu-page eu-page--red">
       <p className="eu-page__eyebrow">Trading Card Game</p>
@@ -19,7 +21,7 @@ export function Play() {
           reward progress persist.
         </p>
         <ul className="eu-play-list">
-          <li>Sign up or log in (or play in guest demo mode)</li>
+          <li>Sign up or log in — beta accounts take seconds to create</li>
           <li>Choose a starter deck or build your own</li>
           <li>Play a full match against the AI — win or lose</li>
           <li>Earn rewards at win milestones and track your collection</li>

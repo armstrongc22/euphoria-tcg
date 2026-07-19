@@ -4,6 +4,7 @@ import { cards, cardImageUrl, cardThumbUrl } from "@euphoria/core/cards";
 import { BETA_URL } from "../beta";
 import { InterestForm } from "../signup/InterestForm";
 import { STARTER_MARKERS, factionColor, type MapMarker } from "../map/markers";
+import { usePageTitle } from "../usePageTitle";
 
 const BASE = import.meta.env.BASE_URL;
 /**
@@ -79,6 +80,7 @@ const teaserMarkers: MapMarker[] = TEASER_MARKER_IDS.map((id) =>
  * appears as faction energy (fx-tokens.css).
  */
 export function Home() {
+  usePageTitle();
   return (
     <div className="hub">
       {/* ---- Hero: the dark stage --------------------------------------- */}
@@ -264,7 +266,11 @@ export function Home() {
       </section>
 
       {/* ---- The Euphoria Dispatch (email capture) ------------------------- */}
-      <section className="hub-panel hub-panel--founders" aria-label="Email list">
+      <section
+        className="hub-panel hub-panel--founders"
+        aria-label="Email list"
+        id="dispatch"
+      >
         <div className="hub-panel__copy hub-panel__copy--center">
           <p className="hub-panel__eyebrow hub-panel__eyebrow--gold">
             The Dispatch

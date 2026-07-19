@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
+import { usePageTitle } from "../usePageTitle";
 
 /** Catch-all 404 page. */
 export function NotFound() {
+  usePageTitle("Not Found");
   return (
     <div className="eu-page eu-page--red">
       <p className="eu-page__eyebrow">Lost in the verse</p>

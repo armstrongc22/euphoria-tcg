@@ -25,7 +25,7 @@ const SECONDARY: ReadonlyArray<{ to: string; label: string }> = [
 const SHEET_MINOR: ReadonlyArray<{ to: string; label: string }> = [
   { to: "/", label: "Home" },
   ...SECONDARY,
-  { to: "/manga", label: "Founder List" },
+  { to: "/manga#kickstarter", label: "Founder List" },
 ];
 
 /**
@@ -48,8 +48,9 @@ export function Nav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Any route change closes the sheet (a link was chosen).
-  useEffect(() => setSheetOpen(false), [location.pathname]);
+  // Any navigation closes the sheet (a link was chosen). location.key changes
+  // on every navigation, including hash-only ones like /manga#kickstarter.
+  useEffect(() => setSheetOpen(false), [location.key]);
 
   useEffect(() => {
     if (!sheetOpen) return;

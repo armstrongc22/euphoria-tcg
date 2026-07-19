@@ -7,6 +7,7 @@ import type { Card } from "../cards/types";
 import { CardTile } from "../cards/CardTile";
 import { CardDetailModal } from "../cards/CardDetailModal";
 import { factionTone } from "../cards/factionTone";
+import { usePageTitle } from "../usePageTitle";
 
 // Control options are derived from the live data via the shared core helpers, so
 // they always match what's actually in the archive.
@@ -42,14 +43,27 @@ function applySort(list: readonly Card[], key: SortKey): Card[] {
  * `filterCards`; name search is applied on top so it stays name-only.
  */
 export function Cards() {
+  usePageTitle("Cards");
   // Deep links like /cards?faction=Dwarf (used by the blog faction pages)
-  // start the archive pre-filtered; unknown values fall back to "all".
-  const [searchParams] = useSearchParams();
+  // pre-filter the archive; unknown values fall back to "all". The URL is the
+  // source of truth for the faction facet, so in-app navigations to a
+  // different ?faction (or to plain /cards) update the already-mounted page,
+  // and changing the select rewrites the URL — filtered views stay shareable.
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
-  const [faction, setFaction] = useState(() => {
-    const wanted = searchParams.get("faction");
-    return wanted !== null && FACTIONS.includes(wanted) ? wanted : "all";
-  });
+  const wanted = searchParams.get("faction");
+  const faction = wanted !== null && FACTIONS.includes(wanted) ? wanted : "all";
+  const setFaction = (value: string): void => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value === "all") next.delete("faction");
+        else next.set("faction", value);
+        return next;
+      },
+      { replace: true },
+    );
+  };
   const [type, setType] = useState("all");
   const [sort, setSort] = useState<SortKey>("grouped");
   const [selected, setSelected] = useState<Card | null>(null);

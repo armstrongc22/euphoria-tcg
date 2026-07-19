@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Euphoria TCG — Beta</title>
     <meta name="description" content="Join the Euphoria TCG beta: sign up, choose a starter deck, and browse the full card set." />
+    <!-- The beta is an auth-gated app, not a public landing page; /play is the
+         indexable entry. This document only serves /beta/, so the noindex
+         cannot leak onto the rest of the SPA. -->
+    <meta name="robots" content="noindex" />
+    <!-- Icons live at the site root (repo public/); in the hosted bundle the
+         beta shares that origin, so root-absolute paths resolve in production. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0a0f" />
   </head>
   <body>
     <div id="app"></div>

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { InterestForm } from "../signup/InterestForm";
+import { usePageTitle } from "../usePageTitle";
 
 const SUPPORT: ReadonlyArray<{
   to: string;
@@ -82,6 +83,7 @@ const PROOF: ReadonlyArray<{
  * publication or campaign dates, pricing, names, or guarantees are claimed.
  */
 export function Manga() {
+  usePageTitle("Manga");
   return (
     <div className="eu-page eu-page--purple eu-manga">
       <section className="eu-manga__hero">

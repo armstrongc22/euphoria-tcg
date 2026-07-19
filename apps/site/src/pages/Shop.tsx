@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { BETA_URL } from "../beta";
 import { trackShop } from "../shop/analytics";
+import { usePageTitle } from "../usePageTitle";
 import {
   ALL_COLLECTION_HANDLE,
   COLLECTIONS,
@@ -42,6 +43,7 @@ const tone = (c: ShopCollection): CSSProperties =>
  * that link to the hosted collection pages.
  */
 export function Shop() {
+  usePageTitle("Shop");
   const [slots, setSlots] = useState<Slots>(LOADING_SLOTS);
   const [allFallback, setAllFallback] = useState<readonly ShopProduct[] | null>(null);
   const [active, setActive] = useState<CollectionHandle>("shirts");
@@ -236,7 +238,7 @@ export function Shop() {
           <a href={BETA_URL} className="hub-btn hub-btn--primary">
             Play the Beta
           </a>
-          <Link to="/" className="hub-btn hub-btn--ghost">
+          <Link to="/#dispatch" className="hub-btn hub-btn--ghost">
             Join the Dispatch
           </Link>
           <a
