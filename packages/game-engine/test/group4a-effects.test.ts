@@ -1,7 +1,7 @@
 /**
  * Group 4A: combat hooks on the status/aura system —
  * RESTRICT_OPPONENT_ATTACK_TARGET (Primetime Interview),
- * PUNISH_ATTACKERS_DISABLE (Moral Determination Authrotity), and
+ * PUNISH_ATTACKERS_DISABLE (Moral Determination Authority), and
  * MONK_RETALIATION (A Dragon's Judgement), tested with the real cards.
  */
 import { describe, expect, it } from "vitest";
@@ -181,7 +181,7 @@ describe("RESTRICT_OPPONENT_ATTACK_TARGET (Primetime Interview)", () => {
   });
 });
 
-describe("PUNISH_ATTACKERS_DISABLE (Moral Determination Authrotity)", () => {
+describe("PUNISH_ATTACKERS_DISABLE (Moral Determination Authority)", () => {
   /** Player 1 plays the Item turn 1; player 2 fields two attackers. */
   function setupAuthority() {
     let game = newGame();

@@ -35,7 +35,7 @@ export interface RulesConfig {
   /** 1 — normal Warrior summons from hand allowed per player per turn */
   warriorSummonsPerTurn: number;
   warriorsCanAttackTurnSummoned: boolean;
-  /** false — attacker takes no counter damage (CLAUDE.md overrides the spec) */
+  /** false — sequential combat: attacker takes no counter damage (CLAUDE.md + rules-spec) */
   combatDamageSimultaneous: boolean;
   /** false — Attack cards are never offered on direct attacks */
   attackCardsOnDirectAttacks: boolean;
@@ -161,13 +161,13 @@ export type StatusCode =
    */
   | "RESTRICT_ATTACKER_TO_WARRIOR"
   /**
-   * Moral Determination Authrotity, stage 1: while active, every attack
+   * Moral Determination Authority, stage 1: while active, every attack
    * declared by one of affectedPlayer's Warriors earns that Warrior a
    * DISABLE_WARRIOR_ATTACKS status.
    */
   | "PUNISH_ATTACKERS_WATCH"
   /**
-   * Moral Determination Authrotity, stage 2: dormant until expiry (the
+   * Moral Determination Authority, stage 2: dormant until expiry (the
    * start of the punished Warrior's owner's next turn), then sets that
    * Warrior's attacksRemaining to 0 for the turn. Fizzles if the Warrior
    * left the field.

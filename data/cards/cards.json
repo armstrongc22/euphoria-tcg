@@ -2177,7 +2177,7 @@
   {
     "id": "item_moral_determination_authrotity",
     "slug": "moral-determination-authrotity",
-    "name": "Moral Determination Authrotity",
+    "name": "Moral Determination Authority",
     "faction": "Neutral",
     "type": "Item",
     "subtype": "Prevent",

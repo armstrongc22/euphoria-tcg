@@ -858,7 +858,7 @@ function attackWarrior(
   );
   if (attacker !== undefined) {
     attacker.attacksRemaining -= 1;
-    // After-attack-declaration hook (Moral Determination Authrotity).
+    // After-attack-declaration hook (Moral Determination Authority).
     recordAttackDeclaration(next, next.activePlayer, attacker.instanceId);
   }
   if (attacker !== undefined && defender !== undefined && !replacesAttack) {
@@ -868,8 +868,8 @@ function attackWarrior(
     // Scythe Cycle checks "opponent has more than 1 Warrior" at attack
     // time, before combat damage can thin the field.
     const opponentCountBeforeCombat = next.players[opponentId].field.length;
-    // The attacker takes no counter damage (CLAUDE.md overrides the spec's
-    // "simultaneous" wording; see RulesConfig.combatDamageSimultaneous).
+    // The attacker takes no counter damage — sequential combat per CLAUDE.md
+    // and docs/rules-spec.md (see RulesConfig.combatDamageSimultaneous).
     let damage = computeCombatDamage(next, next.activePlayer, attacker, defender);
     // Ontology (WEAPON_NEGATE_ONCE_REDUCE_ATTACKER): the equipped Warrior
     // negates the first attack against it each turn (keyed on the unique turn
@@ -1033,7 +1033,7 @@ function directAttack(state: GameState, attackerInstanceId: string): ActionResul
   const attacker = player.field.find((w) => w.instanceId === attackerInstanceId)!;
 
   attacker.attacksRemaining -= 1;
-  // After-attack-declaration hook (Moral Determination Authrotity).
+  // After-attack-declaration hook (Moral Determination Authority).
   recordAttackDeclaration(next, next.activePlayer, attackerInstanceId);
   player.directAttackUsedThisTurn = true;
   opponent.lives -= 1;
