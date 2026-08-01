@@ -35,6 +35,12 @@ export const FEEDBACK_TYPES: readonly { value: FeedbackType; label: string }[] =
 
 /** The columns inserted into `feedback_reports` (id/created_at are DB defaults). */
 export interface FeedbackInsert {
+  /**
+   * Client-generated idempotency key (`feedback_reports.client_key`, UNIQUE).
+   * Minted once per submission and reused across queue retries, so a retry
+   * after an ambiguous failure can never create a duplicate report.
+   */
+  readonly client_key: string;
   readonly user_id: string | null;
   readonly email: string | null;
   readonly type: FeedbackType;
@@ -75,11 +81,29 @@ export function isValidFeedback(message: string): boolean {
 }
 
 /**
+ * A fresh idempotency key for one feedback submission. crypto.randomUUID with
+ * a Math.random v4 fallback for ancient WebViews — uniqueness at "one key per
+ * submission" scale, not cryptographic strength, is what matters here.
+ */
+export function newFeedbackClientKey(): string {
+  const c = globalThis.crypto as Crypto | undefined;
+  if (c !== undefined && typeof c.randomUUID === "function") return c.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (ch) => {
+    const r = Math.floor(Math.random() * 16);
+    const v = ch === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
  * Assembles the insert from the caller's input, folding the optional pieces into
  * the `context` jsonb. Debug events are attached only when the user opted in
  * (Include debug info). Pure — `message` is trimmed but otherwise unchanged.
  */
-export function buildFeedbackInsert(input: FeedbackInput): FeedbackInsert {
+export function buildFeedbackInsert(
+  input: FeedbackInput,
+  clientKey: string = newFeedbackClientKey(),
+): FeedbackInsert {
   const context: Record<string, unknown> = {};
   if (input.deckMode !== undefined) context["deckMode"] = input.deckMode;
   if (input.onboardingStep !== undefined) context["onboardingStep"] = input.onboardingStep;
@@ -89,6 +113,7 @@ export function buildFeedbackInsert(input: FeedbackInput): FeedbackInsert {
     context["debugEvents"] = input.debugEvents.slice(-25);
   }
   return {
+    client_key: clientKey,
     user_id: input.userId,
     email: input.email !== null && input.email.trim().length > 0 ? input.email.trim() : null,
     type: input.type,
@@ -197,8 +222,18 @@ export async function syncPendingFeedback(
   if (store === null) return { sent: 0, remaining: 0 };
   let sent = 0;
   for (const item of readAll(store)) {
+    // Reports queued before idempotency keys existed lack client_key: mint one
+    // and persist it BEFORE sending, so every retry of this item reuses it.
+    let insert = item.insert;
+    if (typeof (insert as Partial<FeedbackInsert>).client_key !== "string") {
+      insert = { ...insert, client_key: newFeedbackClientKey() };
+      writeAll(
+        store,
+        readAll(store).map((f) => (f.id === item.id ? { ...f, insert } : f)),
+      );
+    }
     try {
-      await auth.saveFeedback(item.insert);
+      await auth.saveFeedback(insert);
     } catch (error) {
       recordFailure(store, item.id, error instanceof Error ? error.message : String(error));
       continue;
