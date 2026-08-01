@@ -426,9 +426,16 @@ export function createSupabaseAuth(client: SupabaseClient): Auth {
 
     async saveFeedback(insert) {
       // created_at/id are DB defaults. RLS allows a user to insert their own
-      // report (auth.uid() = user_id); see apps/web/README.md for the SQL.
-      const { error } = await client.from("feedback_reports").insert(insert);
-      if (error) throw error;
+      // report (auth.uid() = user_id); the deployable schema lives in
+      // supabase/migrations/20260720121000_feedback_reports.sql.
+      // user_id is NOT NULL DEFAULT auth.uid() — omit the column when the
+      // caller has no explicit id rather than inserting a null.
+      const { user_id, ...withoutUser } = insert;
+      const row = user_id === null ? withoutUser : insert;
+      const { error } = await client.from("feedback_reports").insert(row);
+      // 23505 = unique violation on client_key: this exact report already
+      // landed (a retry after an ambiguous failure) — that is success.
+      if (error && error.code !== "23505") throw error;
     },
   };
 }

@@ -321,7 +321,8 @@ the static site still works with no backend.
   | Column             | Type          | Notes                                          |
   | ------------------ | ------------- | ---------------------------------------------- |
   | `id`               | `uuid` PK     | `default gen_random_uuid()`                    |
-  | `user_id`          | `uuid` (null) | references `auth.users(id)`, `on delete set null` |
+  | `client_key`       | `uuid` UNIQUE | client-minted idempotency key; retries reuse it, so a retry can never duplicate a report |
+  | `user_id`          | `uuid`        | `not null default auth.uid()`, references `auth.users(id)` `on delete cascade` |
   | `email`            | `text` (null) | optional contact (signed-out reporters)        |
   | `type`             | `text`        | bug / confusing-ux / balance / card-issue / mobile / general |
   | `message`          | `text`        | the report body                                |
@@ -334,56 +335,19 @@ the static site still works with no backend.
   | `created_at`       | `timestamptz` | DB default on insert                           |
 
   **RLS**: signed-in users may `insert` only rows tagged with their own id
-  (`auth.uid() = user_id`) and may `select` their own rows; nobody can read the
-  whole table. Anonymous (signed-out) inserts are **off by default** for the
-  beta — if a report can't be sent it is kept in localStorage and retried from
-  the Account page, so feedback is never silently lost. To allow anonymous
-  reports, add the optional `anon` insert policy noted below. The client only
-  ever uses the anon key; **no `service_role` key is in client code.** Run once
-  in the SQL editor:
+  (`user_id = auth.uid()`, with `user_id` defaulting to `auth.uid()` so the
+  client may omit it) and may `select` only their own rows; there are no
+  UPDATE/DELETE policies and no anon/public access, so nobody can read the
+  whole table. If a report can't be sent it is kept in localStorage and
+  retried from the Account page — each report carries a client-minted
+  `client_key` (UNIQUE), so a retry after an ambiguous failure is a no-op
+  instead of a duplicate. The client only ever uses the anon key; **no
+  `service_role` key is in client code.**
 
-  ```sql
-  -- feedback_reports: beta feedback / bug reports --------------------------
-  create table if not exists public.feedback_reports (
-    id uuid primary key default gen_random_uuid(),
-    user_id uuid references auth.users (id) on delete set null,
-    email text,
-    type text not null,
-    message text not null,
-    view text,
-    build text,
-    user_agent text,
-    mobile boolean not null default false,
-    selected_faction text,
-    context jsonb not null default '{}'::jsonb,
-    created_at timestamptz not null default now()
-  );
-
-  alter table public.feedback_reports enable row level security;
-
-  -- Signed-in users insert reports tagged with their own id.
-  create policy "feedback_reports_insert_own"
-    on public.feedback_reports for insert
-    to authenticated
-    with check (auth.uid() = user_id);
-
-  -- Signed-in users may read back only their own reports (no select-all).
-  create policy "feedback_reports_select_own"
-    on public.feedback_reports for select
-    to authenticated
-    using (auth.uid() = user_id);
-
-  create index if not exists feedback_reports_user_created_idx
-    on public.feedback_reports (user_id, created_at desc);
-
-  -- OPTIONAL — allow anonymous (signed-out) reports. Only enable if you are
-  -- comfortable with unauthenticated inserts (rate-limit / abuse considered).
-  -- The check pins user_id to null so anon rows can never spoof a real user.
-  --   create policy "feedback_reports_insert_anon"
-  --     on public.feedback_reports for insert
-  --     to anon
-  --     with check (user_id is null);
-  ```
+  The deployable schema lives in
+  `supabase/migrations/20260720121000_feedback_reports.sql` and is applied by
+  the migrations workflow on merge to `master` (see
+  `docs/supabase-migrations.md`) — do not paste SQL by hand.
 
 ### Schema verification (run this if rewards/progression misbehave)
 

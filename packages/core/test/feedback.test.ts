@@ -42,6 +42,7 @@ const BASE: FeedbackInput = {
 
 /** The exact column set the README `feedback_reports` table defines. */
 const SCHEMA_COLUMNS = [
+  "client_key",
   "user_id",
   "email",
   "type",
@@ -70,9 +71,17 @@ describe("buildFeedbackInsert", () => {
     expect(insert.message).toBe("it broke");
   });
 
-  it("matches the README feedback_reports schema (exact column set)", () => {
+  it("matches the feedback_reports migration schema (exact column set)", () => {
     const insert = buildFeedbackInsert(BASE);
     expect(Object.keys(insert).sort()).toEqual([...SCHEMA_COLUMNS].sort());
+  });
+
+  it("mints a fresh idempotency key per submission and honors an injected one", () => {
+    const a = buildFeedbackInsert(BASE);
+    const b = buildFeedbackInsert(BASE);
+    expect(a.client_key).toMatch(/^[0-9a-f-]{36}$/);
+    expect(a.client_key).not.toBe(b.client_key);
+    expect(buildFeedbackInsert(BASE, "fixed-key").client_key).toBe("fixed-key");
   });
 
   it("normalizes an empty contact email to null but keeps a real one", () => {
@@ -172,5 +181,30 @@ describe("syncPendingFeedback", () => {
       remaining: 0,
     });
     expect(save).not.toHaveBeenCalled();
+  });
+
+  it("mints and persists an idempotency key for legacy queued reports", async () => {
+    const store = memoryStore();
+    // A report parked before client_key existed.
+    const { client_key: _dropped, ...legacy } = sample;
+    savePendingFeedback(store, legacy as FeedbackInsert, "old failure");
+    const seen: string[] = [];
+    // First attempt fails AFTER the key was minted+persisted; the retry must
+    // reuse the exact same key (this is what makes retries duplicate-proof).
+    const save = vi
+      .fn()
+      .mockImplementation((insert: FeedbackInsert) => {
+        seen.push(insert.client_key);
+        return seen.length === 1
+          ? Promise.reject(new Error("flaky network"))
+          : Promise.resolve(undefined);
+      });
+    await syncPendingFeedback(fakeAuth(save), store);
+    const [parked] = loadPendingFeedback(store);
+    expect(parked!.insert.client_key).toBe(seen[0]);
+    await syncPendingFeedback(fakeAuth(save), store);
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).toBe(seen[0]);
+    expect(pendingFeedbackCount(store)).toBe(0);
   });
 });

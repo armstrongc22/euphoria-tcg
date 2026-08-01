@@ -56,6 +56,29 @@ describe("createSupabaseAuth.saveFeedback", () => {
       message: "permission denied",
     });
   });
+
+  it("omits a null user_id so the DB default (auth.uid()) applies", async () => {
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const client = { from: () => ({ insert }) } as unknown as SupabaseClient;
+    const auth = createSupabaseAuth(client);
+    await auth.saveFeedback({ ...INSERT, user_id: null });
+    const sent = insert.mock.calls[0]![0] as Record<string, unknown>;
+    expect("user_id" in sent).toBe(false);
+    expect(sent["client_key"]).toBe(INSERT.client_key);
+  });
+
+  it("treats a client_key unique violation (23505) as already-delivered", async () => {
+    const client = {
+      from: () => ({
+        insert: () =>
+          Promise.resolve({
+            error: { code: "23505", message: "duplicate key value" },
+          }),
+      }),
+    } as unknown as SupabaseClient;
+    const auth = createSupabaseAuth(client);
+    await expect(auth.saveFeedback(INSERT)).resolves.toBeUndefined();
+  });
 });
 
 describe("createLocalAuth.saveFeedback", () => {
