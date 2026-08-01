@@ -1,9 +1,11 @@
 import { Outlet, ScrollRestoration } from "react-router-dom";
 import { Nav } from "./Nav";
 import { Footer } from "./Footer";
+import { usePageViews } from "../useAnalytics";
 
 /** Shared chrome: top nav, the routed page via <Outlet/>, then the footer. */
 export function Layout() {
+  usePageViews();
   return (
     <div className="eu-shell">
       <a className="eu-skip" href="#main">
