@@ -140,6 +140,15 @@ export function buildFeedbackInsert(
 /** localStorage key holding unsent feedback. Versioned. */
 export const PENDING_FEEDBACK_KEY = "euphoria.pendingFeedback.v1";
 
+/** localStorage key holding reports that permanently failed (dead-letter). */
+export const DEAD_FEEDBACK_KEY = "euphoria.deadFeedback.v1";
+
+/** Max delivery attempts for a transient failure before it is dead-lettered. */
+export const FEEDBACK_MAX_ATTEMPTS = 8;
+
+const BACKOFF_BASE_MS = 60_000; // 1 min after the first failure
+const BACKOFF_MAX_MS = 6 * 3_600_000; // capped at 6 h
+
 /** One queued report: the insert plus retry metadata. */
 export interface PendingFeedback {
   readonly id: string;
@@ -147,6 +156,24 @@ export interface PendingFeedback {
   readonly lastError: string;
   readonly attempts: number;
   readonly createdAt: string;
+  /** Epoch ms before which this entry is not retried (exponential backoff). */
+  readonly nextAttemptAt?: number;
+}
+
+/**
+ * A report that will not be retried — either a permanent rejection or a
+ * transient failure that exhausted its attempts. Preserved for diagnostics
+ * (never silently discarded), with a safe, bounded failure detail only.
+ */
+export interface DeadFeedback {
+  readonly id: string;
+  readonly insert: FeedbackInsert;
+  readonly attempts: number;
+  readonly reason: "permanent" | "attempts-exhausted";
+  /** Safe, truncated failure detail — never auth tokens or full response bodies. */
+  readonly failure: { readonly code: string | null; readonly message: string };
+  readonly createdAt: string;
+  readonly deadLetteredAt: string;
 }
 
 function readAll(store: KeyValueStore): PendingFeedback[] {
@@ -203,33 +230,150 @@ export function removePendingFeedback(store: KeyValueStore, id: string): void {
   writeAll(store, readAll(store).filter((f) => f.id !== id));
 }
 
-function recordFailure(store: KeyValueStore, id: string, error: string): void {
+/** Bumps attempts, records the (safe) error, and schedules the next retry. */
+function recordFailure(
+  store: KeyValueStore,
+  id: string,
+  error: string,
+  nextAttemptAt: number,
+): void {
   writeAll(
     store,
     readAll(store).map((f) =>
-      f.id === id ? { ...f, attempts: f.attempts + 1, lastError: error } : f,
+      f.id === id
+        ? { ...f, attempts: f.attempts + 1, lastError: error, nextAttemptAt }
+        : f,
     ),
   );
+}
+
+/**
+ * Classifies a saveFeedback failure. **Permanent** = the same payload will
+ * always be rejected (bad data, size/CHECK violations, unauthorized) — stop
+ * retrying. **Transient** = recoverable (network, 5xx, rate limit, and crucially
+ * a missing table / schema-cache miss, which resolves once the migration lands)
+ * — retry with backoff up to the attempt cap.
+ */
+export function classifyFeedbackError(error: unknown): "permanent" | "transient" {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code === "string") {
+    // Postgres SQLSTATE: 23xxx integrity (not-null/fk/check), 22xxx data
+    // exception (truncation), 42501 insufficient_privilege (RLS/grant) are
+    // permanent. 23505 (unique) is handled as success upstream. Undefined-table
+    // (42P01) and PostgREST schema-cache misses (PGRST*) stay transient by
+    // omission — they clear once the table exists.
+    if (
+      (/^23/.test(code) && code !== "23505") ||
+      /^22/.test(code) ||
+      code === "42501"
+    ) {
+      return "permanent";
+    }
+  }
+  return "transient";
+}
+
+/** Exponential backoff (ms) before the next retry, given attempts made so far. */
+function backoffMs(attempts: number): number {
+  return Math.min(BACKOFF_BASE_MS * 2 ** Math.max(0, attempts - 1), BACKOFF_MAX_MS);
+}
+
+/** A safe, size-bounded failure detail — never auth tokens or full bodies. */
+function safeFailure(error: unknown): { code: string | null; message: string } {
+  const raw = (error as { code?: unknown } | null)?.code;
+  const code = typeof raw === "string" ? raw : null;
+  const message = error instanceof Error ? error.message : String(error);
+  return { code, message: message.slice(0, 300) };
+}
+
+function readDead(store: KeyValueStore): DeadFeedback[] {
+  const raw = store.getItem(DEAD_FEEDBACK_KEY);
+  if (raw === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as DeadFeedback[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeDead(store: KeyValueStore, items: readonly DeadFeedback[]): void {
+  try {
+    if (items.length === 0) store.removeItem(DEAD_FEEDBACK_KEY);
+    else store.setItem(DEAD_FEEDBACK_KEY, JSON.stringify(items));
+  } catch {
+    /* storage full/blocked: skip the write, never throw */
+  }
+}
+
+/** The dead-lettered reports, for a diagnostics view (never auto-retried). */
+export function loadDeadLetterFeedback(store: KeyValueStore): DeadFeedback[] {
+  return readDead(store);
+}
+
+/** How many reports have been dead-lettered. */
+export function deadLetterFeedbackCount(store: KeyValueStore): number {
+  return readDead(store).length;
+}
+
+/** Moves a pending entry to the dead-letter store, preserving a safe detail. */
+function deadLetter(
+  store: KeyValueStore,
+  item: PendingFeedback,
+  insert: FeedbackInsert,
+  reason: DeadFeedback["reason"],
+  error: unknown,
+  now: number,
+): void {
+  writeDead(store, [
+    ...readDead(store),
+    {
+      id: item.id,
+      insert,
+      attempts: item.attempts + 1,
+      reason,
+      failure: safeFailure(error),
+      createdAt: item.createdAt,
+      deadLetteredAt: new Date(now).toISOString(),
+    },
+  ]);
+  removePendingFeedback(store, item.id);
 }
 
 /** Result of a retry pass over the queue. */
 export interface FeedbackSyncResult {
   readonly sent: number;
   readonly remaining: number;
+  readonly deadLettered: number;
 }
 
 /**
- * Retries every queued report against the backend (one at a time). Each success
- * removes only that report; a failure records the error and is left queued, but
- * we continue to the next. Nothing is silently discarded.
+ * Retries every eligible queued report against the backend (one at a time),
+ * with bounded, safe retry handling:
+ *
+ *   - Backoff: an entry whose `nextAttemptAt` hasn't arrived is skipped.
+ *   - Success removes only that report.
+ *   - A **permanent** failure (bad data / size / CHECK / unauthorized) is moved
+ *     straight to the dead-letter store — never retried again.
+ *   - A **transient** failure is re-queued with an exponential backoff until it
+ *     reaches FEEDBACK_MAX_ATTEMPTS, then it too is dead-lettered.
+ *
+ * Nothing is ever silently discarded — exhausted/permanent reports are preserved
+ * in the dead-letter store with a safe, bounded failure detail (no tokens/bodies).
+ * `now` is injectable for deterministic tests.
  */
 export async function syncPendingFeedback(
   auth: Auth,
   store: KeyValueStore | null,
+  now: number = Date.now(),
 ): Promise<FeedbackSyncResult> {
-  if (store === null) return { sent: 0, remaining: 0 };
+  if (store === null) return { sent: 0, remaining: 0, deadLettered: 0 };
   let sent = 0;
+  let deadLettered = 0;
   for (const item of readAll(store)) {
+    // Backoff: not yet time to retry this entry.
+    if (typeof item.nextAttemptAt === "number" && item.nextAttemptAt > now) continue;
+
     // Reports queued before idempotency keys existed lack client_key: mint one
     // and persist it BEFORE sending, so every retry of this item reuses it.
     let insert = item.insert;
@@ -243,13 +387,22 @@ export async function syncPendingFeedback(
     try {
       await auth.saveFeedback(insert);
     } catch (error) {
-      recordFailure(store, item.id, error instanceof Error ? error.message : String(error));
+      const attempts = item.attempts + 1;
+      if (classifyFeedbackError(error) === "permanent") {
+        deadLetter(store, item, insert, "permanent", error, now);
+        deadLettered += 1;
+      } else if (attempts >= FEEDBACK_MAX_ATTEMPTS) {
+        deadLetter(store, item, insert, "attempts-exhausted", error, now);
+        deadLettered += 1;
+      } else {
+        recordFailure(store, item.id, safeFailure(error).message, now + backoffMs(attempts));
+      }
       continue;
     }
     removePendingFeedback(store, item.id);
     sent += 1;
   }
-  return { sent, remaining: readAll(store).length };
+  return { sent, remaining: readAll(store).length, deadLettered };
 }
 
 /** Returns a usable localStorage for the pending queue, or null when blocked. */

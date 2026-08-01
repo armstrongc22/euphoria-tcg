@@ -8,7 +8,11 @@ import type { Auth } from "../src/auth";
 import type { KeyValueStore } from "@euphoria/core/signup";
 import {
   buildFeedbackInsert,
+  classifyFeedbackError,
+  deadLetterFeedbackCount,
+  FEEDBACK_MAX_ATTEMPTS,
   isValidFeedback,
+  loadDeadLetterFeedback,
   loadPendingFeedback,
   pendingFeedbackCount,
   removePendingFeedback,
@@ -17,6 +21,12 @@ import {
   type FeedbackInput,
   type FeedbackInsert,
 } from "../src/feedback";
+
+/** Builds a rejection that looks like a real Postgres/Supabase error. */
+function pgError(code: string, message = "db error"): Error {
+  return Object.assign(new Error(message), { code });
+}
+const HOUR = 3_600_000;
 
 function memoryStore(): KeyValueStore {
   const map = new Map<string, string>();
@@ -159,19 +169,23 @@ describe("syncPendingFeedback", () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const result = await syncPendingFeedback(fakeAuth(save), store);
     expect(save).toHaveBeenCalledTimes(2);
-    expect(result).toEqual({ sent: 2, remaining: 0 });
+    expect(result).toEqual({ sent: 2, remaining: 0, deadLettered: 0 });
     expect(pendingFeedbackCount(store)).toBe(0);
   });
 
-  it("keeps a report queued and records the error when the send fails", async () => {
+  it("keeps a transient failure queued with backoff and records the error", async () => {
     const store = memoryStore();
     savePendingFeedback(store, sample, "first error");
-    const save = vi.fn().mockRejectedValue(new Error("still offline"));
-    const result = await syncPendingFeedback(fakeAuth(save), store);
-    expect(result).toEqual({ sent: 0, remaining: 1 });
+    const save = vi.fn().mockRejectedValue(new Error("still offline")); // no code => transient
+    const result = await syncPendingFeedback(fakeAuth(save), store, 1_000);
+    expect(result).toEqual({ sent: 0, remaining: 1, deadLettered: 0 });
     const [parked] = loadPendingFeedback(store);
     expect(parked!.lastError).toBe("still offline");
     expect(parked!.attempts).toBe(2);
+    expect(parked!.nextAttemptAt).toBeGreaterThan(1_000); // backoff scheduled
+    // Immediately retrying (before backoff elapses) skips the entry.
+    await syncPendingFeedback(fakeAuth(save), store, 1_001);
+    expect(save).toHaveBeenCalledTimes(1);
   });
 
   it("is a no-op with no store", async () => {
@@ -179,32 +193,105 @@ describe("syncPendingFeedback", () => {
     expect(await syncPendingFeedback(fakeAuth(save), null)).toEqual({
       sent: 0,
       remaining: 0,
+      deadLettered: 0,
     });
     expect(save).not.toHaveBeenCalled();
   });
 
-  it("mints and persists an idempotency key for legacy queued reports", async () => {
+  it("retries a transient failure after backoff, then succeeds and clears it", async () => {
     const store = memoryStore();
-    // A report parked before client_key existed.
-    const { client_key: _dropped, ...legacy } = sample;
+    savePendingFeedback(store, sample, "offline");
+    let call = 0;
+    const save = vi.fn().mockImplementation(() => {
+      call += 1;
+      return call === 1 ? Promise.reject(new Error("network")) : Promise.resolve(undefined);
+    });
+    await syncPendingFeedback(fakeAuth(save), store, 0); // fails, backoff set
+    expect(pendingFeedbackCount(store)).toBe(1);
+    const result = await syncPendingFeedback(fakeAuth(save), store, HOUR); // past backoff
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ sent: 1, remaining: 0 });
+    expect(pendingFeedbackCount(store)).toBe(0);
+  });
+
+  it("reuses the same idempotency key across retries (duplicate-proof)", async () => {
+    const store = memoryStore();
+    const { client_key: _dropped, ...legacy } = sample; // legacy: no client_key
     savePendingFeedback(store, legacy as FeedbackInsert, "old failure");
     const seen: string[] = [];
-    // First attempt fails AFTER the key was minted+persisted; the retry must
-    // reuse the exact same key (this is what makes retries duplicate-proof).
-    const save = vi
-      .fn()
-      .mockImplementation((insert: FeedbackInsert) => {
-        seen.push(insert.client_key);
-        return seen.length === 1
-          ? Promise.reject(new Error("flaky network"))
-          : Promise.resolve(undefined);
-      });
-    await syncPendingFeedback(fakeAuth(save), store);
+    const save = vi.fn().mockImplementation((insert: FeedbackInsert) => {
+      seen.push(insert.client_key);
+      return seen.length === 1 ? Promise.reject(new Error("flaky")) : Promise.resolve(undefined);
+    });
+    await syncPendingFeedback(fakeAuth(save), store, 0);
     const [parked] = loadPendingFeedback(store);
-    expect(parked!.insert.client_key).toBe(seen[0]);
-    await syncPendingFeedback(fakeAuth(save), store);
+    expect(parked!.insert.client_key).toBe(seen[0]); // minted + persisted
+    await syncPendingFeedback(fakeAuth(save), store, HOUR);
     expect(seen).toHaveLength(2);
-    expect(seen[1]).toBe(seen[0]);
+    expect(seen[1]).toBe(seen[0]); // same key on retry
     expect(pendingFeedbackCount(store)).toBe(0);
+  });
+
+  it("dead-letters a permanent rejection immediately (no repeated retries)", async () => {
+    const store = memoryStore();
+    savePendingFeedback(store, sample, "queued");
+    const save = vi.fn().mockRejectedValue(pgError("23514", "message too long")); // CHECK violation
+    const result = await syncPendingFeedback(fakeAuth(save), store, 0);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ sent: 0, remaining: 0, deadLettered: 1 });
+    expect(pendingFeedbackCount(store)).toBe(0);
+    const [dead] = loadDeadLetterFeedback(store);
+    expect(dead!.reason).toBe("permanent");
+    expect(dead!.failure.code).toBe("23514");
+    // Not retried on subsequent reconnects.
+    await syncPendingFeedback(fakeAuth(save), store, 10 * HOUR);
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it("dead-letters a transient failure once the attempt cap is reached", async () => {
+    const store = memoryStore();
+    savePendingFeedback(store, sample, "queued");
+    const save = vi.fn().mockRejectedValue(pgError("42P01", "table not found")); // transient
+    let now = 0;
+    for (let i = 0; i < FEEDBACK_MAX_ATTEMPTS + 2 && pendingFeedbackCount(store) > 0; i++) {
+      now += 10 * HOUR; // always past backoff
+      await syncPendingFeedback(fakeAuth(save), store, now);
+    }
+    expect(save).toHaveBeenCalledTimes(FEEDBACK_MAX_ATTEMPTS - 1);
+    expect(pendingFeedbackCount(store)).toBe(0);
+    expect(deadLetterFeedbackCount(store)).toBe(1);
+    expect(loadDeadLetterFeedback(store)[0]!.reason).toBe("attempts-exhausted");
+    // Dead-lettered => not retried again.
+    await syncPendingFeedback(fakeAuth(save), store, 100 * HOUR);
+    expect(save).toHaveBeenCalledTimes(FEEDBACK_MAX_ATTEMPTS - 1);
+  });
+
+  it("dead-letters a malformed legacy entry (no client_key + permanent error) safely", async () => {
+    const store = memoryStore();
+    const { client_key: _dropped, ...legacy } = sample;
+    savePendingFeedback(store, legacy as FeedbackInsert, "legacy");
+    const save = vi.fn().mockRejectedValue(pgError("23502", "user_id null")); // not-null violation
+    await syncPendingFeedback(fakeAuth(save), store, 0);
+    expect(pendingFeedbackCount(store)).toBe(0);
+    const [dead] = loadDeadLetterFeedback(store);
+    expect(dead!.reason).toBe("permanent");
+    // The dead-letter got a client_key minted before the attempt, and stores no
+    // tokens/bodies — only a safe code + short message.
+    expect(dead!.insert.client_key).toMatch(/^[0-9a-f-]{36}$/);
+    expect(dead!.failure).toEqual({ code: "23502", message: "user_id null" });
+  });
+});
+
+describe("classifyFeedbackError", () => {
+  it("treats integrity/data/authorization errors as permanent", () => {
+    for (const c of ["23514", "23502", "23503", "22001", "42501"]) {
+      expect(classifyFeedbackError({ code: c })).toBe("permanent");
+    }
+  });
+  it("treats missing-table, schema-cache, unique, network as transient", () => {
+    expect(classifyFeedbackError({ code: "42P01" })).toBe("transient"); // table not created yet
+    expect(classifyFeedbackError({ code: "PGRST205" })).toBe("transient"); // schema cache miss
+    expect(classifyFeedbackError({ code: "23505" })).toBe("transient"); // handled as success upstream
+    expect(classifyFeedbackError(new Error("fetch failed"))).toBe("transient");
   });
 });
