@@ -308,14 +308,28 @@ export interface DeckBuilderOptions {
    * app can launch an interactive match using their resolved active deck.
    */
   readonly onPlayMatch?: (faction: StarterFaction) => void;
+  /**
+   * Called when the user clicks "Choose a Starter Deck" on the no-faction
+   * notice, so the app can route to the starter-deck screen. Without it the
+   * notice renders text-only (e.g. embedding contexts with no app router).
+   */
+  readonly onChooseStarter?: () => void;
 }
 
-function notice(message: string): HTMLElement {
+function notice(message: string, cta?: { label: string; onClick: () => void }): HTMLElement {
   const section = document.createElement("section");
   section.className = "deck-builder deck-builder--notice";
   section.innerHTML =
     `<h2 class="deck-builder__title">Deck Builder</h2>` +
     `<p class="deck-builder__notice-body">${escapeHtml(message)}</p>`;
+  if (cta !== undefined) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "deck-builder__save deck-builder__notice-cta";
+    btn.textContent = cta.label;
+    btn.addEventListener("click", cta.onClick);
+    section.append(btn);
+  }
   return section;
 }
 
@@ -374,8 +388,14 @@ export async function mountDeckBuilder(
   const profile = await auth.getProfile(session).catch(() => null);
   const faction = profile?.selected_faction ?? null;
   if (faction === null) {
+    const { onChooseStarter } = options;
     container.replaceChildren(
-      notice("Choose a starter deck on the Starter Decks tab to build a deck."),
+      notice(
+        "Choose a starter deck to build a deck. Your faction's 30-card starter is the base you customize.",
+        onChooseStarter !== undefined
+          ? { label: "Choose a Starter Deck", onClick: onChooseStarter }
+          : undefined,
+      ),
     );
     return;
   }

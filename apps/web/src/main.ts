@@ -286,6 +286,7 @@ function renderActiveScreen(
         onSaved: () => {
           /* saved deck reflects on the account hub / next match; nothing to refresh here */
         },
+        onChooseStarter: () => renderActiveScreen("starter"),
         onPlayMatch: (faction) => {
           playFaction = faction;
           renderActiveScreen("match");
