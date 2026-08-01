@@ -75,6 +75,14 @@ export interface FeedbackInput {
   readonly debugEvents?: readonly unknown[];
 }
 
+/**
+ * Max message length, matching the `feedback_reports.message` CHECK
+ * (char_length between 1 and 5000). Enforced at the input (textarea maxlength)
+ * so an over-length message can never be submitted, permanently rejected by the
+ * DB constraint, and then re-queued forever as a poison retry entry.
+ */
+export const FEEDBACK_MESSAGE_MAX_LENGTH = 5000;
+
 /** True when a report has a non-empty message (the only hard requirement). */
 export function isValidFeedback(message: string): boolean {
   return message.trim().length > 0;

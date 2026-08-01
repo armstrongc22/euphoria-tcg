@@ -18,6 +18,7 @@ import type { KeyValueStore } from "@euphoria/core/signup";
 import { getBuildStamp, readDebugLog } from "@euphoria/core/debug-log";
 import { isLikelyMobile } from "./debug-flags";
 import {
+  FEEDBACK_MESSAGE_MAX_LENGTH,
   FEEDBACK_TYPES,
   buildFeedbackInsert,
   getFeedbackStore,
@@ -124,7 +125,8 @@ export function openFeedbackModal(options: OpenFeedbackOptions): FeedbackModalHa
 
       <label class="feedback-modal__label" for="feedback-message">Message</label>
       <textarea id="feedback-message" class="feedback-modal__textarea" name="message"
-        rows="5" placeholder="What happened? What did you expect?"></textarea>
+        rows="5" maxlength="${FEEDBACK_MESSAGE_MAX_LENGTH}"
+        placeholder="What happened? What did you expect?"></textarea>
 
       ${
         signedIn

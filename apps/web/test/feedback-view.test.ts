@@ -10,7 +10,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFeedbackButton, openFeedbackModal } from "../src/feedback-view";
 import { setBuildStamp } from "@euphoria/core/debug-log";
-import { pendingFeedbackCount } from "@euphoria/core/feedback";
+import { FEEDBACK_MESSAGE_MAX_LENGTH, pendingFeedbackCount } from "@euphoria/core/feedback";
 import type { Auth } from "@euphoria/core/auth";
 import type { KeyValueStore } from "@euphoria/core/signup";
 
@@ -68,6 +68,15 @@ describe("feedback modal", () => {
     const select = modal().querySelector<HTMLSelectElement>("#feedback-type")!;
     expect(select.options.length).toBeGreaterThan(1);
     expect(modal().querySelector("#feedback-message")).not.toBeNull();
+  });
+
+  it("caps the message field at the DB length limit so it cannot become a poison retry entry", () => {
+    openFeedbackModal({
+      auth: fakeAuth(vi.fn()),
+      context: () => ({ view: "account", userId: "u1" }),
+    });
+    const message = modal().querySelector<HTMLTextAreaElement>("#feedback-message")!;
+    expect(message.maxLength).toBe(FEEDBACK_MESSAGE_MAX_LENGTH);
   });
 
   it("hides the contact email field when signed in, shows it when anonymous", () => {
