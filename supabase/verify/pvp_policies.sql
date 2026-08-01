@@ -36,8 +36,9 @@ from pg_proc
 where proname = 'join_pvp_room';
 
 -- 4b. Execute grants (after 20260720120000_join_pvp_room_grants.sql):
---     expect authenticated=true, service_role=true, anon=false, and no
---     PUBLIC fallback (anon's false proves PUBLIC was revoked).
+--     expect authenticated=true, service_role=FALSE (least privilege — no
+--     service_role call site), anon=false, and no PUBLIC fallback (anon's
+--     false proves PUBLIC was revoked).
 select
   has_function_privilege('authenticated', 'public.join_pvp_room(text)', 'execute') as authenticated_can_execute,
   has_function_privilege('service_role', 'public.join_pvp_room(text)', 'execute') as service_role_can_execute,
