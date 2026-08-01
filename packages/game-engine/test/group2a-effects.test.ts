@@ -118,7 +118,7 @@ describe("DESTROY_TARGET_WARRIOR via real Attack cards", () => {
     expect(state.players.player2.outDeck.map((c) => c.id)).toEqual([card.id]);
     expect(
       state.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === card.id,
+        (e) => e.type === "effectFailed" && e.cardId === card.id,
       ),
     ).toBe(true);
     // Combat still resolved normally.
@@ -199,7 +199,7 @@ describe("HEAL_TARGET via Gunder Love (real Item)", () => {
     expect(state.players.player1.outDeck.map((c) => c.id)).toEqual([item.id]);
     expect(
       state.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === item.id,
+        (e) => e.type === "effectFailed" && e.cardId === item.id,
       ),
     ).toBe(true);
   });

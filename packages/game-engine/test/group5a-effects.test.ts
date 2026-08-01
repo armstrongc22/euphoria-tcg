@@ -278,7 +278,7 @@ describe("PREVENT_ATTACKS_AGAINST_FACTION_NEXT_TURN (Orange Court)", () => {
     expect(game.players.player1.outDeck.map((c) => c.id)).toContain(broken.id);
     expect(
       game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === broken.id,
+        (e) => e.type === "effectFailed" && e.cardId === broken.id,
       ),
     ).toBe(true);
     expect(

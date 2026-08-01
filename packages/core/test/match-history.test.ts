@@ -40,6 +40,7 @@ function fakeSummary(outcome: MatchOutcome): MatchSummary {
     finalLives: { player1: playerWon ? 3 : 0, player2: playerWon ? 0 : 3 },
     winByDirectAttack: outcome !== "draw",
     effectFallbacks: 0,
+    effectFailures: 0,
     deckOuts: 0,
     summons: { player1: 8, player2: 7 },
     warriorsLost: { player1: 2, player2: 5 },

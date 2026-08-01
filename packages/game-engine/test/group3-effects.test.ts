@@ -140,7 +140,7 @@ describe("SEARCH_DECK", () => {
     expect(state.players.player1.outDeck.map((c) => c.id)).toEqual([item.id]);
     expect(
       state.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === item.id,
+        (e) => e.type === "effectFailed" && e.cardId === item.id,
       ),
     ).toBe(true);
   });
@@ -223,7 +223,7 @@ describe("STEAL_ITEM_FROM_HAND via A Thief's Pride", () => {
     expect(state.players.player1.outDeck.map((c) => c.id)).toEqual([thief.id]);
     expect(
       state.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === thief.id,
+        (e) => e.type === "effectFailed" && e.cardId === thief.id,
       ),
     ).toBe(true);
   });

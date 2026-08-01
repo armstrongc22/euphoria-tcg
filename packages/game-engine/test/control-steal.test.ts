@@ -183,7 +183,7 @@ describe("CONTROL_STEAL (Coerced Loyalty)", () => {
     expect(game.players.player1.field).toHaveLength(game.config.warriorSlots);
     expect(
       game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === card.id,
+        (e) => e.type === "effectFailed" && e.cardId === card.id,
       ),
     ).toBe(true);
   });
@@ -220,7 +220,7 @@ describe("CONTROL_STEAL (Coerced Loyalty)", () => {
       .stolenFrom).toBeUndefined();
     expect(
       game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === card.id,
+        (e) => e.type === "effectFailed" && e.cardId === card.id,
       ),
     ).toBe(true);
   });

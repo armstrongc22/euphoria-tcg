@@ -156,7 +156,7 @@ describe("TEMPORARY_OUT_OF_PLAY_RESTORE (GILs Unit)", () => {
     expect(game.players.player1.outOfPlay).toHaveLength(0);
     expect(
       game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === card.id,
+        (e) => e.type === "effectFailed" && e.cardId === card.id,
       ),
     ).toBe(true);
   });

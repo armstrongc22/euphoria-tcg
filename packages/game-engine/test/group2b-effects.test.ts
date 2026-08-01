@@ -94,7 +94,7 @@ describe("REVIVE_WARRIOR via Totem's Creation", () => {
     ]);
     expect(
       state.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === item.id,
+        (e) => e.type === "effectFailed" && e.cardId === item.id,
       ),
     ).toBe(true);
   });
@@ -245,7 +245,7 @@ describe("HEALTH_PER_ITEM_IN_OUT_DECK via Vibrant Pastures", () => {
     expect(state.players.player1.field[0]?.currentHealth).toBe(900);
     expect(state.players.player1.spirit).toBe(1); // spent per current behavior
     expect(
-      state.events.some((e) => e.type === "effectNotImplemented"),
+      state.events.some((e) => e.type === "effectFailed"),
     ).toBe(true);
   });
 

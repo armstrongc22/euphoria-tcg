@@ -156,7 +156,7 @@ describe("TANK_FORM (XL-QR517)", () => {
     expect(p1Warrior(game, warrior.instanceId)!.currentHealth).toBe(3100);
     expect(
       game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === card.id,
+        (e) => e.type === "effectFailed" && e.cardId === card.id,
       ),
     ).toBe(true);
   });
@@ -178,7 +178,7 @@ describe("TANK_FORM (XL-QR517)", () => {
     ).toBeUndefined();
     expect(
       game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === card.id,
+        (e) => e.type === "effectFailed" && e.cardId === card.id,
       ),
     ).toBe(true);
   });
