@@ -1,8 +1,8 @@
 name: Verify join_pvp_room grants (preview only)
 
-# Manual-only verification of the feedback_reports migration + RLS against a
-# DISPOSABLE, non-production Supabase project. It is intentionally NOT part of
-# the deploy pipeline and never runs on push.
+# Manual-only verification of the join_pvp_room grant-hardening migration + RPC
+# authorization matrix against a DISPOSABLE, non-production Supabase project. It
+# is intentionally NOT part of the deploy pipeline and never runs on push.
 #
 # Design:
 #   * Lives on the default branch so it can be dispatched, but tests an explicit
@@ -12,6 +12,8 @@ name: Verify join_pvp_room grants (preview only)
 #   * All disposable credentials live in the protected `feedback-preview`
 #     GitHub Environment; the safety-guard job never receives them.
 #   * Every external action is pinned to a full commit SHA.
+#   * The artifact is scanned for infrastructure values BEFORE upload and the
+#     upload is gated on that scan, so a leak fails the run instead of shipping.
 
 on:
   workflow_dispatch:
@@ -223,10 +225,73 @@ jobs:
             -e 's#(postgres(ql)?://)[^ ]+#\1[REDACTED_DB_URL]#g' \
             verification-report.txt
 
-      - name: Upload sanitized verification report
+      # Last line of defence before anything leaves the runner. The scripts
+      # classify and redact at the source and the step above is a fallback sed;
+      # this scan assumes BOTH failed. It never echoes what it matched — only
+      # the pattern label and line numbers — so the scan itself cannot leak.
+      - name: Scan artifact for infrastructure values (fail closed, pre-upload)
+        id: artifact-scan
         if: always()
+        env:
+          SCAN_FILES: verification-report.txt
+        run: |
+          set -euo pipefail
+          if [ -z "${PREVIEW_REF:-}" ] || [ -z "${PROD_REF:-}" ]; then
+            echo "::error::artifact scan: project-ref variables missing; cannot scan. Refusing to upload."
+            exit 1
+          fi
+          # label#regex — '#' never occurs inside these patterns.
+          patterns=$(cat <<'PATTERNS'
+          Supavisor pooler hostname#[A-Za-z0-9_.-]*pooler\.supabase\.[a-z]{2,}
+          direct database hostname#db\.[A-Za-z0-9-]+\.supabase\.[a-z]{2,}
+          Supabase project hostname#[A-Za-z0-9-]+\.supabase\.[a-z]{2,}
+          PostgreSQL connection URI#postgres(ql)?://
+          IPv4 address#(^|[^0-9A-Za-z.])([0-9]{1,3}\.){3}[0-9]{1,3}([^0-9A-Za-z.]|$)
+          IPv6 address (full form)#(^|[^0-9A-Za-z:.])([0-9A-Fa-f]{1,4}:){3,7}[0-9A-Fa-f]{1,4}([^0-9A-Za-z:.]|$)
+          IPv6 address (compressed form)#(^|[^0-9A-Za-z:.])([0-9A-Fa-f]{1,4}(:[0-9A-Fa-f]{1,4})*)?::([0-9A-Fa-f]{1,4}(:[0-9A-Fa-f]{1,4})*)?([^0-9A-Za-z:.]|$)
+          Supavisor tenant username#postgres\.[A-Za-z0-9-]{8,}
+          JWT-like value#eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}
+          Supabase key prefix#sb[a-z]*_[A-Za-z0-9_-]{10,}
+          authorization header#(authorization|apikey|api-key|x-api-key)[[:space:]]*[:=][[:space:]]*[^[:space:]]
+          bearer token#[Bb]earer[[:space:]]+[A-Za-z0-9._~+/=-]{8,}
+          PATTERNS
+          )
+          leaks=0
+          for f in $SCAN_FILES; do
+            if [ ! -f "$f" ]; then
+              echo "::error::artifact scan: '$f' is missing — refusing to upload (fail closed)."
+              exit 1
+            fi
+            while IFS= read -r entry; do
+              [ -n "$entry" ] || continue
+              label="${entry%%#*}"
+              regex="${entry#*#}"
+              hits="$(grep -nE -- "$regex" "$f" | cut -d: -f1 | tr '\n' ' ' || true)"
+              if [ -n "$hits" ]; then
+                echo "::error::artifact scan: '$f' matches [$label] on line(s): $hits"
+                leaks=1
+              fi
+            done <<< "$patterns"
+            # Configured project refs, matched literally (never printed).
+            for ref in "$PREVIEW_REF" "$PROD_REF"; do
+              hits="$(grep -nF -- "$ref" "$f" | cut -d: -f1 | tr '\n' ' ' || true)"
+              if [ -n "$hits" ]; then
+                echo "::error::artifact scan: '$f' matches [configured project ref] on line(s): $hits"
+                leaks=1
+              fi
+            done
+          done
+          if [ "$leaks" -ne 0 ]; then
+            echo "::error::Artifact upload BLOCKED: the report still contains infrastructure values."
+            exit 1
+          fi
+          echo "Artifact scan passed: no forbidden patterns in $SCAN_FILES."
+
+      # Gated on the scan: a failed OR skipped scan means no upload at all.
+      - name: Upload sanitized verification report
+        if: always() && steps.artifact-scan.outcome == 'success'
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
-          name: feedback-preview-verification
+          name: pvp-preview-verification
           path: verification-report.txt
           retention-days: 14
