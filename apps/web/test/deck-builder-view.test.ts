@@ -134,6 +134,57 @@ describe("renderDeckBuilder", () => {
   });
 });
 
+describe("mountDeckBuilder — no-faction notice CTA", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  async function mountedWithoutFaction(
+    onChooseStarter?: () => void,
+  ): Promise<HTMLElement> {
+    const auth = createLocalAuth(memoryStore());
+    await auth.signUp("p@example.com", "pw");
+    // No saveFaction call: the builder must land on the choose-starter notice.
+    const container = document.createElement("div");
+    await mountDeckBuilder(container, { auth, pool: cards, onChooseStarter });
+    return container;
+  }
+
+  it("renders a keyboard-activatable Choose a Starter Deck button that routes", async () => {
+    const onChooseStarter = vi.fn();
+    const container = await mountedWithoutFaction(onChooseStarter);
+    document.body.append(container); // focus() only works on attached elements
+    expect(container.querySelector(".deck-builder--notice")).not.toBeNull();
+    const cta = container.querySelector<HTMLButtonElement>(".deck-builder__notice-cta");
+    expect(cta).not.toBeNull();
+    expect(cta!.textContent).toBe("Choose a Starter Deck");
+    // A native button is focusable and activates on Enter/Space by platform
+    // behavior — assert the element really is one, then activate it.
+    expect(cta!.tagName).toBe("BUTTON");
+    expect(cta!.type).toBe("button");
+    cta!.focus();
+    expect(document.activeElement).toBe(cta);
+    cta!.click();
+    expect(onChooseStarter).toHaveBeenCalledTimes(1);
+    container.remove();
+  });
+
+  it("renders the notice without a button when no router callback is given", async () => {
+    const container = await mountedWithoutFaction(undefined);
+    expect(container.querySelector(".deck-builder--notice")).not.toBeNull();
+    expect(container.querySelector(".deck-builder__notice-cta")).toBeNull();
+  });
+
+  it("shows the full builder, not the notice, once a faction exists", async () => {
+    const auth = createLocalAuth(memoryStore());
+    await auth.signUp("p@example.com", "pw");
+    await auth.saveFaction({ userId: "local-demo", email: "p@example.com" }, "Dwarf");
+    const container = document.createElement("div");
+    await mountDeckBuilder(container, { auth, pool: cards, onChooseStarter: vi.fn() });
+    expect(container.querySelector(".deck-builder--notice")).toBeNull();
+    expect(container.querySelector(".deck-builder__notice-cta")).toBeNull();
+    expect(container.querySelector(".deck-builder__count")).not.toBeNull();
+  });
+});
+
 describe("mountDeckBuilder — onboarding helper (Feature F)", () => {
   beforeEach(() => window.localStorage.clear());
 
