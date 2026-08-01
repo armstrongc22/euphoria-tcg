@@ -18,8 +18,15 @@ name: Verify join_pvp_room grants (preview only)
 on:
   workflow_dispatch:
     inputs:
+      target_ref:
+        description: "Branch containing the commit to test. Allowlisted branches only — no free-form refs."
+        required: true
+        type: choice
+        options:
+          - review/pvp-rpc-grants
+          - fix/pvp-migration-order
       target_sha:
-        description: "Full 40-char commit SHA from review/pvp-rpc-grants (PR #88) to test."
+        description: "Full 40-char lowercase commit SHA on target_ref. Must equal that branch's open PR head."
         required: true
       allow_preview_tests:
         description: 'Type "true" to confirm you are targeting a DISPOSABLE, non-production Supabase project.'
@@ -43,11 +50,18 @@ jobs:
   # ===========================================================================
   safety-guard:
     runs-on: ubuntu-latest
+    # Minimum additional privilege: read-only PR metadata for the target check.
+    # Still no packages/actions/write scopes, and no Environment declaration —
+    # the disposable-project secrets are unreachable from this job.
+    permissions:
+      contents: read
+      pull-requests: read
     env:
       REPO_ALLOW: ${{ vars.ALLOW_FEEDBACK_PREVIEW_TESTS }}
       PROD_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
       PREVIEW_REF: ${{ vars.FEEDBACK_PREVIEW_PROJECT_REF }}
       TARGET_SHA: ${{ inputs.target_sha }}
+      TARGET_REF: ${{ inputs.target_ref }}
     steps:
       - name: Require explicit opt-in (input + repo variable)
         run: |
@@ -86,24 +100,88 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Validate target_sha is a full SHA belonging to review/pvp-rpc-grants
+      # Every check below runs BEFORE any job that can see the disposable
+      # credentials. Fail-closed throughout: no check may be skipped, and an
+      # unexpected shape is always a refusal, never a default-allow.
+      - name: Validate target_ref + target_sha against the branch allowlist and its open PR
+        id: validate-target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+
+          # (1) target_sha must be exactly a lowercase 40-hex commit SHA. This
+          #     also forecloses ref expressions and commit-ish syntax.
           if ! printf '%s' "${TARGET_SHA:-}" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "::error::target_sha must be a full 40-character lowercase Git commit SHA."
+            echo "::error::target_sha must be a full 40-character lowercase hexadecimal commit SHA."
             exit 1
           fi
-          git fetch --no-tags --quiet origin review/pvp-rpc-grants master
-          if ! git merge-base --is-ancestor "$TARGET_SHA" origin/review/pvp-rpc-grants; then
-            echo "::error::target_sha is not contained in review/pvp-rpc-grants."
+
+          # (2) target_ref must be EXACTLY one of the allowlisted branch names.
+          #     A literal case match — no globbing, no free-form refs, no tags,
+          #     no refs/pull/*/merge, no fork syntax, no shell metacharacters.
+          case "${TARGET_REF:-}" in
+            review/pvp-rpc-grants) ;;
+            fix/pvp-migration-order) ;;
+            *)
+              echo "::error::target_ref is not an allowlisted branch. Refusing."
+              exit 1
+              ;;
+          esac
+
+          # (3) The branch must actually exist on origin.
+          git fetch --no-tags --quiet origin "$TARGET_REF" master
+          if ! git rev-parse --verify --quiet "refs/remotes/origin/$TARGET_REF^{commit}" >/dev/null; then
+            echo "::error::origin/$TARGET_REF does not exist. Refusing."
             exit 1
           fi
-          # Reject a commit that is only shared master history (not a PR #88 commit).
-          if git merge-base --is-ancestor "$TARGET_SHA" origin/master; then
-            echo "::error::target_sha is a shared master commit, not a PR #88 commit."
+
+          # (4) The SHA must be contained in that branch's history...
+          if ! git merge-base --is-ancestor "$TARGET_SHA" "refs/remotes/origin/$TARGET_REF"; then
+            echo "::error::target_sha is not contained in origin/$TARGET_REF."
             exit 1
           fi
-          echo "target_sha validated: immutable and on the PR #88 branch lineage."
+
+          # (5) ...and must not already be part of master (nothing already
+          #     shipped is a preview-verification target).
+          if git merge-base --is-ancestor "$TARGET_SHA" refs/remotes/origin/master; then
+            echo "::error::target_sha is already contained in master. Refusing."
+            exit 1
+          fi
+
+          # (6) There must be exactly one OPEN pull request from this branch,
+          #     in THIS repository (not a fork), targeting master, whose head is
+          #     exactly target_sha. Deliberately unfiltered by base/head so the
+          #     assertions below do the rejecting rather than the query hiding
+          #     the mismatch.
+          prs="$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" \
+                   --jq '.[] | [.head.ref, .head.sha, (.head.repo.full_name // "DELETED"), .base.ref, .number] | @tsv')"
+          matching="$(printf '%s\n' "$prs" | awk -F'\t' -v ref="$TARGET_REF" '$1 == ref' || true)"
+          count="$(printf '%s' "$matching" | grep -c . || true)"
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly one open PR with head branch '$TARGET_REF', found $count. Refusing."
+            exit 1
+          fi
+          IFS=$'\t' read -r pr_head_ref pr_head_sha pr_head_repo pr_base_ref pr_number <<< "$matching"
+
+          if [ "$pr_head_repo" != "$GITHUB_REPOSITORY" ]; then
+            echo "::error::PR #$pr_number head is not in this repository (fork or deleted head). Refusing."
+            exit 1
+          fi
+          if [ "$pr_base_ref" != "master" ]; then
+            echo "::error::PR #$pr_number targets '$pr_base_ref', not master. Refusing."
+            exit 1
+          fi
+          if [ "$pr_head_ref" != "$TARGET_REF" ]; then
+            echo "::error::PR #$pr_number head branch '$pr_head_ref' does not equal target_ref. Refusing."
+            exit 1
+          fi
+          if [ "$pr_head_sha" != "$TARGET_SHA" ]; then
+            echo "::error::target_sha is not the current head of PR #$pr_number (stale or unreviewed commit). Refusing."
+            exit 1
+          fi
+
+          echo "target validated: immutable SHA, on allowlisted branch $TARGET_REF, head of open PR #$pr_number into master."
 
   # ===========================================================================
   # Gate 2 — verification. Runs only after the guard. Declares the protected
