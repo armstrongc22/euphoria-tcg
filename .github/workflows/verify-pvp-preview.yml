@@ -295,3 +295,40 @@ jobs:
           name: pvp-preview-verification
           path: verification-report.txt
           retention-days: 14
+
+      # Runs AFTER the upload so the evidence is preserved even when the verdict
+      # is FAIL. A green step status is not enough on its own: every required
+      # stage must have produced a report that explicitly says OVERALL: PASS.
+      # A missing report, or one with no OVERALL line, is a stage that did NOT
+      # RUN — which fails the workflow rather than passing silently.
+      - name: Require OVERALL PASS from every stage (fail closed on FAIL or NOT RUN)
+        id: overall-gate
+        if: always()
+        env:
+          REQUIRED_REPORTS: report-migration.txt report-api.txt
+        run: |
+          set -euo pipefail
+          rc=0
+          for f in $REQUIRED_REPORTS; do
+            if [ ! -f "$f" ]; then
+              echo "::error::stage report '$f' was never produced — stage NOT RUN. Failing closed."
+              rc=1
+              continue
+            fi
+            if grep -q '^OVERALL: FAIL$' "$f"; then
+              echo "::error::stage '$f' reported OVERALL: FAIL."
+              rc=1
+              continue
+            fi
+            if ! grep -q '^OVERALL: PASS$' "$f"; then
+              echo "::error::stage '$f' has no OVERALL verdict line — treating as NOT RUN. Failing closed."
+              rc=1
+              continue
+            fi
+            echo "stage '$f': OVERALL: PASS"
+          done
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::PvP preview verification did NOT pass. Do not treat this run as green."
+            exit 1
+          fi
+          echo "All required stages reported OVERALL: PASS."
