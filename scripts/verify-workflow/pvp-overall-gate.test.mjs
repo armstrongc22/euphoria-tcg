@@ -118,6 +118,18 @@ describe("OVERALL gate — only an explicit pass from every stage is a pass", ()
     expect(res.out).toContain("has no OVERALL verdict line");
   });
 
+  it("requires exactly one verdict: two PASS lines are an ambiguous report", () => {
+    const res = runGate({ migration: MIGRATION_PASS, api: `${API_PASS}${API_PASS}` });
+    expect(res.status).not.toBe(0);
+    expect(res.out).toContain("2 OVERALL verdict lines (expected exactly 1)");
+  });
+
+  it("requires exactly one verdict: a PASS alongside a FAIL cannot pass", () => {
+    const res = runGate({ migration: MIGRATION_PASS, api: `${API_PASS}${API_FAIL}` });
+    expect(res.status).not.toBe(0);
+    expect(res.out).toContain("expected exactly 1");
+  });
+
   it("reports every failing stage, not just the first", () => {
     const res = runGate({ migration: MIGRATION_FAIL, api: null });
     expect(res.out).toContain("report-migration.txt");

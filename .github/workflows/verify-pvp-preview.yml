@@ -315,13 +315,26 @@ jobs:
               rc=1
               continue
             fi
+            # Exactly one verdict per stage: zero means the stage did not finish,
+            # more than one means the report is not a single trustworthy run.
+            verdicts="$(grep -c '^OVERALL: ' "$f" || true)"
+            if [ "$verdicts" -eq 0 ]; then
+              echo "::error::stage '$f' has no OVERALL verdict line — treating as NOT RUN. Failing closed."
+              rc=1
+              continue
+            fi
+            if [ "$verdicts" -ne 1 ]; then
+              echo "::error::stage '$f' has $verdicts OVERALL verdict lines (expected exactly 1) — ambiguous report. Failing closed."
+              rc=1
+              continue
+            fi
             if grep -q '^OVERALL: FAIL$' "$f"; then
               echo "::error::stage '$f' reported OVERALL: FAIL."
               rc=1
               continue
             fi
             if ! grep -q '^OVERALL: PASS$' "$f"; then
-              echo "::error::stage '$f' has no OVERALL verdict line — treating as NOT RUN. Failing closed."
+              echo "::error::stage '$f' verdict is not a recognised OVERALL: PASS — failing closed."
               rc=1
               continue
             fi
