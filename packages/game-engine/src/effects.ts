@@ -897,7 +897,7 @@ const restrictOpponentAttackTargetHandler: EffectHandler = (state, params, conte
 };
 
 /**
- * Moral Determination Authrotity: "Any of your opponent's Warriors that
+ * Moral Determination Authority: "Any of your opponent's Warriors that
  * attack next turn can't attack on their next turn." Stage 1: a watch
  * status through the opponent's next turn; recordAttackDeclaration turns
  * each attack into a stage-2 DISABLE_WARRIOR_ATTACKS for the turn after.
