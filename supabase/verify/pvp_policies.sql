@@ -35,7 +35,7 @@ select proname, prosecdef
 from pg_proc
 where proname = 'join_pvp_room';
 
--- 4b. Execute grants (after 20260720120000_join_pvp_room_grants.sql):
+-- 4b. Execute grants (after 20260801153000_join_pvp_room_grants.sql):
 --     expect authenticated=true, service_role=FALSE (least privilege — no
 --     service_role call site), anon=false, and no PUBLIC fallback (anon's
 --     false proves PUBLIC was revoked).
