@@ -1,0 +1,232 @@
+name: Verify join_pvp_room grants (preview only)
+
+# Manual-only verification of the feedback_reports migration + RLS against a
+# DISPOSABLE, non-production Supabase project. It is intentionally NOT part of
+# the deploy pipeline and never runs on push.
+#
+# Design:
+#   * Lives on the default branch so it can be dispatched, but tests an explicit
+#     immutable target_sha from review/pvp-rpc-grants (PR #88) — it never
+#     blindly checks out a mutable branch's contents.
+#   * Fail-closed production identity checks using dedicated repo variables.
+#   * All disposable credentials live in the protected `feedback-preview`
+#     GitHub Environment; the safety-guard job never receives them.
+#   * Every external action is pinned to a full commit SHA.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: "Full 40-char commit SHA from review/pvp-rpc-grants (PR #88) to test."
+        required: true
+      allow_preview_tests:
+        description: 'Type "true" to confirm you are targeting a DISPOSABLE, non-production Supabase project.'
+        required: true
+        default: "false"
+
+# Least privilege for the whole workflow.
+permissions:
+  contents: read
+
+# Only one preview verification at a time so two runs cannot mutate the
+# disposable database simultaneously. Do not cancel an in-progress mutation.
+concurrency:
+  group: pvp-preview-verify
+  cancel-in-progress: false
+
+jobs:
+  # ===========================================================================
+  # Gate 1 — safety guard. Receives NO preview credentials (no `environment:`,
+  # no FEEDBACK_PREVIEW_* secrets). Uses only repo variables + git. Fail-closed.
+  # ===========================================================================
+  safety-guard:
+    runs-on: ubuntu-latest
+    env:
+      REPO_ALLOW: ${{ vars.ALLOW_FEEDBACK_PREVIEW_TESTS }}
+      PROD_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
+      PREVIEW_REF: ${{ vars.FEEDBACK_PREVIEW_PROJECT_REF }}
+      TARGET_SHA: ${{ inputs.target_sha }}
+    steps:
+      - name: Require explicit opt-in (input + repo variable)
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.allow_preview_tests }}" != "true" ]; then
+            echo "::error::allow_preview_tests input must be exactly 'true'. Refusing."
+            exit 1
+          fi
+          if [ "${REPO_ALLOW:-}" != "true" ]; then
+            echo "::error::Repository variable ALLOW_FEEDBACK_PREVIEW_TESTS must be 'true'. Refusing."
+            exit 1
+          fi
+
+      - name: Fail-closed production identity check (project refs are variables, not secrets)
+        run: |
+          set -euo pipefail
+          # A missing production or preview ref is NEVER permission to continue.
+          if [ -z "${PROD_REF:-}" ]; then
+            echo "::error::PRODUCTION_SUPABASE_PROJECT_REF variable is not set. Refusing (fail closed)."
+            exit 1
+          fi
+          if [ -z "${PREVIEW_REF:-}" ]; then
+            echo "::error::FEEDBACK_PREVIEW_PROJECT_REF variable is not set. Refusing (fail closed)."
+            exit 1
+          fi
+          # PRIMARY identity check: preview ref must differ from production ref.
+          if [ "${PREVIEW_REF}" = "${PROD_REF}" ]; then
+            echo "::error::Preview project ref equals the production project ref. Refusing."
+            exit 1
+          fi
+          echo "Project-ref identity check passed."
+
+      - name: Checkout (full history) for SHA validation
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate target_sha is a full SHA belonging to review/pvp-rpc-grants
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "${TARGET_SHA:-}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::target_sha must be a full 40-character lowercase Git commit SHA."
+            exit 1
+          fi
+          git fetch --no-tags --quiet origin review/pvp-rpc-grants master
+          if ! git merge-base --is-ancestor "$TARGET_SHA" origin/review/pvp-rpc-grants; then
+            echo "::error::target_sha is not contained in review/pvp-rpc-grants."
+            exit 1
+          fi
+          # Reject a commit that is only shared master history (not a PR #88 commit).
+          if git merge-base --is-ancestor "$TARGET_SHA" origin/master; then
+            echo "::error::target_sha is a shared master commit, not a PR #88 commit."
+            exit 1
+          fi
+          echo "target_sha validated: immutable and on the PR #88 branch lineage."
+
+  # ===========================================================================
+  # Gate 2 — verification. Runs only after the guard. Declares the protected
+  # `feedback-preview` Environment, which is the ONLY place the disposable
+  # credentials live. Re-binds those credentials to the preview ref before any
+  # database operation (fail-closed), then runs the checks at the exact SHA.
+  # ===========================================================================
+  verify:
+    needs: safety-guard
+    runs-on: ubuntu-latest
+    environment: feedback-preview
+    permissions:
+      contents: read
+    env:
+      PROD_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
+      PREVIEW_REF: ${{ vars.FEEDBACK_PREVIEW_PROJECT_REF }}
+      # Unique per run so cleanup can target only this run's disposable data.
+      VERIFY_RUN_ID: preview-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Checkout the exact immutable target SHA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.target_sha }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 24
+
+      - name: Install dependencies (locked)
+        run: npm ci
+
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Preflight — bind preview credentials to the preview ref (fail closed)
+        env:
+          PREVIEW_URL: ${{ secrets.FEEDBACK_PREVIEW_SUPABASE_URL }}
+          PREVIEW_DB_URL: ${{ secrets.FEEDBACK_PREVIEW_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PREVIEW_URL:-}" ] || [ -z "${PREVIEW_DB_URL:-}" ]; then
+            echo "::error::feedback-preview environment is missing FEEDBACK_PREVIEW_SUPABASE_URL / _DB_URL."
+            exit 1
+          fi
+          if [ -z "${PREVIEW_REF:-}" ] || [ -z "${PROD_REF:-}" ]; then
+            echo "::error::project-ref variables missing. Refusing (fail closed)."
+            exit 1
+          fi
+          echo "::add-mask::$PREVIEW_URL"
+          echo "::add-mask::$PREVIEW_DB_URL"
+          ref_from_url="$(printf '%s' "$PREVIEW_URL" | sed -E 's#^https?://([a-z0-9-]+)\.supabase\.(co|in|net).*#\1#')"
+          echo "::add-mask::$ref_from_url"
+          # PRIMARY identity: the URL's ref must equal the DECLARED preview ref...
+          if [ "$ref_from_url" != "$PREVIEW_REF" ]; then
+            echo "::error::FEEDBACK_PREVIEW_SUPABASE_URL ref does not match FEEDBACK_PREVIEW_PROJECT_REF."
+            exit 1
+          fi
+          # ...and must never be production.
+          if [ "$ref_from_url" = "$PROD_REF" ]; then
+            echo "::error::Preview URL resolves to the production project ref. Refusing."
+            exit 1
+          fi
+          # Bind the DB connection to the preview ref where the URI exposes it
+          # (Supabase direct 'db.<ref>.supabase.co' or pooler 'postgres.<ref>').
+          if printf '%s' "$PREVIEW_DB_URL" | grep -qiE 'supabase\.(co|in|net)|pooler\.supabase'; then
+            if ! printf '%s' "$PREVIEW_DB_URL" | grep -qF "$PREVIEW_REF"; then
+              echo "::error::Preview DB URL does not reference the preview project ref."
+              exit 1
+            fi
+            if printf '%s' "$PREVIEW_DB_URL" | grep -qF "$PROD_REF"; then
+              echo "::error::Preview DB URL references the production project ref. Refusing."
+              exit 1
+            fi
+          else
+            echo "note: DB URL format does not expose a project ref; skipped ref-in-DB-URL check."
+          fi
+          echo "Preflight identity checks passed (all identifiers redacted)."
+
+      - name: Migration + metadata + fail-loud (psql against the disposable DB)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.FEEDBACK_PREVIEW_DB_URL }}
+        run: |
+          set -o pipefail
+          bash scripts/verify-pvp-preview/run-pvp-checks.sh | tee report-migration.txt
+
+      - name: API — anon / A / B / C / service_role RPC authorization matrix
+        env:
+          SUPABASE_URL: ${{ secrets.FEEDBACK_PREVIEW_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.FEEDBACK_PREVIEW_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.FEEDBACK_PREVIEW_SERVICE_ROLE_KEY }}
+        run: |
+          set -o pipefail
+          node scripts/verify-pvp-preview/pvp-authz-test.mjs | tee report-api.txt
+
+      - name: Cleanup this run's disposable users/rows (always; does not mask failures)
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.FEEDBACK_PREVIEW_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.FEEDBACK_PREVIEW_SERVICE_ROLE_KEY }}
+        run: node scripts/verify-pvp-preview/cleanup-run.mjs
+
+      - name: Assemble sanitized report (fallback redaction, not the primary defence)
+        if: always()
+        run: |
+          set -euo pipefail
+          : > verification-report.txt
+          for f in report-migration.txt report-api.txt; do
+            if [ -f "$f" ]; then
+              echo "===== $f ====="
+              cat "$f"
+              echo
+            fi >> verification-report.txt
+          done
+          sed -E -i \
+            -e 's/eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}/[REDACTED_JWT]/g' \
+            -e 's/(sb[a-z]*_[A-Za-z0-9]{10,})/[REDACTED_KEY]/g' \
+            -e 's#(postgres(ql)?://)[^ ]+#\1[REDACTED_DB_URL]#g' \
+            verification-report.txt
+
+      - name: Upload sanitized verification report
+        if: always()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: feedback-preview-verification
+          path: verification-report.txt
+          retention-days: 14
