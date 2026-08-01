@@ -432,6 +432,9 @@ export function createSupabaseAuth(client: SupabaseClient): Auth {
       // caller has no explicit id rather than inserting a null.
       const { user_id, ...withoutUser } = insert;
       const row = user_id === null ? withoutUser : insert;
+      // Insert-only, by design: do NOT chain .select() here. The table grants
+      // authenticated INSERT but not SELECT (least privilege), so requesting a
+      // returned representation would fail. The DB assigns id/created_at.
       const { error } = await client.from("feedback_reports").insert(row);
       // 23505 = unique violation on client_key: this exact report already
       // landed (a retry after an ambiguous failure) — that is success.

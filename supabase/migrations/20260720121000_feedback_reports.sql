@@ -9,7 +9,14 @@
 -- with ownership defaults, length constraints, and an idempotency key so those
 -- queued reports can flush without ever double-inserting.
 --
--- Idempotent throughout (create if not exists / drop policy if exists).
+-- Access is least-privilege: the client only INSERTs (no returned
+-- representation), so authenticated is granted INSERT only — never
+-- SELECT/UPDATE/DELETE — and anon gets nothing. Retrieval is service_role-only
+-- (it bypasses RLS) via an approved administrative backend.
+--
+-- Idempotent throughout (create if not exists / drop policy if exists / revoke
+-- + grant are safe to re-run), with an explicit stale-schema guard so a
+-- pre-existing incompatible table fails loudly instead of appearing to succeed.
 
 create table if not exists public.feedback_reports (
   id uuid primary key default gen_random_uuid(),
@@ -37,20 +44,74 @@ create table if not exists public.feedback_reports (
   created_at timestamptz not null default now()
 );
 
+-- Stale-schema guard: `create table if not exists` silently skips a pre-existing
+-- table, which could be an incompatible one (e.g. the old README SQL that had a
+-- NULLABLE user_id and no client_key). Assert the critical invariants so such a
+-- table makes THIS migration fail loudly — deployment must not appear to
+-- succeed against a schema that the app's inserts would then break on.
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'feedback_reports'
+      and column_name = 'client_key'
+  ) then
+    raise exception
+      'feedback_reports exists without a client_key column — incompatible pre-existing schema; reconcile it manually before deploying (idempotency + de-dup depend on client_key).';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'feedback_reports'
+      and column_name = 'user_id' and is_nullable = 'YES'
+  ) then
+    raise exception
+      'feedback_reports.user_id is NULLABLE — incompatible pre-existing schema; expected NOT NULL DEFAULT auth.uid() so ownership/RLS cannot be bypassed.';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public' and t.relname = 'feedback_reports'
+      and c.contype = 'u'
+      and c.conkey = array[
+        (select attnum from pg_attribute
+         where attrelid = t.oid and attname = 'client_key' and not attisdropped)
+      ]
+  ) then
+    raise exception
+      'feedback_reports.client_key lacks a UNIQUE constraint — incompatible pre-existing schema; the idempotency guarantee depends on it.';
+  end if;
+end $$;
+
 create index if not exists feedback_reports_user_created_idx
   on public.feedback_reports (user_id, created_at desc);
 
 alter table public.feedback_reports enable row level security;
 
--- Users may insert only their own reports.
+-- ---------------------------------------------------------------------------
+-- Least-privilege grants. Supabase grants anon/authenticated broad table
+-- privileges by default; strip them and re-grant only what the client needs
+-- (INSERT for authenticated). service_role is left untouched — it keeps full
+-- access and bypasses RLS for the approved administrative retrieval path.
+-- ---------------------------------------------------------------------------
+revoke all on public.feedback_reports from public;
+revoke all on public.feedback_reports from anon;
+revoke all on public.feedback_reports from authenticated;
+grant insert on public.feedback_reports to authenticated;
+
+-- Insert policy: a user may insert only rows owned by their own auth.uid().
+-- Combined with the NOT NULL DEFAULT auth.uid() column, a client-supplied
+-- user_id that differs from the caller's id is rejected — no ID spoofing.
 drop policy if exists feedback_reports_insert on public.feedback_reports;
 create policy feedback_reports_insert on public.feedback_reports
   for insert to authenticated
   with check (user_id = auth.uid());
 
--- Users may read back only their own reports (never anyone else's). There are
--- deliberately no UPDATE or DELETE policies, and no anon/public access at all.
+-- No SELECT/UPDATE/DELETE policies exist, and (with the grants above) no table
+-- privilege for them either — so authenticated users cannot read, edit, or
+-- delete any report, their own or others'. Retrieval is service_role-only.
+-- Drop the read policy from the earlier revision of this migration, if present.
 drop policy if exists feedback_reports_select on public.feedback_reports;
-create policy feedback_reports_select on public.feedback_reports
-  for select to authenticated
-  using (user_id = auth.uid());

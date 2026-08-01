@@ -334,15 +334,19 @@ the static site still works with no backend.
   | `context`          | `jsonb`       | `default '{}'::jsonb` — onboarding/match/reward/debug summary |
   | `created_at`       | `timestamptz` | DB default on insert                           |
 
-  **RLS**: signed-in users may `insert` only rows tagged with their own id
-  (`user_id = auth.uid()`, with `user_id` defaulting to `auth.uid()` so the
-  client may omit it) and may `select` only their own rows; there are no
-  UPDATE/DELETE policies and no anon/public access, so nobody can read the
-  whole table. If a report can't be sent it is kept in localStorage and
-  retried from the Account page — each report carries a client-minted
-  `client_key` (UNIQUE), so a retry after an ambiguous failure is a no-op
-  instead of a duplicate. The client only ever uses the anon key; **no
-  `service_role` key is in client code.**
+  **RLS (least privilege)**: the client only ever **inserts** (no returned
+  representation), so `authenticated` is granted `INSERT` only — never
+  `SELECT`/`UPDATE`/`DELETE` — and `anon` is granted nothing. The single
+  `INSERT` policy checks `user_id = auth.uid()`, and `user_id` defaults to
+  `auth.uid()` (the client omits it), so a client-supplied id that isn't the
+  caller's is rejected — no ID spoofing. There are no read/update/delete
+  policies, so no signed-in user can read any report (their own or others').
+  **Retrieval is `service_role`-only** (it bypasses RLS) via an approved
+  admin backend. If a report can't be sent it is kept in localStorage and
+  retried from the Account page — each carries a client-minted `client_key`
+  (UNIQUE), so a retry after an ambiguous failure is a no-op instead of a
+  duplicate. The client only ever uses the anon key; **no `service_role` key
+  is in client code.**
 
   The deployable schema lives in
   `supabase/migrations/20260720121000_feedback_reports.sql` and is applied by

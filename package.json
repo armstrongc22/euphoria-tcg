@@ -27,6 +27,7 @@
     "brand:optimize": "node scripts/optimize-brand-art.mjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "@types/node": "^24.0.0",
     "jsdom": "^29.1.1",
     "tsx": "^4.19.0",
