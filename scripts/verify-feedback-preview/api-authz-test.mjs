@@ -15,6 +15,7 @@
 // users and deletes them (and their rows) at the end. NEVER run against prod.
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
+import { isAuthzDenied, tableProbeVerdict } from "./authz-classify.mjs";
 
 const URL = process.env.SUPABASE_URL;
 const ANON = process.env.SUPABASE_ANON_KEY;
@@ -54,23 +55,39 @@ async function signInUser() {
   return { id: data.user.id, client };
 }
 
+// Preflight: the table MUST exist (migration applied). A missing table
+// (404 / PGRST205) is a SETUP failure, not an authorization result — abort so
+// the denial checks below can never false-pass on a missing table.
+{
+  const probe = await admin
+    .from("feedback_reports").select("*", { count: "exact", head: true });
+  if (tableProbeVerdict(probe.status, probe.error?.code) === "missing") {
+    check("preflight: feedback_reports exists (migration applied)", false,
+      { status: probe.status, code: probe.error?.code });
+    console.log("\n== API authorization matrix: ABORTED — table missing (migration not applied) ==");
+    process.exit(1);
+  }
+  check("preflight: feedback_reports exists (migration applied)", true, { status: probe.status });
+}
+
 let A, B;
 try {
   A = await signInUser();
   B = await signInUser();
 
-  // --- anon: everything denied ---------------------------------------------
+  // --- anon: everything denied (must be a genuine authz denial) -------------
   {
     const ins = await anon.from("feedback_reports").insert(row({ user_id: A.id }));
-    check("anon INSERT is denied", ins.error !== null, { status: ins.status, code: ins.error?.code });
+    check("anon INSERT is denied (authz, not missing-table)", isAuthzDenied(ins.status, ins.error?.code),
+      { status: ins.status, code: ins.error?.code });
     const sel = await anon.from("feedback_reports").select("id");
-    check("anon SELECT returns nothing/denied", sel.error !== null || (sel.data ?? []).length === 0,
+    check("anon SELECT is denied (authz, not missing-table)", isAuthzDenied(sel.status, sel.error?.code),
       { status: sel.status, code: sel.error?.code });
     const upd = await anon.from("feedback_reports").update({ message: "x" }).eq("type", "bug");
-    check("anon UPDATE is denied/no-op", upd.error !== null || (upd.data ?? []).length === 0,
+    check("anon UPDATE is denied (authz, not missing-table)", isAuthzDenied(upd.status, upd.error?.code),
       { status: upd.status, code: upd.error?.code });
     const del = await anon.from("feedback_reports").delete().eq("type", "bug");
-    check("anon DELETE is denied/no-op", del.error !== null || (del.data ?? []).length === 0,
+    check("anon DELETE is denied (authz, not missing-table)", isAuthzDenied(del.status, del.error?.code),
       { status: del.status, code: del.error?.code });
   }
 
@@ -82,28 +99,29 @@ try {
       { status: ins.status });
 
     const insRepr = await A.client.from("feedback_reports").insert(row()).select();
-    check("user A INSERT .select() (returned representation) is denied", insRepr.error !== null,
+    check("user A INSERT .select() (returned representation) is denied",
+      isAuthzDenied(insRepr.status, insRepr.error?.code),
       { status: insRepr.status, code: insRepr.error?.code });
 
     const spoof = await A.client.from("feedback_reports").insert(row({ user_id: B.id }));
-    check("user A cannot INSERT a row owned by user B", spoof.error !== null,
+    check("user A cannot INSERT a row owned by user B", isAuthzDenied(spoof.status, spoof.error?.code),
       { status: spoof.status, code: spoof.error?.code });
 
     const sel = await A.client.from("feedback_reports").select("id");
-    check("user A cannot SELECT any rows", sel.error !== null || (sel.data ?? []).length === 0,
+    check("user A cannot SELECT any rows", isAuthzDenied(sel.status, sel.error?.code),
       { status: sel.status, code: sel.error?.code });
     const upd = await A.client.from("feedback_reports").update({ message: "x" }).eq("type", "bug");
-    check("user A cannot UPDATE", upd.error !== null || (upd.data ?? []).length === 0,
+    check("user A cannot UPDATE", isAuthzDenied(upd.status, upd.error?.code),
       { status: upd.status, code: upd.error?.code });
     const del = await A.client.from("feedback_reports").delete().eq("type", "bug");
-    check("user A cannot DELETE", del.error !== null || (del.data ?? []).length === 0,
+    check("user A cannot DELETE", isAuthzDenied(del.status, del.error?.code),
       { status: del.status, code: del.error?.code });
   }
 
   // --- user B: cannot see user A's report ----------------------------------
   {
     const sel = await B.client.from("feedback_reports").select("id");
-    check("user B cannot access user A's report", sel.error !== null || (sel.data ?? []).length === 0,
+    check("user B cannot access user A's report", isAuthzDenied(sel.status, sel.error?.code),
       { status: sel.status, code: sel.error?.code });
   }
 
