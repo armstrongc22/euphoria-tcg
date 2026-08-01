@@ -1,7 +1,7 @@
 /**
  * Group 4A: combat hooks on the status/aura system —
  * RESTRICT_OPPONENT_ATTACK_TARGET (Primetime Interview),
- * PUNISH_ATTACKERS_DISABLE (Moral Determination Authrotity), and
+ * PUNISH_ATTACKERS_DISABLE (Moral Determination Authority), and
  * MONK_RETALIATION (A Dragon's Judgement), tested with the real cards.
  */
 import { describe, expect, it } from "vitest";
@@ -75,7 +75,7 @@ describe("RESTRICT_OPPONENT_ATTACK_TARGET (Primetime Interview)", () => {
     expect(game.statuses).toHaveLength(0);
     expect(
       game.events.filter(
-        (e) => e.type === "effectNotImplemented" && e.cardId === item.id,
+        (e) => e.type === "effectFailed" && e.cardId === item.id,
       ),
     ).toHaveLength(2);
   });
@@ -181,7 +181,7 @@ describe("RESTRICT_OPPONENT_ATTACK_TARGET (Primetime Interview)", () => {
   });
 });
 
-describe("PUNISH_ATTACKERS_DISABLE (Moral Determination Authrotity)", () => {
+describe("PUNISH_ATTACKERS_DISABLE (Moral Determination Authority)", () => {
   /** Player 1 plays the Item turn 1; player 2 fields two attackers. */
   function setupAuthority() {
     let game = newGame();
@@ -505,7 +505,7 @@ describe("MONK_RETALIATION (A Dragon's Judgement)", () => {
     expect(game.players.player1.outDeck.map((c) => c.id)).toContain(broken.id);
     expect(
       game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === broken.id,
+        (e) => e.type === "effectFailed" && e.cardId === broken.id,
       ),
     ).toBe(true);
   });

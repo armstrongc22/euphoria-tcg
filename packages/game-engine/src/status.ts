@@ -212,7 +212,7 @@ export function findAttackerRestriction(
 }
 
 /**
- * After-attack-declaration hook (Moral Determination Authrotity): while a
+ * After-attack-declaration hook (Moral Determination Authority): while a
  * PUNISH_ATTACKERS_WATCH covers the attacking player, each attacking
  * Warrior earns a delayed DISABLE_WARRIOR_ATTACKS for its owner's next
  * turn. Called by attackWarrior and directAttack once the attack is

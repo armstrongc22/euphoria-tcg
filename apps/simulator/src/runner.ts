@@ -42,8 +42,10 @@ export interface GameResult {
    * one — tracked explicitly so a future combat/alt win condition shows up.
    */
   winByDirectAttack: boolean;
-  /** `effectNotImplemented` events: a card whose effect failed to resolve. */
+  /** `effectNotImplemented` events: a card with no coded handler yet. */
   effectFallbacks: number;
+  /** `effectFailed` events: a handled effect that fizzled (e.g. no valid target). */
+  effectFailures: number;
   /** `drawFailedDeckEmpty` events: a player tried to draw from an empty deck. */
   deckOuts: number;
   /** Warriors each player summoned over the game. */
@@ -109,6 +111,7 @@ export function buildGameResult(
 ): GameResult {
   let winByDirectAttack = false;
   let effectFallbacks = 0;
+  let effectFailures = 0;
   let deckOuts = 0;
   const summons: Record<PlayerId, number> = { player1: 0, player2: 0 };
   const warriorsLost: Record<PlayerId, number> = { player1: 0, player2: 0 };
@@ -123,6 +126,8 @@ export function buildGameResult(
       warriorsLost[event.player] += 1;
     } else if (event.type === "effectNotImplemented") {
       effectFallbacks += 1;
+    } else if (event.type === "effectFailed") {
+      effectFailures += 1;
     } else if (event.type === "drawFailedDeckEmpty") {
       deckOuts += 1;
     }
@@ -140,6 +145,7 @@ export function buildGameResult(
     },
     winByDirectAttack: state.winner !== null && winByDirectAttack,
     effectFallbacks,
+    effectFailures,
     deckOuts,
     summons,
     warriorsLost,

@@ -36,7 +36,7 @@ Once Battle Phase begins:
 - When a Warrior attacks another Warrior, the player may use compatible Attack cards from hand.
 - Multiple compatible Attack cards may be used on the same attack if the player has enough Spirit.
 - Each Attack card resolves fully before the next Attack card is chosen.
-- After Attack card choices are finished, combat damage resolves simultaneously.
+- After Attack card choices are finished, the attacker's combat damage resolves. Combat damage is not simultaneous: the attacker deals damage first, and a defender destroyed by that damage does not retaliate.
 - No Attack cards are offered on direct attacks.
 
 ### End Phase
@@ -48,7 +48,7 @@ Once Battle Phase begins:
 - Warriors can attack the turn they are summoned after the first turn.
 - Each Warrior may attack once per turn unless a card effect says otherwise.
 - Multiple Warriors can attack in one turn.
-- Combat damage is simultaneous.
+- Combat damage is not simultaneous. The attacker deals its damage first and takes no counter damage from the base combat rules; a defender destroyed by the attack never retaliates. (Card effects — e.g. faction retaliation statuses — may still damage attackers.)
 - Direct attacks are allowed only if the opponent controls no Warriors.
 - Only one direct attack is allowed per turn.
 

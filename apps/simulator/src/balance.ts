@@ -47,6 +47,7 @@ export interface BalanceReport {
   winsByCombat: number;
   maxTurnGames: number;
   effectFallbacks: number;
+  effectFailures: number;
   deckOuts: number;
   /** Thrown-error message -> occurrences (agent/engine faults; 0 when healthy). */
   errors: Record<string, number>;
@@ -88,6 +89,7 @@ export function generateBalanceReport(options: BalanceOptions): BalanceReport {
   let winsByCombat = 0;
   let maxTurnGames = 0;
   let effectFallbacks = 0;
+  let effectFailures = 0;
   let deckOuts = 0;
   let failedGames = 0;
 
@@ -146,6 +148,7 @@ export function generateBalanceReport(options: BalanceOptions): BalanceReport {
           }
           if (result.reason === "maxTurns") maxTurnGames += 1;
           effectFallbacks += result.effectFallbacks;
+          effectFailures += result.effectFailures;
           deckOuts += result.deckOuts;
         } catch (error) {
           failedGames += 1;
@@ -170,6 +173,7 @@ export function generateBalanceReport(options: BalanceOptions): BalanceReport {
     winsByCombat,
     maxTurnGames,
     effectFallbacks,
+    effectFailures,
     deckOuts,
     errors,
     failedGames,
@@ -234,7 +238,7 @@ export function formatBalanceReport(report: BalanceReport): string {
   );
   lines.push(`  hit max-turn limit: ${report.maxTurnGames}`);
   lines.push(
-    `  anomalies: effect fallbacks ${report.effectFallbacks} | deck-outs ${report.deckOuts} | failed games ${report.failedGames}`,
+    `  anomalies: unimplemented effects ${report.effectFallbacks} | effect fizzles ${report.effectFailures} | deck-outs ${report.deckOuts} | failed games ${report.failedGames}`,
   );
   const errorEntries = Object.entries(report.errors).sort((a, b) => b[1] - a[1]);
   if (errorEntries.length > 0) {

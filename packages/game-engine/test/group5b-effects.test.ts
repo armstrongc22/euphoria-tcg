@@ -40,7 +40,7 @@ describe("PROTECT_WARRIOR_THIS_TURN (High Tea)", () => {
     expect(game.players.player1.outDeck.map((c) => c.id)).toContain(item.id);
     expect(
       game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === item.id,
+        (e) => e.type === "effectFailed" && e.cardId === item.id,
       ),
     ).toBe(true);
   });
@@ -231,7 +231,7 @@ describe("DELAYED_ATTACK_BUFF (Training Arc)", () => {
     expect(game.statuses).toHaveLength(0);
     expect(
       game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === item.id,
+        (e) => e.type === "effectFailed" && e.cardId === item.id,
       ),
     ).toBe(true);
   });
@@ -327,7 +327,7 @@ describe("SPIRIT_ESCROW (Secure Deposits)", () => {
     expect(p1.outDeck.map((c) => c.id)).toContain(item.id);
     expect(
       game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === item.id,
+        (e) => e.type === "effectFailed" && e.cardId === item.id,
       ),
     ).toBe(true);
   });

@@ -29,7 +29,7 @@ The engine can read your current `effects` array and infer some generic handlers
 - Coerced Loyalty
 - GILs Unit
 - High Tea
-- Moral Determination Authrotity
+- Moral Determination Authority
 - Slush Fund
 - Trial of Gia
 - XL-QR517

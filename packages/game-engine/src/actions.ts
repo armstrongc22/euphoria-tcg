@@ -2,6 +2,7 @@ import type { Card } from "@euphoria/card-data";
 import {
   defaultEffectRegistry,
   normalizeEffectCode,
+  type EffectOutcome,
   type EffectRegistry,
 } from "./effects";
 import {
@@ -57,6 +58,26 @@ export type ActionResult =
 
 function fail(code: EngineErrorCode, message: string): ActionResult {
   return { ok: false, error: { code, message } };
+}
+
+/**
+ * Records an unresolved effect without changing the play's outcome (the cost
+ * stays paid and the card is spent either way, per project decision). A
+ * missing handler stays `effectNotImplemented`; a handler that ran but could
+ * not resolve (no valid target, empty Out Deck, …) is a fizzle and is
+ * reported as `effectFailed` with the diagnostic reason preserved.
+ */
+function pushUnresolvedEffect(
+  state: GameState,
+  player: PlayerId,
+  cardId: string,
+  outcome: Extract<EffectOutcome, { resolved: false }>,
+): void {
+  if (outcome.code === "EFFECT_FAILED") {
+    state.events.push({ type: "effectFailed", player, cardId, reason: outcome.reason });
+  } else {
+    state.events.push({ type: "effectNotImplemented", player, cardId });
+  }
 }
 
 /**
@@ -824,11 +845,7 @@ function attackWarrior(
     if (resolution.outcome.resolved) {
       next = resolution.state;
     } else {
-      next.events.push({
-        type: "effectNotImplemented",
-        player: player.id,
-        cardId: card.id,
-      });
+      pushUnresolvedEffect(next, player.id, card.id, resolution.outcome);
     }
   }
 
@@ -841,7 +858,7 @@ function attackWarrior(
   );
   if (attacker !== undefined) {
     attacker.attacksRemaining -= 1;
-    // After-attack-declaration hook (Moral Determination Authrotity).
+    // After-attack-declaration hook (Moral Determination Authority).
     recordAttackDeclaration(next, next.activePlayer, attacker.instanceId);
   }
   if (attacker !== undefined && defender !== undefined && !replacesAttack) {
@@ -851,8 +868,8 @@ function attackWarrior(
     // Scythe Cycle checks "opponent has more than 1 Warrior" at attack
     // time, before combat damage can thin the field.
     const opponentCountBeforeCombat = next.players[opponentId].field.length;
-    // The attacker takes no counter damage (CLAUDE.md overrides the spec's
-    // "simultaneous" wording; see RulesConfig.combatDamageSimultaneous).
+    // The attacker takes no counter damage — sequential combat per CLAUDE.md
+    // and docs/rules-spec.md (see RulesConfig.combatDamageSimultaneous).
     let damage = computeCombatDamage(next, next.activePlayer, attacker, defender);
     // Ontology (WEAPON_NEGATE_ONCE_REDUCE_ATTACKER): the equipped Warrior
     // negates the first attack against it each turn (keyed on the unique turn
@@ -1016,7 +1033,7 @@ function directAttack(state: GameState, attackerInstanceId: string): ActionResul
   const attacker = player.field.find((w) => w.instanceId === attackerInstanceId)!;
 
   attacker.attacksRemaining -= 1;
-  // After-attack-declaration hook (Moral Determination Authrotity).
+  // After-attack-declaration hook (Moral Determination Authority).
   recordAttackDeclaration(next, next.activePlayer, attackerInstanceId);
   player.directAttackUsedThisTurn = true;
   opponent.lives -= 1;
@@ -1225,11 +1242,7 @@ function playItem(
   if (resolution.outcome.resolved) {
     next = resolution.state;
   } else {
-    next.events.push({
-      type: "effectNotImplemented",
-      player: nextPlayer.id,
-      cardId: card.id,
-    });
+    pushUnresolvedEffect(next, nextPlayer.id, card.id, resolution.outcome);
   }
   next.players[next.activePlayer].outDeck.push(card);
   return { ok: true, state: next };
@@ -1289,6 +1302,8 @@ function equipWeapon(
     if (resolution.outcome.resolved) {
       return { ok: true, state: resolution.state };
     }
+    pushUnresolvedEffect(next, nextPlayer.id, card.id, resolution.outcome);
+    return { ok: true, state: next };
   }
   next.events.push({
     type: "effectNotImplemented",

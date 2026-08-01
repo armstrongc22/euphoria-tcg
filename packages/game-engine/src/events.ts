@@ -29,6 +29,15 @@ export type GameEvent =
   | { type: "weaponEquipped"; player: PlayerId; cardId: string; warriorInstanceId: string; cost: number }
   /** The card resolved with no effect — it needs a coded handler later. */
   | { type: "effectNotImplemented"; player: PlayerId; cardId: string }
+  /**
+   * The card's effect HAS a handler but could not resolve this time (missing
+   * or invalid target, empty Out Deck, precondition unmet, handler threw…).
+   * The cost stays paid and the card is spent, exactly like before — only the
+   * reporting differs from effectNotImplemented, so diagnostics never conflate
+   * a legitimate fizzle with a missing handler. `reason` is a developer
+   * diagnostic string, never player-facing copy.
+   */
+  | { type: "effectFailed"; player: PlayerId; cardId: string; reason: string }
   /** Cost paid and card moved to the Out Deck; its effect is still pending a handler. */
   | { type: "attackCardUsed"; player: PlayerId; cardId: string; attackerInstanceId: string; cost: number }
   | { type: "warriorAttacked"; player: PlayerId; attackerInstanceId: string; defenderInstanceId: string; damage: number }
