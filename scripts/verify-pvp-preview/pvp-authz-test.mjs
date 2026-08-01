@@ -25,6 +25,7 @@ const ANON = process.env.SUPABASE_ANON_KEY;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!URL || !ANON || !SERVICE) {
   console.error("FAIL: set SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (disposable project).");
+  console.log("OVERALL: FAIL");
   process.exit(1);
 }
 const noPersist = { auth: { persistSession: false, autoRefreshToken: false } };
@@ -127,4 +128,7 @@ try {
   }
 }
 console.log(`\n== PvP RPC API matrix: ${pass} passed, ${fail} failed ==`);
+// Single explicit verdict line, so a consumer never has to infer a pass from a
+// truncated report. A stage that produces no OVERALL line counts as NOT RUN.
+console.log(fail === 0 && pass > 0 ? "OVERALL: PASS" : "OVERALL: FAIL");
 process.exit(fail === 0 ? 0 : 1);

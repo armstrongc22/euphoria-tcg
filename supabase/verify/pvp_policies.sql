@@ -39,10 +39,17 @@ where proname = 'join_pvp_room';
 --     expect authenticated=true, service_role=FALSE (least privilege — no
 --     service_role call site), anon=false, and no PUBLIC fallback (anon's
 --     false proves PUBLIC was revoked).
+--     A NULL proacl is NOT "no privileges": it is the built-in default, which
+--     grants EXECUTE to PUBLIC — so public_can_execute reports it as true.
 select
   has_function_privilege('authenticated', 'public.join_pvp_room(text)', 'execute') as authenticated_can_execute,
   has_function_privilege('service_role', 'public.join_pvp_room(text)', 'execute') as service_role_can_execute,
-  has_function_privilege('anon', 'public.join_pvp_room(text)', 'execute') as anon_can_execute;
+  has_function_privilege('anon', 'public.join_pvp_room(text)', 'execute') as anon_can_execute,
+  (select case when p.proacl is null then true
+               else exists (select 1 from aclexplode(p.proacl) a
+                            where a.grantee = 0 and a.privilege_type = 'EXECUTE')
+          end
+   from pg_proc p where p.oid = 'public.join_pvp_room(text)'::regprocedure) as public_can_execute;
 
 -- 5. Optional: realtime publication membership (0–2 rows; the app polls as a
 --    fallback, so missing rows here only mean slower lobby updates).

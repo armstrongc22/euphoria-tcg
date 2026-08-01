@@ -42,9 +42,17 @@ node scripts/verify-pvp-preview/pvp-authz-test.mjs
 npx vitest run scripts/verify-pvp-preview            # redaction/classifier regressions
 ```
 
+## Verdict line
+Both stages end with exactly one `OVERALL: PASS` or `OVERALL: FAIL`, emitted on
+every exit path (including an early abort). A stage report that is missing, or
+that has no `OVERALL:` line, means the stage did **not run** — the workflow
+treats that as a failure rather than a pass.
+
 ## Expected results
 - Metadata: 1 overload, `(text)`, SECURITY DEFINER, `search_path=public`, owner `postgres`, body unchanged; rerun idempotent.
-- Grants: anon `false`, authenticated `true`, service_role `false`.
+- Grants: PUBLIC `false`, anon `false`, authenticated `true`, service_role `false`.
+  (service_role needs an explicit `revoke` — Supabase's default privileges grant
+  it EXECUTE at `create function` time.)
 - API matrix: A/B join valid rooms; reconnect idempotent; own/invalid/full/expired rejected; seat always equals the caller's `auth.uid()`; anon + service_role denied by permission (function proven to exist).
 - Fail-loud: every case raises, schema restored, grants unchanged.
 

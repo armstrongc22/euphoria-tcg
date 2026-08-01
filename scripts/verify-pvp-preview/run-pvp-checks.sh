@@ -27,9 +27,21 @@ REPO="$(cd "$HERE/../.." && pwd)"
 BASE="$REPO/supabase/migrations/20260702120000_pvp_schema.sql"
 GRANT="$REPO/supabase/migrations/20260720120000_join_pvp_room_grants.sql"
 
+pass=0; fail=0
+ok(){ echo "PASS: $1"; pass=$((pass+1)); }
+no(){ echo "FAIL: $1"; fail=$((fail+1)); }
+
 # Scratch space for captured stderr. Never uploaded, removed on exit.
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/pvp-verify.XXXXXX")"
-trap 'rm -rf "$TMP"' EXIT
+
+# Every exit path — including an early abort — ends with exactly one OVERALL
+# line, so a consumer can never mistake a truncated report for a pass.
+finish() {
+  local rc=$?
+  if [ "$rc" -eq 0 ] && [ "${fail:-1}" -eq 0 ]; then echo "OVERALL: PASS"; else echo "OVERALL: FAIL"; fi
+  rm -rf "$TMP"
+}
+trap finish EXIT
 
 PSQL_OPTS=(-X -q -w -v ON_ERROR_STOP=1)
 
@@ -52,10 +64,6 @@ scalar() {
   fi
 }
 db_error() { if [ -s "$TMP/last.summary" ]; then cat "$TMP/last.summary"; else echo "UNKNOWN_DATABASE_ERROR"; fi; }
-
-pass=0; fail=0
-ok(){ echo "PASS: $1"; pass=$((pass+1)); }
-no(){ echo "FAIL: $1"; fail=$((fail+1)); }
 
 echo "== join_pvp_room migration + metadata + fail-loud checks =="
 
@@ -102,6 +110,16 @@ grant_is() { local role="$1" exp="$2"; local v; v="$(scalar "select has_function
   if [ -z "$v" ]; then no "grant: $role execute unreadable ($(db_error))"; \
   elif [ "$v" = "$exp" ]; then ok "grant: $role execute = $exp"; \
   else no "grant: $role execute = $v (expected $exp)"; fi; }
+
+# PUBLIC has no role name, so check its ACL entry directly. A NULL proacl is not
+# "no privileges" — it is the built-in default, which grants EXECUTE to PUBLIC.
+PUBEXEC="$(scalar "select case when p.proacl is null then true
+       else exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0 and a.privilege_type = 'EXECUTE')
+  end from pg_proc p where p.oid = 'public.join_pvp_room(text)'::regprocedure")"
+if [ -z "$PUBEXEC" ]; then no "grant: PUBLIC execute unreadable ($(db_error))"
+elif [ "$PUBEXEC" = "f" ]; then ok "grant: PUBLIC execute = f"
+else no "grant: PUBLIC execute = $PUBEXEC (expected f)"; fi
+
 grant_is anon f
 grant_is authenticated t
 grant_is service_role f

@@ -209,3 +209,70 @@ describe("run-pvp-checks.sh — generated report never carries infrastructure va
     expectNoLeaks(res.report);
   });
 });
+
+/**
+ * A psql stub that answers each query the script asks, so the whole happy path
+ * runs end to end. It exists to pin the OVERALL verdict wiring — the real
+ * migration behaviour is covered by the PGlite tests in packages/core.
+ */
+const HAPPY_PATH = [
+  "#!/usr/bin/env bash",
+  'q=""; prev=""; mode="stdin"',
+  'for a in "$@"; do',
+  '  [ "$prev" = "-c" ] && { q="$a"; mode="c"; }',
+  '  [ "$prev" = "-f" ] && mode="f"',
+  '  prev="$a"',
+  "done",
+  'case "$mode" in',
+  // The fail-loud cases read SQL on stdin; emit every phrase the greps look for.
+  "  stdin) cat >/dev/null;",
+  '    echo "ERROR:  is missing / expected signature / exactly one overload / not SECURITY DEFINER / lacks a fixed search_path";',
+  "    exit 0 ;;",
+  "  f) exit 0 ;;",
+  "  c)",
+  '    case "$q" in',
+  '      *to_regprocedure*)   echo "1|t|t|postgres|search_path=public|deadbeef|p_code~text" ;;',
+  '      *aclexplode*)        echo "f" ;;',
+  "      *has_function_privilege*anon*)          echo \"f\" ;;",
+  "      *has_function_privilege*authenticated*) echo \"t\" ;;",
+  "      *has_function_privilege*service_role*)  echo \"f\" ;;",
+  '      *md5*)               echo "deadbeef" ;;',
+  '      *)                   echo "1" ;;',
+  "    esac ;;",
+  "esac",
+  "exit 0",
+  "",
+].join("\n");
+
+describe("run-pvp-checks.sh — explicit OVERALL verdict", () => {
+  const overallLines = (report) => report.split("\n").filter((l) => /^OVERALL: /.test(l));
+
+  it("emits exactly one OVERALL: PASS when every check passes", () => {
+    const res = runChecksWithStub(HAPPY_PATH, "");
+    expect(res.report).toContain("PASS: grant: PUBLIC execute = f");
+    expect(res.report).toContain("PASS: grant: service_role execute = f");
+    expect(res.report).toMatch(/== PvP migration checks: \d+ passed, 0 failed ==/);
+    expect(overallLines(res.report)).toEqual(["OVERALL: PASS"]);
+    expect(res.status).toBe(0);
+  });
+
+  it("emits OVERALL: FAIL when the run aborts early on connectivity", () => {
+    const fixture = DB_ERROR_FIXTURES.find((f) => f.name.startsWith("pooler connection refused"));
+    const res = runChecksWithStub(ALWAYS_FAILS, fixture.stderr);
+    expect(overallLines(res.report)).toEqual(["OVERALL: FAIL"]);
+    expect(res.status).not.toBe(0);
+    expectNoLeaks(res.report);
+  });
+
+  it("emits OVERALL: FAIL when a query-level check fails mid-run", () => {
+    const denied = DB_ERROR_FIXTURES.find((f) => f.name === "permission denied");
+    const res = runChecksWithStub(CONNECTS_THEN_FAILS, denied.stderr);
+    expect(overallLines(res.report)).toEqual(["OVERALL: FAIL"]);
+    expect(res.status).not.toBe(0);
+  });
+
+  it("the verdict line survives redaction unchanged", () => {
+    expect(redact("OVERALL: PASS", { extraSecrets: [] })).toBe("OVERALL: PASS");
+    expect(redact("OVERALL: FAIL", { extraSecrets: [] })).toBe("OVERALL: FAIL");
+  });
+});
