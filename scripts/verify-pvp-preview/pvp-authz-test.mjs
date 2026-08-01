@@ -7,10 +7,18 @@
 // tokens). Creates run-scoped disposable users + rooms and deletes them at the
 // end. NEVER run against production.
 //
+// OUTPUT SAFETY: console.log/error are wrapped by `installRedactingConsole` on
+// the first line of execution, so even an unexpected client error message —
+// which can carry the API hostname, the project ref or a response body — is
+// redacted before it can reach a report or artifact.
+//
 //   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (disposable only).
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { deniedByPermission } from "./pvp-classify.mjs";
+import { installRedactingConsole } from "./redact.mjs";
+
+installRedactingConsole();
 
 const URL = process.env.SUPABASE_URL;
 const ANON = process.env.SUPABASE_ANON_KEY;

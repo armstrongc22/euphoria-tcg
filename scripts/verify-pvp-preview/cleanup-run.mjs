@@ -4,8 +4,13 @@
 // The API test deletes its own disposable users/rooms in a `finally`; this
 // removes any leaked `pvpverify+<VERIFY_RUN_ID>-…` users (deleting a user
 // cascades their pvp_rooms) after a crash/timeout. Scoped strictly to this
-// run's prefix. Prints counts only — never emails/keys/tokens.
+// run's prefix. Prints counts only — never emails/keys/tokens; console output
+// additionally passes through `redact()` so a client error cannot leak the API
+// hostname or the project ref into the artifact.
 import { createClient } from "@supabase/supabase-js";
+import { installRedactingConsole } from "./redact.mjs";
+
+installRedactingConsole();
 
 const URL = process.env.SUPABASE_URL;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
