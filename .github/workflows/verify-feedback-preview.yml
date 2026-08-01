@@ -185,26 +185,34 @@ jobs:
       - name: Migration — clean apply, idempotent rerun, stale-table guard
         env:
           SUPABASE_DB_URL: ${{ secrets.FEEDBACK_PREVIEW_DB_URL }}
-        run: bash scripts/verify-feedback-preview/run-migration-checks.sh | tee report-migration.txt
+        run: |
+          set -o pipefail
+          bash scripts/verify-feedback-preview/run-migration-checks.sh | tee report-migration.txt
 
       - name: SQL — schema, constraints, indexes, RLS, policies, ownership, grants
         env:
           SUPABASE_DB_URL: ${{ secrets.FEEDBACK_PREVIEW_DB_URL }}
-        run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -f scripts/verify-feedback-preview/schema-checks.sql | tee report-schema.txt
+        run: |
+          set -o pipefail
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -f scripts/verify-feedback-preview/schema-checks.sql | tee report-schema.txt
 
       - name: API — anon / user A / user B / service_role authorization matrix
         env:
           SUPABASE_URL: ${{ secrets.FEEDBACK_PREVIEW_SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.FEEDBACK_PREVIEW_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.FEEDBACK_PREVIEW_SERVICE_ROLE_KEY }}
-        run: node scripts/verify-feedback-preview/api-authz-test.mjs | tee report-api.txt
+        run: |
+          set -o pipefail
+          node scripts/verify-feedback-preview/api-authz-test.mjs | tee report-api.txt
 
       - name: App — queue + retry + dead-letter integration
         env:
           SUPABASE_URL: ${{ secrets.FEEDBACK_PREVIEW_SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.FEEDBACK_PREVIEW_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.FEEDBACK_PREVIEW_SERVICE_ROLE_KEY }}
-        run: npx --no-install tsx scripts/verify-feedback-preview/app-integration-test.ts | tee report-app.txt
+        run: |
+          set -o pipefail
+          npx --no-install tsx scripts/verify-feedback-preview/app-integration-test.ts | tee report-app.txt
 
       - name: Cleanup this run's disposable users/rows (always; does not mask failures)
         if: always()
