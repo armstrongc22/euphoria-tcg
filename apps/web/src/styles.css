@@ -1450,10 +1450,18 @@ body {
   color: var(--text-dim);
 }
 
-/* CTA under the no-faction notice; inherits .deck-builder__save button chrome. */
+/* CTA under the no-faction notice; inherits .deck-builder__save button chrome.
+   min-height keeps the touch target >=44px on mobile; inline-flex centering
+   keeps the label vertically centered at that height and on a single line.
+   Scoped to this CTA only — not an app-wide button change. */
 .deck-builder__notice-cta {
   margin-top: 0.9rem;
   align-self: flex-start;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .account__value--custom {
