@@ -284,7 +284,7 @@ describe("DAMAGE_UP_TO_TWO_DISABLE (Serf's Bondage)", () => {
     expect(game.players.player1.outDeck.map((c) => c.id)).toContain(card.id);
     expect(
       game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === card.id,
+        (e) => e.type === "effectFailed" && e.cardId === card.id,
       ),
     ).toBe(true);
     const hitDefender = game.players.player2.field.find(

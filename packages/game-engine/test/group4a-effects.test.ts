@@ -75,7 +75,7 @@ describe("RESTRICT_OPPONENT_ATTACK_TARGET (Primetime Interview)", () => {
     expect(game.statuses).toHaveLength(0);
     expect(
       game.events.filter(
-        (e) => e.type === "effectNotImplemented" && e.cardId === item.id,
+        (e) => e.type === "effectFailed" && e.cardId === item.id,
       ),
     ).toHaveLength(2);
   });
@@ -505,7 +505,7 @@ describe("MONK_RETALIATION (A Dragon's Judgement)", () => {
     expect(game.players.player1.outDeck.map((c) => c.id)).toContain(broken.id);
     expect(
       game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === broken.id,
+        (e) => e.type === "effectFailed" && e.cardId === broken.id,
       ),
     ).toBe(true);
   });

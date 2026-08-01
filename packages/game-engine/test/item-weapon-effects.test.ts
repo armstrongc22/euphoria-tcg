@@ -78,11 +78,15 @@ describe("Items resolve through the effect registry", () => {
     ]);
   });
 
-  it("an Item with an unimplemented real-world code is spent safely", () => {
+  it("an Item with no registered handler (unimplemented code) is spent safely", () => {
     const game = newGame();
+    // A code with no registered handler: this exercises the no-handler path
+    // (effectNotImplemented), distinct from a handler that runs but fizzles
+    // (effectFailed). Uses a sentinel rather than a real card code so a future
+    // implementation can never silently turn this into a fizzle case.
     const item = makeItemCard({
-      effectCode: "SEARCH_DECK",
-      effectParams: { amount: 1, target: "dwarf_warrior" },
+      effectCode: "UNIMPLEMENTED_ITEM_EFFECT_SENTINEL",
+      effectParams: { amount: 1 },
     });
     game.players.player1.hand.push(item);
 
@@ -118,7 +122,7 @@ describe("Items resolve through the effect registry", () => {
     );
     expect(
       state.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === item.id,
+        (e) => e.type === "effectFailed" && e.cardId === item.id,
       ),
     ).toBe(true);
   });

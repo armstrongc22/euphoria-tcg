@@ -192,7 +192,7 @@ describe("FORCED_DUEL (Trial of Gia)", () => {
     expect(game.statuses.some((s) => s.code === "FORCED_DUEL")).toBe(false);
     expect(
       game.events.some(
-        (e) => e.type === "effectNotImplemented" && e.cardId === card.id,
+        (e) => e.type === "effectFailed" && e.cardId === card.id,
       ),
     ).toBe(true);
   });
