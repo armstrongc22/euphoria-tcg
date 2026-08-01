@@ -30,7 +30,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 const MIGRATION = readFileSync(
   path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
-    "../../../supabase/migrations/20260720120000_join_pvp_room_grants.sql",
+    "../../../supabase/migrations/20260801153000_join_pvp_room_grants.sql",
   ),
   "utf8",
 );

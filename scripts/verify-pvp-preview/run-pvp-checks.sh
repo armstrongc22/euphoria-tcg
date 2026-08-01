@@ -25,7 +25,7 @@ command -v node >/dev/null 2>&1 || { echo "FAIL: node is required (database-erro
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 BASE="$REPO/supabase/migrations/20260702120000_pvp_schema.sql"
-GRANT="$REPO/supabase/migrations/20260720120000_join_pvp_room_grants.sql"
+GRANT="$REPO/supabase/migrations/20260801153000_join_pvp_room_grants.sql"
 
 pass=0; fail=0
 ok(){ echo "PASS: $1"; pass=$((pass+1)); }
